@@ -87,9 +87,16 @@ function AuthPage() {
     toast.success("Welcome back");
   };
 
-  const onRecovery = async (values: RecoveryValues) => {
+  const onRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = recoverySchema.safeParse({ email: recoveryEmail });
+    if (!parsed.success) {
+      setRecoveryError(parsed.error.issues[0]?.message ?? "Enter a valid email");
+      return;
+    }
+    setRecoveryError(null);
     setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
       redirectTo:
         typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined,
     });
@@ -98,9 +105,10 @@ function AuthPage() {
       toast.error(error.message);
       return;
     }
-    setRecoverySent(values.email);
+    setRecoverySent(parsed.data.email);
     toast.success("Password reset link sent");
   };
+
 
   return (
     <div className="grid-bg flex min-h-dvh items-center justify-center p-6">
