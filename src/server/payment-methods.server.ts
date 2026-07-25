@@ -61,13 +61,19 @@ export async function listActivePaymentMethods(tenantId: string): Promise<Paymen
 }
 
 export async function countActivePaymentMethods(tenantId: string): Promise<number> {
-  const { count, error } = await adminAny
+  // Deliberately NOT a `head: true` count: PostgREST answers HEAD on a
+  // missing/unknown table with an empty-body 404 that postgrest-js reports as
+  // success (count null) — which made the card-setup flow look healthy while
+  // the wallet tables didn't exist and every webhook write was failing. A row
+  // fetch surfaces the real error (wallets hold at most 3 rows, so this is
+  // just as cheap).
+  const { data, error } = await adminAny
     .from("payment_methods")
-    .select("id", { count: "exact", head: true })
+    .select("id")
     .eq("tenant_id", tenantId)
     .eq("status", "active");
   if (error) throw new Error(`payment_methods_count_failed: ${error.message}`);
-  return count ?? 0;
+  return (data ?? []).length;
 }
 
 /** Sync the tenant's primary card onto the Stripe customer so invoices and
