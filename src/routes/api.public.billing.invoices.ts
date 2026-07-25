@@ -4,20 +4,16 @@ import { jsonResponse, resolveCloneApiKey } from "@/server/clone-api-keys.server
 import { checkRateLimit } from "@/server/token-rate-limit.server";
 
 /**
- * GET /api/public/purchases
+ * GET /api/public/billing/invoices
  *
- * Purchase-history read-back for command centers (user-attributed pricing
- * workflow, Phase 4): a clone can render its own attributed purchase ledger
- * (who bought what, when, for how much) inside its billing/settings UI.
- *
- * Auth: `x-clone-api-key`. Rows are hard-scoped to the key's clone — a clone
- * can never read another clone's purchases. Optional `?tenant_ref=` narrows
- * to one tenant (resolved within the key's clone; unknown refs return an
- * empty page rather than provisioning anything). `?status=` filters by
- * lifecycle state; default returns completed + refunded (the money that
- * actually moved).
+ * Invoice read-back for command centers (billing & usage page). Rows come
+ * from the `invoices` mirror the Stripe webhook maintains (subscription
+ * cycles + one-time purchases via invoice_creation) and are hard-scoped to
+ * the key's clone; optional `?tenant_ref=` narrows to one tenant and
+ * `?status=` filters by Stripe lifecycle state. Hosted/PDF links point at
+ * Stripe's customer-safe invoice pages.
  */
-export const Route = createFileRoute("/api/public/purchases")({
+export const Route = createFileRoute("/api/public/billing/invoices")({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -34,8 +30,6 @@ export const Route = createFileRoute("/api/public/purchases")({
             JSON.stringify({
               ok: false,
               error: "rate_limited",
-              count: rl.count,
-              limit: rl.limit,
               retry_after_seconds: rl.retry_after_seconds,
             }),
             {
@@ -52,16 +46,10 @@ export const Route = createFileRoute("/api/public/purchases")({
         const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") ?? 25) || 25));
         const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0);
         const statusParam = url.searchParams.get("status");
-        // "all" = every lifecycle state (the billing page's transactions view
-        // wants failed/initiated attempts visible too, not just settled money).
-        const allowedStatuses = [
-          "initiated",
-          "completed",
-          "failed",
-          "refunded",
-          "abandoned",
-          "all",
-        ];
+        const allowedStatuses = ["draft", "open", "paid", "void", "uncollectible"];
+        if (statusParam && !allowedStatuses.includes(statusParam)) {
+          return jsonResponse({ ok: false, error: "invalid_status" }, 400);
+        }
 
         // Optional tenant narrowing, resolved strictly inside this key's clone.
         let tenantId: string | null = null;
@@ -73,19 +61,22 @@ export const Route = createFileRoute("/api/public/purchases")({
           if (!tenant) {
             return jsonResponse({
               ok: true,
-              purchases: [],
+              invoices: [],
               pagination: { limit, offset, total: 0, has_more: false, next_offset: null },
             });
           }
           tenantId = tenant.id;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- item_name postdates the generated DB types
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const adminAny = supabaseAdmin as any;
         let q = adminAny
-          .from("purchases")
+          .from("invoices")
           .select(
-            "id, created_at, completed_at, status, mode, item_slug, item_name, quantity, amount_cents, currency, payment_status, origin_user_id, origin_username, origin_source, stripe_checkout_session_id, stripe_payment_intent_id",
+            "id, created_at, issued_at, paid_at, number, status, description, mode, item_slug, item_name, " +
+              "amount_due_cents, amount_paid_cents, subtotal_cents, tax_cents, total_cents, currency, " +
+              "hosted_invoice_url, invoice_pdf_url, origin_user_id, origin_username, origin_source, " +
+              "period_start, period_end, stripe_invoice_id, purchase_id",
             { count: "exact" },
           )
           .order("created_at", { ascending: false })
@@ -94,42 +85,23 @@ export const Route = createFileRoute("/api/public/purchases")({
         // Hard clone scoping — the key IS the boundary.
         q = key.clone_id == null ? q.is("clone_id", null) : q.eq("clone_id", key.clone_id);
         if (tenantId) q = q.eq("tenant_id", tenantId);
-        if (statusParam === "all") {
-          // no status filter
-        } else if (statusParam && allowedStatuses.includes(statusParam)) {
-          q = q.eq("status", statusParam);
-        } else if (!statusParam) {
-          q = q.in("status", ["completed", "refunded"]);
-        } else {
-          return jsonResponse({ ok: false, error: "invalid_status" }, 400);
-        }
+        if (statusParam) q = q.eq("status", statusParam);
 
         const { data: rows, count, error } = await q;
         if (error) return jsonResponse({ ok: false, error: error.message }, 500);
 
         const total = count ?? 0;
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            purchases: rows ?? [],
-            pagination: {
-              limit,
-              offset,
-              total,
-              has_more: offset + (rows?.length ?? 0) < total,
-              next_offset: offset + (rows?.length ?? 0) < total ? offset + limit : null,
-            },
-          }),
-          {
-            status: 200,
-            headers: {
-              "Content-Type": "application/json",
-              "X-RateLimit-Limit": String(rl.limit),
-              "X-RateLimit-Remaining": String(Math.max(0, rl.limit - rl.count)),
-              "X-Total-Count": String(total),
-            },
+        return jsonResponse({
+          ok: true,
+          invoices: rows ?? [],
+          pagination: {
+            limit,
+            offset,
+            total,
+            has_more: offset + (rows?.length ?? 0) < total,
+            next_offset: offset + (rows?.length ?? 0) < total ? offset + limit : null,
           },
-        );
+        });
       },
     },
   },
