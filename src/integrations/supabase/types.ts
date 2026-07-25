@@ -3677,6 +3677,103 @@ export type Database = {
           },
         ]
       }
+      payment_methods: {
+        Row: {
+          brand: string | null
+          card_fingerprint: string | null
+          clone_id: string | null
+          created_at: string
+          detached_at: string | null
+          exp_month: number | null
+          exp_year: number | null
+          funding: string | null
+          id: string
+          last4: string | null
+          metadata: Json
+          origin_source: string
+          origin_user_id: string | null
+          origin_username: string | null
+          priority: number
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          stripe_setup_intent_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          card_fingerprint?: string | null
+          clone_id?: string | null
+          created_at?: string
+          detached_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          funding?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json
+          origin_source?: string
+          origin_user_id?: string | null
+          origin_username?: string | null
+          priority: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          stripe_setup_intent_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          card_fingerprint?: string | null
+          clone_id?: string | null
+          created_at?: string
+          detached_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          funding?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json
+          origin_source?: string
+          origin_user_id?: string | null
+          origin_username?: string | null
+          priority?: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string
+          stripe_payment_method_id?: string
+          stripe_setup_intent_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_methods_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "payment_methods_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_hosting_config: {
         Row: {
           auto_provision: boolean
@@ -5727,6 +5824,10 @@ export type Database = {
       }
       release_seat: {
         Args: { _clone_id: string; _external_user_id: string; _reason?: string }
+        Returns: Json
+      }
+      reorder_payment_methods: {
+        Args: { _ordered_ids: string[]; _tenant_id: string }
         Returns: Json
       }
       reserve_seat: {
