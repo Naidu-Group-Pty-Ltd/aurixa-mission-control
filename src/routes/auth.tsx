@@ -157,35 +157,46 @@ function AuthPage() {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Form {...recoveryForm}>
-                  <form onSubmit={recoveryForm.handleSubmit(onRecovery)} className="space-y-4">
-                    <FormField
-                      control={recoveryForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" autoComplete="email" autoFocus {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={busy}>
-                      {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {busy ? "Sending link…" : "Send reset link"}
-                    </Button>
-                    <button
-                      type="button"
-                      className="mx-auto block text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => setView("auth")}
+                <form onSubmit={onRecovery} className="space-y-4" noValidate>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="recovery-email"
+                      className="text-sm font-medium leading-none"
                     >
-                      ← Back to sign in
-                    </button>
-                  </form>
-                </Form>
+                      Email
+                    </label>
+                    <Input
+                      id="recovery-email"
+                      type="email"
+                      autoComplete="email"
+                      autoFocus
+                      value={recoveryEmail}
+                      onChange={(e) => {
+                        setRecoveryEmail(e.target.value);
+                        if (recoveryError) setRecoveryError(null);
+                      }}
+                    />
+                    {recoveryError && (
+                      <p className="text-sm font-medium text-destructive">{recoveryError}</p>
+                    )}
+                  </div>
+                  <Button type="submit" className="w-full" disabled={busy}>
+                    {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {busy ? "Sending link…" : "Send reset link"}
+                  </Button>
+                  <button
+                    type="button"
+                    className="mx-auto block text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setView("auth");
+                      setRecoveryError(null);
+                    }}
+                  >
+                    ← Back to sign in
+                  </button>
+                </form>
               )
+
             ) : (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
