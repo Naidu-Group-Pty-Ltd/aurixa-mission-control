@@ -29,13 +29,21 @@ async function fanBalanceUpdated(tenantId: string, cloneId?: string | null) {
 
 export const previewGiftTargets = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((input) => ScopeSchema.parse(input))
+  .inputValidator((input) =>
+    z
+      .intersection(ScopeSchema, z.object({ excludeInactive: z.boolean().default(true) }))
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     let q = context.supabase
       .from("tenants")
       .select("id, display_name, external_ref, plan_id, clone_id, status", { count: "exact" });
     if (data.scope === "plan") q = q.in("plan_id", data.planIds);
     if (data.scope === "tenants") q = q.in("id", data.tenantIds);
+    // Mirror bulkGiftTokens' filter so the preview count matches what the
+    // send will actually target — otherwise the button can promise N tenants
+    // and the send comes back with "no_tenants_matched".
+    if (data.excludeInactive) q = q.eq("status", "active");
     const { data: tenants, error, count } = await q.limit(500);
     if (error) throw new Error(error.message);
     return { tenants: tenants ?? [], count: count ?? 0 };

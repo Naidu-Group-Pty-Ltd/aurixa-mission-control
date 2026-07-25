@@ -47,14 +47,14 @@ function GiftTokensPage() {
 
   const preview = useServerFn(previewGiftTargets);
   const previewQ = useQuery({
-    queryKey: ["gift-preview", scope, planIds, tenantIds],
+    queryKey: ["gift-preview", scope, planIds, tenantIds, excludeInactive],
     queryFn: () => {
       const payload =
         scope === "all"
-          ? { scope: "all" as const }
+          ? { scope: "all" as const, excludeInactive }
           : scope === "plan"
-            ? { scope: "plan" as const, planIds }
-            : { scope: "tenants" as const, tenantIds };
+            ? { scope: "plan" as const, planIds, excludeInactive }
+            : { scope: "tenants" as const, tenantIds, excludeInactive };
       return preview({ data: payload });
     },
     enabled:
@@ -297,6 +297,14 @@ function GiftTokensPage() {
                   <span className="font-mono text-foreground">{totalToIssue.toLocaleString()}</span>{" "}
                   tokens total.
                 </div>
+                {previewQ.isError && (
+                  <div className="mt-1 text-destructive">
+                    Target preview failed
+                    {previewQ.error instanceof Error && previewQ.error.message.includes("403")
+                      ? " — your account needs an admin role to gift tokens."
+                      : `: ${previewQ.error instanceof Error ? previewQ.error.message : "unknown error"}`}
+                  </div>
+                )}
               </div>
             </div>
           </div>
