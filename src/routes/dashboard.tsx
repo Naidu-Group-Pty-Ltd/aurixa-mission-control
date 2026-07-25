@@ -124,8 +124,9 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    if (loading || clones.length === 0) {
-      setSecurityRows([]);
+    if (loading) return;
+    if (clones.length === 0) {
+      setSecurityRows((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     let cancelled = false;
@@ -134,12 +135,13 @@ function Dashboard() {
         if (!cancelled) setSecurityRows((result.summaries ?? []) as SecuritySummary[]);
       })
       .catch(() => {
-        if (!cancelled) setSecurityRows([]);
+        if (!cancelled) setSecurityRows((prev) => (prev.length === 0 ? prev : []));
       });
     return () => {
       cancelled = true;
     };
   }, [clones, loading, listSecurity]);
+
 
   const securityByClone = useMemo(() => {
     const map = new Map<string, SecuritySummary[]>();
