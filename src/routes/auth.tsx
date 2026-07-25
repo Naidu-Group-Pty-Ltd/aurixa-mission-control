@@ -42,7 +42,6 @@ const credsSchema = z.object({
 });
 type Creds = z.infer<typeof credsSchema>;
 const recoverySchema = z.object({ email: emailField });
-type RecoveryValues = z.infer<typeof recoverySchema>;
 
 function AuthPage() {
   const { session, signIn } = useAuth();
@@ -51,6 +50,8 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<"auth" | "recovery">("auth");
   const [recoverySent, setRecoverySent] = useState<string | null>(null);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const isPartnerIntent =
     search.intent === "partner" || search.redirect?.startsWith("/partner-portal");
 
@@ -58,10 +59,7 @@ function AuthPage() {
     resolver: zodResolver(credsSchema),
     defaultValues: { email: "", password: "" },
   });
-  const recoveryForm = useForm<RecoveryValues>({
-    resolver: zodResolver(recoverySchema),
-    defaultValues: { email: "" },
-  });
+
 
   useEffect(() => {
     if (session) {
@@ -89,9 +87,16 @@ function AuthPage() {
     toast.success("Welcome back");
   };
 
-  const onRecovery = async (values: RecoveryValues) => {
+  const onRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = recoverySchema.safeParse({ email: recoveryEmail });
+    if (!parsed.success) {
+      setRecoveryError(parsed.error.issues[0]?.message ?? "Enter a valid email");
+      return;
+    }
+    setRecoveryError(null);
     setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
       redirectTo:
         typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined,
     });
@@ -100,9 +105,10 @@ function AuthPage() {
       toast.error(error.message);
       return;
     }
-    setRecoverySent(values.email);
+    setRecoverySent(parsed.data.email);
     toast.success("Password reset link sent");
   };
+
 
   return (
     <div className="grid-bg flex min-h-dvh items-center justify-center p-6">
@@ -151,35 +157,46 @@ function AuthPage() {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Form {...recoveryForm}>
-                  <form onSubmit={recoveryForm.handleSubmit(onRecovery)} className="space-y-4">
-                    <FormField
-                      control={recoveryForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" autoComplete="email" autoFocus {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={busy}>
-                      {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {busy ? "Sending link…" : "Send reset link"}
-                    </Button>
-                    <button
-                      type="button"
-                      className="mx-auto block text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => setView("auth")}
+                <form onSubmit={onRecovery} className="space-y-4" noValidate>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="recovery-email"
+                      className="text-sm font-medium leading-none"
                     >
-                      ← Back to sign in
-                    </button>
-                  </form>
-                </Form>
+                      Email
+                    </label>
+                    <Input
+                      id="recovery-email"
+                      type="email"
+                      autoComplete="email"
+                      autoFocus
+                      value={recoveryEmail}
+                      onChange={(e) => {
+                        setRecoveryEmail(e.target.value);
+                        if (recoveryError) setRecoveryError(null);
+                      }}
+                    />
+                    {recoveryError && (
+                      <p className="text-sm font-medium text-destructive">{recoveryError}</p>
+                    )}
+                  </div>
+                  <Button type="submit" className="w-full" disabled={busy}>
+                    {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {busy ? "Sending link…" : "Send reset link"}
+                  </Button>
+                  <button
+                    type="button"
+                    className="mx-auto block text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setView("auth");
+                      setRecoveryError(null);
+                    }}
+                  >
+                    ← Back to sign in
+                  </button>
+                </form>
               )
+
             ) : (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
