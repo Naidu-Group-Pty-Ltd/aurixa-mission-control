@@ -42,7 +42,6 @@ const credsSchema = z.object({
 });
 type Creds = z.infer<typeof credsSchema>;
 const recoverySchema = z.object({ email: emailField });
-type RecoveryValues = z.infer<typeof recoverySchema>;
 
 function AuthPage() {
   const { session, signIn } = useAuth();
@@ -51,6 +50,8 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<"auth" | "recovery">("auth");
   const [recoverySent, setRecoverySent] = useState<string | null>(null);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const isPartnerIntent =
     search.intent === "partner" || search.redirect?.startsWith("/partner-portal");
 
@@ -58,10 +59,7 @@ function AuthPage() {
     resolver: zodResolver(credsSchema),
     defaultValues: { email: "", password: "" },
   });
-  const recoveryForm = useForm<RecoveryValues>({
-    resolver: zodResolver(recoverySchema),
-    defaultValues: { email: "" },
-  });
+
 
   useEffect(() => {
     if (session) {
