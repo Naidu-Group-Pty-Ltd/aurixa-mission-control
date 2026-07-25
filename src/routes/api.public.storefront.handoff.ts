@@ -26,6 +26,10 @@ export const Route = createFileRoute("/api/public/storefront/handoff")({
         const handoff = await loadValidHandoff(h);
         if (!handoff) return storefrontJson({ ok: false, error: "handoff_invalid" }, 404);
 
+        // Workspace display name: the clone's name when the handoff belongs to
+        // a clone, else the tenant's display name — prime-install handoffs have
+        // clone_id NULL but always carry tenant_id, and returning null here
+        // made the pricing page fall back to a generic "your workspace".
         let cloneName: string | null = null;
         if (handoff.clone_id) {
           const { data: clone } = await supabaseAdmin
@@ -34,6 +38,14 @@ export const Route = createFileRoute("/api/public/storefront/handoff")({
             .eq("id", handoff.clone_id)
             .maybeSingle();
           cloneName = clone?.name ?? clone?.slug ?? null;
+        }
+        if (!cloneName && handoff.tenant_id) {
+          const { data: tenant } = await supabaseAdmin
+            .from("tenants")
+            .select("display_name, external_ref")
+            .eq("id", handoff.tenant_id)
+            .maybeSingle();
+          cloneName = tenant?.display_name ?? tenant?.external_ref ?? null;
         }
 
         return storefrontJson({
