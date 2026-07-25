@@ -77,12 +77,20 @@ export const Route = createFileRoute("/api/public/storefront/wallet")({
           }
         }
 
-        const { data: row } = await adminAny
+        const { data: row, error: lookupError } = await adminAny
           .from("payment_methods")
           .select("brand, last4, exp_month, exp_year, priority, status, created_at")
           .eq("stripe_checkout_session_id", sessionId)
           .eq("status", "active")
           .maybeSingle();
+        if (lookupError) {
+          // Surface backend problems (e.g. wallet tables missing) instead of
+          // letting the card-saved page poll `saved:false` forever.
+          return storefrontJson(
+            { ok: false, error: `wallet_lookup_failed: ${lookupError.message}` },
+            500,
+          );
+        }
 
         return storefrontJson({
           ok: true,
