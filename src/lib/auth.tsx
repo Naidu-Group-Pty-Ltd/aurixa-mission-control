@@ -7,7 +7,6 @@ type AuthCtx = {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -79,16 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       return { error: error ? new Error(error.message) : null };
     },
-    signUp: async (email, password) => {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
-        },
-      });
-      return { error: error ? new Error(error.message) : null };
-    },
+    // Self-serve sign-up is deprecated: this is a closed system. New accounts
+    // are created exclusively via invite links (see /join/$token), which are
+    // redeemed server-side with the service role.
     signOut: async () => {
       await supabase.auth.signOut();
     },

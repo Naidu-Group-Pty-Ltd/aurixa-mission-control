@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { ROLE_LEVELS, highestLevel, type RoleName } from "@/integrations/supabase/roles";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -12,12 +13,12 @@ export function ProtectedRoute({
 }: {
   children: React.ReactNode;
   /**
-   * If set, the signed-in user must hold this role (row in `user_roles`) to
-   * view the page — otherwise they see an access-denied panel. When omitted,
-   * any operator role grants access. Previously this prop was accepted but
-   * silently ignored; it is now enforced.
+   * If set, the signed-in user's highest tier must meet or exceed this role's
+   * level to view the page — otherwise they see an access-denied panel. The
+   * check is hierarchy-aware: requireRole="admin" admits super_admin and the
+   * High King too. When omitted, any role grants access.
    */
-  requireRole?: string;
+  requireRole?: RoleName;
 }) {
   const { session, loading } = useAuth();
   const nav = useNavigate();
@@ -32,7 +33,7 @@ export function ProtectedRoute({
       // Preserve where the user was headed so auth.tsx can send them back
       // after they sign in (it already honours a `redirect` search param).
       const redirect = loc.pathname + (loc.searchStr ?? "");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cross-route
+
       // search typing collapses to `never` under this project's loose tsconfig;
       // the value is validated by /auth's validateSearch at runtime.
       nav({ to: "/auth", search: { redirect } as any });
@@ -100,7 +101,7 @@ export function ProtectedRoute({
     );
   }
 
-  if (requireRole && !roles?.includes(requireRole)) {
+  if (requireRole && highestLevel(roles ?? []) < ROLE_LEVELS[requireRole]) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
         <div className="max-w-md rounded-lg border border-border bg-card p-6 text-center">

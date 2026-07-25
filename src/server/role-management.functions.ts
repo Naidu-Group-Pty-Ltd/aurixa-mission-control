@@ -99,11 +99,14 @@ export const assignRole = createServerFn({ method: "POST" })
       };
     }
 
-    // Double-check: nobody can assign super_admin via this endpoint
-    if (data.role === "super_admin") {
+    // The High King seat is seeded, never assigned. super_admin IS assignable
+    // now — but only by someone who outranks it, i.e. the High King (the
+    // can_assign_role check above plus the DB trigger both enforce level
+    // 1000 > 100).
+    if (data.role === "high_king") {
       return {
         ok: false as const,
-        error: "super_admin can only be assigned by the system seed process",
+        error: "The High King seat is singular and seeded — it cannot be assigned",
       };
     }
 
@@ -162,24 +165,14 @@ export const revokeRole = createServerFn({ method: "POST" })
       };
     }
 
-    // Server-side guardrail: prevent revoking the last super_admin
-    if (data.role === "super_admin") {
-      const { data: saCount } = await supabase
-        .from("user_roles")
-        .select("id", { count: "exact", head: true })
-        .eq("role", "super_admin");
-      const count = (saCount as unknown as number) ?? 0;
-      // Use a direct count query for accuracy
-      const { count: exactCount } = await supabase
-        .from("user_roles")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "super_admin");
-      if ((exactCount ?? 0) <= 1) {
-        return {
-          ok: false as const,
-          error: "Cannot revoke the last super_admin — the system must always have at least one",
-        };
-      }
+    // Server-side guardrail: the High King seat cannot be revoked from the
+    // app. Nobody outranks level 1000, and DB triggers (guard_last_high_king,
+    // can_manage_user) enforce the same — this is just a clearer error.
+    if (data.role === "high_king") {
+      return {
+        ok: false as const,
+        error: "The High King seat cannot be revoked — succession is a database operation",
+      };
     }
 
     // Server-side guardrail: verify assigner outranks the target role
@@ -187,6 +180,7 @@ export const revokeRole = createServerFn({ method: "POST" })
       _user_id: userId,
     });
     const roleLevels: Record<string, number> = {
+      high_king: 1000,
       super_admin: 100,
       admin: 80,
       operator: 50,
@@ -239,7 +233,15 @@ export const getRoleAuditLog = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("audit_log")
       .select("*")
-      .in("action", ["role.assigned", "role.revoked", "role.changed", "clone.created"])
+      .in("action", [
+        "role.assigned",
+        "role.revoked",
+        "role.changed",
+        "clone.created",
+        "invite.created",
+        "invite.revoked",
+        "invite.accepted",
+      ])
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);

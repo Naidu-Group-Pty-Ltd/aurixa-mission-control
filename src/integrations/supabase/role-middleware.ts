@@ -5,7 +5,13 @@
 // service-role client (which bypasses RLS) directly over RPC.
 import { createMiddleware } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "./auth-middleware";
-import { ADMIN_ROLES, OPERATOR_ROLES, hasAnyRole } from "./roles";
+import {
+  ADMIN_ROLES,
+  HIGH_KING_ROLES,
+  OPERATOR_ROLES,
+  SUPER_ADMIN_ROLES,
+  hasAnyRole,
+} from "./roles";
 
 function forbidden(error: string): never {
   throw new Response(JSON.stringify({ error }), {
@@ -24,7 +30,7 @@ async function fetchRoles(
   return ((data as { role: string }[] | null) ?? []).map((r) => r.role);
 }
 
-/** Require an operator-level role (operator, admin, or super_admin). */
+/** Require an operator-level role (operator, admin, super_admin, or high_king). */
 export const requireOperator = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
   .server(async ({ next, context }) => {
@@ -33,11 +39,29 @@ export const requireOperator = createMiddleware({ type: "function" })
     return next();
   });
 
-/** Require an admin-level role (admin or super_admin). */
+/** Require an admin-level role (admin, super_admin, or high_king). */
 export const requireAdmin = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
   .server(async ({ next, context }) => {
     const roles = await fetchRoles(context.supabase, context.userId);
     if (!hasAnyRole(roles, ADMIN_ROLES)) forbidden("forbidden_admin_required");
+    return next();
+  });
+
+/** Require a super-admin-level role (super_admin or high_king). Gates invite issuance. */
+export const requireSuperAdmin = createMiddleware({ type: "function" })
+  .middleware([requireSupabaseAuth])
+  .server(async ({ next, context }) => {
+    const roles = await fetchRoles(context.supabase, context.userId);
+    if (!hasAnyRole(roles, SUPER_ADMIN_ROLES)) forbidden("forbidden_super_admin_required");
+    return next();
+  });
+
+/** Require the High King seat. Gates the cross-tier oversight surface. */
+export const requireHighKing = createMiddleware({ type: "function" })
+  .middleware([requireSupabaseAuth])
+  .server(async ({ next, context }) => {
+    const roles = await fetchRoles(context.supabase, context.userId);
+    if (!hasAnyRole(roles, HIGH_KING_ROLES)) forbidden("forbidden_high_king_required");
     return next();
   });

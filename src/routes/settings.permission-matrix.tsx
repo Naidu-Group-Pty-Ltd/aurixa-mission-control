@@ -13,6 +13,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Crown,
+  Gem,
   Shield,
   Wrench,
   User,
@@ -36,7 +37,8 @@ const ROLES: Array<{
   icon: typeof Crown;
   color: string;
 }> = [
-  { role: "super_admin", label: "Super Admin", level: 100, icon: Crown, color: "text-warning" },
+  { role: "high_king", label: "High King", level: 1000, icon: Crown, color: "text-warning" },
+  { role: "super_admin", label: "Super Admin", level: 100, icon: Gem, color: "text-warning" },
   { role: "admin", label: "Admin", level: 80, icon: Shield, color: "text-primary" },
   { role: "operator", label: "Operator", level: 50, icon: Wrench, color: "text-accent" },
   { role: "user", label: "User", level: 10, icon: User, color: "text-muted-foreground" },
@@ -60,45 +62,105 @@ const PERMISSIONS: PermissionRow[] = [
   // ── Role Management ──
   {
     category: "Role Management",
-    capability: "Assign super_admin",
-    description: "No one can assign super_admin — it's system-seeded only",
-    access: { super_admin: "none", admin: "none", operator: "none", user: "none" },
+    capability: "Assign high_king",
+    description: "No one can assign the High King seat — it's system-seeded and singular",
+    access: {
+      high_king: "none",
+      super_admin: "none",
+      admin: "none",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
-      type: "server",
-      label: "Server guardrail + DB trigger",
+      type: "trigger",
+      label: "guard_singular_high_king + hierarchy",
       detail:
-        "assignRole() server function explicitly blocks role='super_admin'. DB trigger enforce_role_hierarchy() also validates via can_assign_role() — since no role has level > 100, assignment is impossible at both layers.",
+        "assignRole() explicitly blocks role='high_king'. DB trigger guard_singular_high_king() rejects granting the seat while occupied, and can_assign_role() requires level > 1000, which no role has. Succession is a deliberate database operation.",
+    },
+  },
+  {
+    category: "Role Management",
+    capability: "Assign super_admin",
+    description: "Only the High King (level 1000 > 100)",
+    access: {
+      high_king: "full",
+      super_admin: "none",
+      admin: "none",
+      operator: "none",
+      user: "none",
+    },
+    enforcement: {
+      type: "function",
+      label: "can_assign_role(_assigner, 'super_admin')",
+      detail:
+        "RLS INSERT policy on user_roles: WITH CHECK (can_assign_role(auth.uid(), role) AND assigned_by = auth.uid()). The function checks highest_role_level(assigner) > role_level('super_admin'=100). Only the High King (level 1000) passes.",
+    },
+  },
+  {
+    category: "Role Management",
+    capability: "Issue invite links",
+    description: "Closed system — super_admin+ mint outbound invites; sign-up is disabled",
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "none",
+      operator: "none",
+      user: "none",
+    },
+    enforcement: {
+      type: "rls",
+      label: "RLS INSERT on user_invites + requireSuperAdmin",
+      detail:
+        "Policy 'Super admins can issue invites within their rank': WITH CHECK (is_super_admin(auth.uid()) AND invited_by = auth.uid() AND can_assign_role(auth.uid(), role)). The invite's granted role must be below the issuer's own level, and invites can never grant high_king (CHECK constraint). The createUserInvite server function is additionally gated by requireSuperAdmin middleware.",
     },
   },
   {
     category: "Role Management",
     capability: "Assign admin",
-    description: "Only super_admin (level 100 > 80)",
-    access: { super_admin: "full", admin: "none", operator: "none", user: "none" },
+    description: "Super_admin+ (level 100+ > 80)",
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "none",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
       type: "function",
       label: "can_assign_role(_assigner, 'admin')",
       detail:
-        "RLS INSERT policy on user_roles: WITH CHECK (can_assign_role(auth.uid(), role) AND assigned_by = auth.uid()). The function checks highest_role_level(assigner) > role_level('admin'=80). Only level 100 (super_admin) passes.",
+        "RLS INSERT policy on user_roles: WITH CHECK (can_assign_role(auth.uid(), role) AND assigned_by = auth.uid()). The function checks highest_role_level(assigner) > role_level('admin'=80). Levels 100 (super_admin) and 1000 (high_king) pass.",
     },
   },
   {
     category: "Role Management",
     capability: "Assign operator",
     description: "Admin+ can assign operator (level 80+ > 50)",
-    access: { super_admin: "full", admin: "full", operator: "none", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
       type: "function",
       label: "can_assign_role(_assigner, 'operator')",
       detail:
-        "Same RLS INSERT policy. highest_role_level(assigner) must exceed role_level('operator'=50). Levels 80 (admin) and 100 (super_admin) qualify.",
+        "Same RLS INSERT policy. highest_role_level(assigner) must exceed role_level('operator'=50). Levels 80 (admin) and above qualify.",
     },
   },
   {
     category: "Role Management",
     capability: "Assign user",
     description: "Operator+ can assign user (level 50+ > 10)",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "function",
       label: "can_assign_role(_assigner, 'user')",
@@ -110,24 +172,54 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Role Management",
     capability: "Revoke roles",
     description: "Can only revoke from users with lower role level",
-    access: { super_admin: "full", admin: "limited", operator: "limited", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "limited",
+      admin: "limited",
+      operator: "limited",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
-      label: "RLS DELETE + guard_last_super_admin trigger",
+      label: "RLS DELETE + guard_last_high_king trigger",
       detail:
-        "RLS DELETE policy: USING can_manage_user(auth.uid(), user_id) — checks highest_role_level(manager) > highest_role_level(target). Server function revokeRole() additionally counts remaining super_admins before delete. DB trigger guard_last_super_admin() raises exception if the last super_admin row would be removed.",
+        "RLS DELETE policy: USING can_manage_user(auth.uid(), user_id) — checks highest_role_level(manager) > highest_role_level(target). The High King outranks every tier; everyone else is hierarchy-scoped. DB trigger guard_last_high_king() raises an exception if the High King seat would be vacated.",
     },
   },
   {
     category: "Role Management",
     capability: "View all roles",
     description: "Admin+ can see all users' roles",
-    access: { super_admin: "full", admin: "full", operator: "none", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS SELECT on user_roles",
       detail:
-        "Policy 'Admins and super_admins can read all roles': USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'super_admin')). Separate policy allows users to read their own roles: USING (auth.uid() = user_id).",
+        "Policy 'Admins and super_admins can read all roles': USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'super_admin')). has_role() is hierarchy-aware — a caller passes when their highest level meets or exceeds the required tier, so super_admin and high_king qualify. A separate policy allows users to read their own roles: USING (auth.uid() = user_id).",
+    },
+  },
+  {
+    category: "Role Management",
+    capability: "Cross-tier oversight",
+    description: "Full visibility of all actions taken by every user tier",
+    access: {
+      high_king: "full",
+      super_admin: "none",
+      admin: "none",
+      operator: "none",
+      user: "none",
+    },
+    enforcement: {
+      type: "server",
+      label: "requireHighKing middleware",
+      detail:
+        "The /oversight surface (getOversightOverview / getOversightFeed server functions) is gated by requireHighKing middleware — a 403 for anyone whose roles do not include high_king. It aggregates the append-only audit_log across every actor and annotates each action with the actor's tier.",
     },
   },
   // ── Fleet Management ──
@@ -135,19 +227,31 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Fleet Management",
     capability: "View clones",
     description: "Read access to all clones",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS SELECT on clones",
       detail:
-        "Policy 'Operators can read clones': USING is_operator(auth.uid()). The is_operator() function checks for super_admin, admin, or operator roles.",
+        "Policy 'Operators can read clones': USING is_operator(auth.uid()). The is_operator() function passes any tier at level 50 or above (operator, admin, super_admin, high_king).",
     },
   },
   {
     category: "Fleet Management",
     capability: "Create clones",
     description: "Provision new clone repos",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS INSERT on clones",
@@ -159,7 +263,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Fleet Management",
     capability: "Delete clones",
     description: "Permanently remove clones (admin+ only)",
-    access: { super_admin: "full", admin: "full", operator: "none", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS DELETE on clones",
@@ -171,7 +281,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Fleet Management",
     capability: "Manage backends",
     description: "Provision / retry clone dedicated backends",
-    access: { super_admin: "full", admin: "full", operator: "none", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS ALL on clone_backends",
@@ -184,7 +300,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Cascades",
     capability: "View cascades",
     description: "Read cascade events and results",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS SELECT on cascade_events/results",
@@ -196,7 +318,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Cascades",
     capability: "Execute cascades",
     description: "Trigger cascade operations",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS ALL on cascade_events",
@@ -208,7 +336,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Cascades",
     capability: "Approve cascades",
     description: "Second-operator approval for high-blast-radius cascades",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS INSERT on cascade_approvals",
@@ -221,7 +355,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Modules",
     capability: "View modules",
     description: "Browse the module catalog",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS SELECT on modules",
@@ -232,7 +372,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Modules",
     capability: "Install / remove modules",
     description: "Modify clone module sets",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS ALL on clone_modules",
@@ -244,7 +390,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Modules",
     capability: "Detect modules (AI)",
     description: "Run AI module detection on prime",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "server",
       label: "Server function auth middleware",
@@ -257,7 +409,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Settings",
     capability: "Edit prime config",
     description: "Change prime repo, default branch, cascade mode",
-    access: { super_admin: "full", admin: "full", operator: "none", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS ALL on prime_config",
@@ -269,7 +427,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Settings",
     capability: "Manage GitHub App",
     description: "Configure App secrets and webhook",
-    access: { super_admin: "full", admin: "full", operator: "none", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "none",
+      user: "none",
+    },
     enforcement: {
       type: "server",
       label: "Server function + admin check",
@@ -281,7 +445,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Settings",
     capability: "View audit log",
     description: "Read operational audit trail",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS SELECT on audit_log",
@@ -294,7 +464,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Notifications",
     capability: "Manage own push",
     description: "Enable/disable push notifications on own devices",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "full" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "full",
+    },
     enforcement: {
       type: "rls",
       label: "RLS on push_subscriptions (own rows)",
@@ -306,7 +482,13 @@ const PERMISSIONS: PermissionRow[] = [
     category: "Notifications",
     capability: "View all subscriptions",
     description: "See all push device subscriptions",
-    access: { super_admin: "full", admin: "full", operator: "full", user: "none" },
+    access: {
+      high_king: "full",
+      super_admin: "full",
+      admin: "full",
+      operator: "full",
+      user: "none",
+    },
     enforcement: {
       type: "rls",
       label: "RLS SELECT on push_subscriptions (all)",

@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Form,
@@ -18,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Radio, MailCheck, Loader2, ArrowLeft } from "lucide-react";
+import { Radio, MailCheck, Loader2, ArrowLeft, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 type AuthSearch = { redirect?: string; intent?: string; clone?: string; h?: string };
@@ -46,12 +45,10 @@ const recoverySchema = z.object({ email: emailField });
 type RecoveryValues = z.infer<typeof recoverySchema>;
 
 function AuthPage() {
-  const { session, signIn, signUp } = useAuth();
+  const { session, signIn } = useAuth();
   const nav = useNavigate();
   const search = useSearch({ from: "/auth" }) as AuthSearch;
   const [busy, setBusy] = useState(false);
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const [mode, setMode] = useState<"in" | "up">("in");
   const [view, setView] = useState<"auth" | "recovery">("auth");
   const [recoverySent, setRecoverySent] = useState<string | null>(null);
   const isPartnerIntent =
@@ -83,25 +80,13 @@ function AuthPage() {
 
   const onSubmit = async (values: Creds) => {
     setBusy(true);
-    const fn = mode === "in" ? signIn : signUp;
-    const { error } = await fn(values.email, values.password);
+    const { error } = await signIn(values.email, values.password);
     setBusy(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    if (mode === "up") {
-      // A session means email confirmation is disabled; otherwise prompt to confirm.
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        toast.success("Account created — welcome aboard");
-      } else {
-        setPendingEmail(values.email);
-        toast.success("Account created — check your inbox to confirm");
-      }
-    } else {
-      toast.success("Welcome back");
-    }
+    toast.success("Welcome back");
   };
 
   const onRecovery = async (values: RecoveryValues) => {
@@ -117,21 +102,6 @@ function AuthPage() {
     }
     setRecoverySent(values.email);
     toast.success("Password reset link sent");
-  };
-
-  const resendConfirmation = async () => {
-    if (!pendingEmail) return;
-    setBusy(true);
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: pendingEmail,
-      options: {
-        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
-      },
-    });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("Confirmation email re-sent");
   };
 
   return (
@@ -211,110 +181,60 @@ function AuthPage() {
                 </Form>
               )
             ) : (
-              <>
-                <Tabs value={mode} onValueChange={(v) => setMode(v as "in" | "up")}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="in">Sign in</TabsTrigger>
-                    <TabsTrigger value="up">Sign up</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" autoComplete="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <div className="flex items-center justify-between">
-                            <FormLabel>Password</FormLabel>
-                            {mode === "in" && (
-                              <button
-                                type="button"
-                                className="text-xs text-muted-foreground hover:text-foreground"
-                                onClick={() => setView("recovery")}
-                              >
-                                Forgot password?
-                              </button>
-                            )}
-                          </div>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              autoComplete={mode === "in" ? "current-password" : "new-password"}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={busy}>
-                      {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {busy
-                        ? mode === "in"
-                          ? "Signing in…"
-                          : "Creating account…"
-                        : mode === "in"
-                          ? "Sign in"
-                          : "Create account"}
-                    </Button>
-                    {mode === "up" && (
-                      <p className="text-xs text-muted-foreground">
-                        {isPartnerIntent
-                          ? "Partner access is issued only after Aurixa approves your email and assigns your testing cycles."
-                          : "The first account created becomes the admin operator automatically."}
-                      </p>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" autoComplete="email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </form>
-                </Form>
-              </>
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Password</FormLabel>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => setView("recovery")}
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
+                        <FormControl>
+                          <Input type="password" autoComplete="current-password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full" disabled={busy}>
+                    {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {busy ? "Signing in…" : "Sign in"}
+                  </Button>
+                </form>
+              </Form>
             )}
 
-            {pendingEmail && (
-              <Alert className="mt-6 border-primary/40 bg-primary/5">
-                <MailCheck className="h-4 w-4 text-primary" />
-                <AlertTitle className="font-mono text-sm">Confirm your email</AlertTitle>
-                <AlertDescription className="space-y-3 text-xs text-muted-foreground">
-                  <p>
-                    We sent a confirmation link to{" "}
-                    <span className="font-mono text-foreground">{pendingEmail}</span>. Click it to
-                    finish setup, then sign in.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={resendConfirmation}
-                    >
-                      Resend email
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setPendingEmail(null)}
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
+            {view === "auth" && (
+              <div className="mt-6 flex items-start gap-2.5 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5">
+                <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  This is a closed system — self-serve registration is disabled. Access is granted
+                  exclusively through invite links issued by a super admin. If you were sent an
+                  invite, open its link to create your account.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

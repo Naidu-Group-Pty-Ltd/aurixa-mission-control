@@ -42,6 +42,7 @@ import {
 import { toast } from "sonner";
 import {
   Crown,
+  Gem,
   Shield,
   Wrench,
   User,
@@ -65,13 +66,14 @@ const ROLE_META: Record<
   AppRole,
   { label: string; level: number; icon: typeof Crown; color: string }
 > = {
-  super_admin: { label: "Super Admin", level: 100, icon: Crown, color: "text-warning" },
+  high_king: { label: "High King", level: 1000, icon: Crown, color: "text-warning" },
+  super_admin: { label: "Super Admin", level: 100, icon: Gem, color: "text-warning" },
   admin: { label: "Admin", level: 80, icon: Shield, color: "text-primary" },
   operator: { label: "Operator", level: 50, icon: Wrench, color: "text-accent" },
   user: { label: "User", level: 10, icon: User, color: "text-muted-foreground" },
 };
 
-const ALL_ROLES: AppRole[] = ["super_admin", "admin", "operator", "user"];
+const ALL_ROLES: AppRole[] = ["high_king", "super_admin", "admin", "operator", "user"];
 
 export const Route = createFileRoute("/settings/roles")({
   // Nested under /settings (auth already gated by the parent layout).
@@ -360,6 +362,7 @@ function UserRow({
   const availableToAssign = assignableRoles.filter((r) => !existingRoles.has(r));
 
   // Promote target = the next role above currentTop that the actor can assign.
+  // high_king is deliberately absent: the seat is seeded, never assigned.
   const ladderAsc: AppRole[] = ["user", "operator", "admin", "super_admin"];
   const promoteTo: AppRole | null = (() => {
     const idx = currentTop ? ladderAsc.indexOf(currentTop) : -1;

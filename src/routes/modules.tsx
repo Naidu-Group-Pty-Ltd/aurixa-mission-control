@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProtectedRoute } from "@/components/protected-route";
+import { ADMIN_ROLES, hasAnyRole } from "@/integrations/supabase/roles";
 import { useModules, useClones, usePrimeConfig } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1631,7 +1632,7 @@ function ModuleLibraryPanel() {
       .eq("user_id", user.id)
       .then(({ data }) => {
         const roles = (data ?? []).map((r) => r.role as string);
-        setIsAdmin(roles.includes("admin") || roles.includes("super_admin"));
+        setIsAdmin(hasAnyRole(roles, ADMIN_ROLES));
       });
   }, [user]);
 

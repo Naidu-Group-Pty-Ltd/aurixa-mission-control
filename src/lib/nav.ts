@@ -17,6 +17,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Cloud,
+  Crown,
   Coins,
   GitFork,
   Handshake,
@@ -117,6 +118,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ScrollText,
         shortcut: "a",
         keywords: "activity history",
+      },
+      {
+        to: "/oversight",
+        label: "Oversight",
+        icon: Crown,
+        shortcut: "o",
+        keywords: "high king sovereign tiers actions",
       },
       {
         to: "/route-errors",

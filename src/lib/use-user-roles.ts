@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { ROLE_LEVELS } from "@/integrations/supabase/roles";
 import type { Database } from "@/integrations/supabase/types";
 
 export type AppRole = Database["public"]["Enums"]["app_role"];
-
-const LEVEL: Record<AppRole, number> = {
-  super_admin: 100,
-  admin: 80,
-  operator: 50,
-  user: 10,
-};
 
 export function useUserRoles() {
   const { session, loading: authLoading } = useAuth();
@@ -40,11 +34,14 @@ export function useUserRoles() {
     };
   }, [session, authLoading]);
 
-  const max = roles.reduce((m, r) => Math.max(m, LEVEL[r] ?? 0), 0);
+  const max = roles.reduce((m, r) => Math.max(m, ROLE_LEVELS[r] ?? 0), 0);
   return {
     roles,
     loading,
-    isAdmin: max >= 80,
-    isOperator: max >= 50,
+    level: max,
+    isHighKing: max >= ROLE_LEVELS.high_king,
+    isSuperAdmin: max >= ROLE_LEVELS.super_admin,
+    isAdmin: max >= ROLE_LEVELS.admin,
+    isOperator: max >= ROLE_LEVELS.operator,
   };
 }

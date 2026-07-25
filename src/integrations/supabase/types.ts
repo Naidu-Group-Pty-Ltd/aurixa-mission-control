@@ -5440,6 +5440,57 @@ export type Database = {
         }
         Relationships: []
       }
+      user_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user_id: string | null
+          created_at: string
+          email: string | null
+          expires_at: string
+          id: string
+          invited_by: string
+          note: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          token_hash: string
+          token_prefix: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          expires_at: string
+          id?: string
+          invited_by: string
+          note?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          token_hash: string
+          token_prefix: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          note?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          token_hash?: string
+          token_prefix?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           assigned_at: string
@@ -5681,7 +5732,9 @@ export type Database = {
       heartbeat_device: { Args: { _device_id: string }; Returns: Json }
       highest_role_level: { Args: { _user_id: string }; Returns: number }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_high_king: { Args: { _user_id: string }; Returns: boolean }
       is_operator: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_security_partner_member: {
         Args: { _partner_id: string }
         Returns: boolean
@@ -5768,7 +5821,7 @@ export type Database = {
       tenant_usage_summary: { Args: { _tenant_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "super_admin" | "admin" | "operator" | "user"
+      app_role: "high_king" | "super_admin" | "admin" | "operator" | "user"
       brand_assignment_status: "pending" | "applied" | "drifted" | "failed"
       brand_profile_status: "draft" | "published" | "archived"
       cascade_event_status:
@@ -5998,7 +6051,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "admin", "operator", "user"],
+      app_role: ["high_king", "super_admin", "admin", "operator", "user"],
       brand_assignment_status: ["pending", "applied", "drifted", "failed"],
       brand_profile_status: ["draft", "published", "archived"],
       cascade_event_status: [

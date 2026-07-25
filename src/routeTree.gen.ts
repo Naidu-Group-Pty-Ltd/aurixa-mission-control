@@ -18,6 +18,7 @@ import { Route as RouteErrorsRouteImport } from './routes/route-errors'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReportJobsRouteImport } from './routes/report-jobs'
 import { Route as PartnerPortalRouteImport } from './routes/partner-portal'
+import { Route as OversightRouteImport } from './routes/oversight'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as ModulesRouteImport } from './routes/modules'
 import { Route as MetricsRouteImport } from './routes/metrics'
@@ -41,6 +42,7 @@ import { Route as SettingsRoleAuditRouteImport } from './routes/settings.role-au
 import { Route as SettingsProvisioningPreviewRouteImport } from './routes/settings.provisioning-preview'
 import { Route as SettingsPermissionMatrixRouteImport } from './routes/settings.permission-matrix'
 import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
+import { Route as SettingsInvitesRouteImport } from './routes/settings.invites'
 import { Route as SettingsHandoffTermsRouteImport } from './routes/settings.handoff-terms'
 import { Route as SettingsHandoffPoliciesRouteImport } from './routes/settings.handoff-policies'
 import { Route as SettingsGithubAccessRouteImport } from './routes/settings.github-access'
@@ -51,6 +53,7 @@ import { Route as SettingsClientAccountsRouteImport } from './routes/settings.cl
 import { Route as SettingsBillingRouteImport } from './routes/settings.billing'
 import { Route as ModulesBuilderRouteImport } from './routes/modules.builder'
 import { Route as ModulesSlugRouteImport } from './routes/modules.$slug'
+import { Route as JoinTokenRouteImport } from './routes/join.$token'
 import { Route as HooksWarmHealthRouteImport } from './routes/hooks.warm-health'
 import { Route as HooksTokenAlertsRouteImport } from './routes/hooks.token-alerts'
 import { Route as HooksRunSchedulesRouteImport } from './routes/hooks.run-schedules'
@@ -155,6 +158,11 @@ const ReportJobsRoute = ReportJobsRouteImport.update({
 const PartnerPortalRoute = PartnerPortalRouteImport.update({
   id: '/partner-portal',
   path: '/partner-portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OversightRoute = OversightRouteImport.update({
+  id: '/oversight',
+  path: '/oversight',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotificationsRoute = NotificationsRouteImport.update({
@@ -274,6 +282,11 @@ const SettingsNotificationsRoute = SettingsNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsInvitesRoute = SettingsInvitesRouteImport.update({
+  id: '/invites',
+  path: '/invites',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsHandoffTermsRoute = SettingsHandoffTermsRouteImport.update({
   id: '/handoff-terms',
   path: '/handoff-terms',
@@ -323,6 +336,11 @@ const ModulesSlugRoute = ModulesSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => ModulesRoute,
+} as any)
+const JoinTokenRoute = JoinTokenRouteImport.update({
+  id: '/join/$token',
+  path: '/join/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const HooksWarmHealthRoute = HooksWarmHealthRouteImport.update({
   id: '/hooks/warm-health',
@@ -660,6 +678,7 @@ export interface FileRoutesByFullPath {
   '/metrics': typeof MetricsRoute
   '/modules': typeof ModulesRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/oversight': typeof OversightRoute
   '/partner-portal': typeof PartnerPortalRoute
   '/report-jobs': typeof ReportJobsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -697,6 +716,7 @@ export interface FileRoutesByFullPath {
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
+  '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
   '/modules/builder': typeof ModulesBuilderRoute
   '/settings/billing': typeof SettingsBillingRoute
@@ -707,6 +727,7 @@ export interface FileRoutesByFullPath {
   '/settings/github-access': typeof SettingsGithubAccessRoute
   '/settings/handoff-policies': typeof SettingsHandoffPoliciesRoute
   '/settings/handoff-terms': typeof SettingsHandoffTermsRoute
+  '/settings/invites': typeof SettingsInvitesRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/permission-matrix': typeof SettingsPermissionMatrixRoute
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
@@ -764,6 +785,7 @@ export interface FileRoutesByTo {
   '/metrics': typeof MetricsRoute
   '/modules': typeof ModulesRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/oversight': typeof OversightRoute
   '/partner-portal': typeof PartnerPortalRoute
   '/report-jobs': typeof ReportJobsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -800,6 +822,7 @@ export interface FileRoutesByTo {
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
+  '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
   '/modules/builder': typeof ModulesBuilderRoute
   '/settings/billing': typeof SettingsBillingRoute
@@ -810,6 +833,7 @@ export interface FileRoutesByTo {
   '/settings/github-access': typeof SettingsGithubAccessRoute
   '/settings/handoff-policies': typeof SettingsHandoffPoliciesRoute
   '/settings/handoff-terms': typeof SettingsHandoffTermsRoute
+  '/settings/invites': typeof SettingsInvitesRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/permission-matrix': typeof SettingsPermissionMatrixRoute
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
@@ -868,6 +892,7 @@ export interface FileRoutesById {
   '/metrics': typeof MetricsRoute
   '/modules': typeof ModulesRouteWithChildren
   '/notifications': typeof NotificationsRoute
+  '/oversight': typeof OversightRoute
   '/partner-portal': typeof PartnerPortalRoute
   '/report-jobs': typeof ReportJobsRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -905,6 +930,7 @@ export interface FileRoutesById {
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
+  '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
   '/modules/builder': typeof ModulesBuilderRoute
   '/settings/billing': typeof SettingsBillingRoute
@@ -915,6 +941,7 @@ export interface FileRoutesById {
   '/settings/github-access': typeof SettingsGithubAccessRoute
   '/settings/handoff-policies': typeof SettingsHandoffPoliciesRoute
   '/settings/handoff-terms': typeof SettingsHandoffTermsRoute
+  '/settings/invites': typeof SettingsInvitesRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/permission-matrix': typeof SettingsPermissionMatrixRoute
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
@@ -974,6 +1001,7 @@ export interface FileRouteTypes {
     | '/metrics'
     | '/modules'
     | '/notifications'
+    | '/oversight'
     | '/partner-portal'
     | '/report-jobs'
     | '/reset-password'
@@ -1011,6 +1039,7 @@ export interface FileRouteTypes {
     | '/hooks/run-schedules'
     | '/hooks/token-alerts'
     | '/hooks/warm-health'
+    | '/join/$token'
     | '/modules/$slug'
     | '/modules/builder'
     | '/settings/billing'
@@ -1021,6 +1050,7 @@ export interface FileRouteTypes {
     | '/settings/github-access'
     | '/settings/handoff-policies'
     | '/settings/handoff-terms'
+    | '/settings/invites'
     | '/settings/notifications'
     | '/settings/permission-matrix'
     | '/settings/provisioning-preview'
@@ -1078,6 +1108,7 @@ export interface FileRouteTypes {
     | '/metrics'
     | '/modules'
     | '/notifications'
+    | '/oversight'
     | '/partner-portal'
     | '/report-jobs'
     | '/reset-password'
@@ -1114,6 +1145,7 @@ export interface FileRouteTypes {
     | '/hooks/run-schedules'
     | '/hooks/token-alerts'
     | '/hooks/warm-health'
+    | '/join/$token'
     | '/modules/$slug'
     | '/modules/builder'
     | '/settings/billing'
@@ -1124,6 +1156,7 @@ export interface FileRouteTypes {
     | '/settings/github-access'
     | '/settings/handoff-policies'
     | '/settings/handoff-terms'
+    | '/settings/invites'
     | '/settings/notifications'
     | '/settings/permission-matrix'
     | '/settings/provisioning-preview'
@@ -1181,6 +1214,7 @@ export interface FileRouteTypes {
     | '/metrics'
     | '/modules'
     | '/notifications'
+    | '/oversight'
     | '/partner-portal'
     | '/report-jobs'
     | '/reset-password'
@@ -1218,6 +1252,7 @@ export interface FileRouteTypes {
     | '/hooks/run-schedules'
     | '/hooks/token-alerts'
     | '/hooks/warm-health'
+    | '/join/$token'
     | '/modules/$slug'
     | '/modules/builder'
     | '/settings/billing'
@@ -1228,6 +1263,7 @@ export interface FileRouteTypes {
     | '/settings/github-access'
     | '/settings/handoff-policies'
     | '/settings/handoff-terms'
+    | '/settings/invites'
     | '/settings/notifications'
     | '/settings/permission-matrix'
     | '/settings/provisioning-preview'
@@ -1286,6 +1322,7 @@ export interface RootRouteChildren {
   MetricsRoute: typeof MetricsRoute
   ModulesRoute: typeof ModulesRouteWithChildren
   NotificationsRoute: typeof NotificationsRoute
+  OversightRoute: typeof OversightRoute
   PartnerPortalRoute: typeof PartnerPortalRoute
   ReportJobsRoute: typeof ReportJobsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -1320,6 +1357,7 @@ export interface RootRouteChildren {
   HooksRunSchedulesRoute: typeof HooksRunSchedulesRoute
   HooksTokenAlertsRoute: typeof HooksTokenAlertsRoute
   HooksWarmHealthRoute: typeof HooksWarmHealthRoute
+  JoinTokenRoute: typeof JoinTokenRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
   ClientsHandoffTokenRoute: typeof ClientsHandoffTokenRoute
   ApiPublicBillingHandoffRoute: typeof ApiPublicBillingHandoffRoute
@@ -1415,6 +1453,13 @@ declare module '@tanstack/react-router' {
       path: '/partner-portal'
       fullPath: '/partner-portal'
       preLoaderRoute: typeof PartnerPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oversight': {
+      id: '/oversight'
+      path: '/oversight'
+      fullPath: '/oversight'
+      preLoaderRoute: typeof OversightRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notifications': {
@@ -1578,6 +1623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsNotificationsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/invites': {
+      id: '/settings/invites'
+      path: '/invites'
+      fullPath: '/settings/invites'
+      preLoaderRoute: typeof SettingsInvitesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/handoff-terms': {
       id: '/settings/handoff-terms'
       path: '/handoff-terms'
@@ -1647,6 +1699,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/modules/$slug'
       preLoaderRoute: typeof ModulesSlugRouteImport
       parentRoute: typeof ModulesRoute
+    }
+    '/join/$token': {
+      id: '/join/$token'
+      path: '/join/$token'
+      fullPath: '/join/$token'
+      preLoaderRoute: typeof JoinTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/hooks/warm-health': {
       id: '/hooks/warm-health'
@@ -2119,6 +2178,7 @@ interface SettingsRouteChildren {
   SettingsGithubAccessRoute: typeof SettingsGithubAccessRoute
   SettingsHandoffPoliciesRoute: typeof SettingsHandoffPoliciesRoute
   SettingsHandoffTermsRoute: typeof SettingsHandoffTermsRoute
+  SettingsInvitesRoute: typeof SettingsInvitesRoute
   SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsPermissionMatrixRoute: typeof SettingsPermissionMatrixRoute
   SettingsProvisioningPreviewRoute: typeof SettingsProvisioningPreviewRoute
@@ -2136,6 +2196,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsGithubAccessRoute: SettingsGithubAccessRoute,
   SettingsHandoffPoliciesRoute: SettingsHandoffPoliciesRoute,
   SettingsHandoffTermsRoute: SettingsHandoffTermsRoute,
+  SettingsInvitesRoute: SettingsInvitesRoute,
   SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsPermissionMatrixRoute: SettingsPermissionMatrixRoute,
   SettingsProvisioningPreviewRoute: SettingsProvisioningPreviewRoute,
@@ -2192,6 +2253,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetricsRoute: MetricsRoute,
   ModulesRoute: ModulesRouteWithChildren,
   NotificationsRoute: NotificationsRoute,
+  OversightRoute: OversightRoute,
   PartnerPortalRoute: PartnerPortalRoute,
   ReportJobsRoute: ReportJobsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
@@ -2226,6 +2288,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksRunSchedulesRoute: HooksRunSchedulesRoute,
   HooksTokenAlertsRoute: HooksTokenAlertsRoute,
   HooksWarmHealthRoute: HooksWarmHealthRoute,
+  JoinTokenRoute: JoinTokenRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
   ClientsHandoffTokenRoute: ClientsHandoffTokenRoute,
   ApiPublicBillingHandoffRoute: ApiPublicBillingHandoffRoute,
@@ -2260,12 +2323,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
