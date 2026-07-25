@@ -25,6 +25,7 @@ import {
   Newspaper,
   Palette,
   Receipt,
+  ReceiptText,
   ScrollText,
   Settings,
   Shield,
@@ -173,6 +174,12 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/billing/seats", label: "Seats", icon: Users },
       { to: "/billing/purchases", label: "Purchases", icon: ShoppingCart },
+      {
+        to: "/billing/invoices",
+        label: "Invoices",
+        icon: ReceiptText,
+        keywords: "invoice pdf receipts wallet cards payment methods",
+      },
       {
         to: "/billing/catalog",
         label: "Pricing Catalog",

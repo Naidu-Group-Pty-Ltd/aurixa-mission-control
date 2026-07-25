@@ -15,6 +15,7 @@ import {
   recordPurchaseInitiated,
 } from "@/server/purchases.server";
 import { intentAllows } from "@/server/billing-handoffs.server";
+import { countActivePaymentMethods, MAX_PAYMENT_METHODS } from "@/server/payment-methods.server";
 import type { OriginAttribution } from "@/server/purchases.server";
 
 export type CheckoutMode = "topup" | "seat_plan" | "setup_package";
@@ -141,6 +142,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     mode: args.mode,
     item_id: args.itemId,
     item_slug: item.slug,
+    item_name: item.name,
     tenant_id: tenantId ?? "",
     clone_id: cloneId ?? "",
     billing_user_id: billingUserId,
@@ -161,9 +163,15 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     metadata: sharedMeta,
     // Propagate metadata onto the Subscription so that subsequent
     // subscription.* / invoice.* webhook events carry tenant/clone context.
+    // One-time payments additionally get a real Stripe invoice (hosted page +
+    // PDF) so every purchase surfaces on the Invoices ledger, with the same
+    // metadata contract on the invoice itself.
     ...(args.mode === "seat_plan"
       ? { subscription_data: { metadata: sharedMeta } }
-      : { payment_intent_data: { metadata: sharedMeta } }),
+      : {
+          payment_intent_data: { metadata: sharedMeta },
+          invoice_creation: { enabled: true, invoice_data: { metadata: sharedMeta } },
+        }),
   };
 
   let session;
@@ -201,6 +209,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     mode: args.mode,
     itemId: args.itemId,
     itemSlug: item.slug,
+    itemName: item.name,
     quantity: args.quantity,
     cloneId,
     tenantId: tenantId ?? null,
@@ -309,6 +318,157 @@ export async function startUidCheckout(input: UidCheckoutInput) {
     quantity: input.quantity,
     cloneId,
     tenantId,
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+    attribution: {
+      originUserId: uid,
+      originUsername: displayName,
+      originSource: "storefront_uid",
+      handoffId: null,
+    },
+  });
+}
+
+// ── Saved cards (wallet) — Stripe Checkout in `setup` mode ──────────────────
+//
+// Same credential model and redirect plumbing as purchases, but no catalog
+// item and no money moves: the session only vaults a payment method against
+// the tenant's Stripe customer. The webhook (checkout.session.completed with
+// session.mode === 'setup') persists the resulting card reference.
+
+export type CardSetupCoreArgs = {
+  cloneId: string | null;
+  tenantId: string;
+  successUrl: string;
+  cancelUrl: string;
+  attribution: OriginAttribution;
+  handoffToConsume?: string | null;
+};
+
+export async function startCardSetupCore(args: CardSetupCoreArgs) {
+  const existing = await countActivePaymentMethods(args.tenantId);
+  if (existing >= MAX_PAYMENT_METHODS) {
+    return { ok: false as const, error: "card_limit_reached" };
+  }
+
+  let customerId: string;
+  try {
+    customerId = await ensureStripeCustomer(args.tenantId);
+  } catch (err) {
+    const msg = stripeErrorMessage(err);
+    console.error("[wallet] ensureStripeCustomer failed:", msg);
+    return { ok: false as const, error: `stripe_customer: ${msg}` };
+  }
+
+  const meta = {
+    kind: "save_card",
+    tenant_id: args.tenantId,
+    clone_id: args.cloneId ?? "",
+    ...attributionMetadata(args.attribution),
+  };
+
+  let session;
+  try {
+    session = await getStripe().checkout.sessions.create({
+      mode: "setup",
+      customer: customerId,
+      payment_method_types: ["card"],
+      success_url: args.successUrl,
+      cancel_url: args.cancelUrl,
+      metadata: meta,
+    });
+  } catch (err) {
+    const msg = stripeErrorMessage(err);
+    console.error("[wallet] setup session create failed:", msg);
+    return { ok: false as const, error: `stripe: ${msg}` };
+  }
+
+  // Traceability: card-save attempts land in the audit log (they are not
+  // purchases, so the purchases ledger is not the right home).
+  try {
+    await supabaseAdmin.from("audit_log").insert({
+      action: "payment_method.setup_started",
+      entity_type: "stripe",
+      metadata: {
+        session_id: session.id,
+        tenant_id: args.tenantId,
+        clone_id: args.cloneId,
+        origin_user_id: args.attribution.originUserId,
+        origin_username: args.attribution.originUsername,
+        origin_source: args.attribution.originSource,
+      },
+    });
+  } catch {
+    /* best effort */
+  }
+
+  if (args.handoffToConsume) await consumeHandoff(args.handoffToConsume);
+  return { ok: true as const, url: session.url, sessionId: session.id };
+}
+
+export async function startHandoffCardSetup(input: {
+  handoffId: string;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  const handoff = await loadValidHandoff(input.handoffId);
+  if (!handoff) return { ok: false as const, error: "handoff_invalid" };
+  if (!handoff.tenant_id) return { ok: false as const, error: "handoff_missing_tenant" };
+
+  return await startCardSetupCore({
+    cloneId: handoff.clone_id,
+    tenantId: handoff.tenant_id,
+    successUrl: input.successUrl,
+    cancelUrl: input.cancelUrl,
+    attribution: {
+      originUserId: handoff.origin_user_id,
+      originUsername: handoff.origin_username,
+      originSource: handoff.origin_source,
+      handoffId: handoff.id,
+    },
+    handoffToConsume: handoff.id,
+  });
+}
+
+export async function startUidCardSetup(input: {
+  billingUserId: string;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  const uid = input.billingUserId.trim();
+  if (!uid) return { ok: false as const, error: "uid_required" };
+
+  const { data: clone } = await supabaseAdmin
+    .from("clones")
+    .select("id, name, slug")
+    .eq("billing_user_id", uid)
+    .maybeSingle();
+
+  let cloneId: string | null = null;
+  let tenantId: string | undefined;
+  let displayName: string | null = null;
+
+  if (clone) {
+    cloneId = clone.id;
+    displayName = clone.name ?? clone.slug ?? null;
+    const ensured = await ensureTenant(clone.id, `clone:${clone.slug ?? clone.id}`, clone.name);
+    if (!ensured.ok) return { ok: false as const, error: ensured.error };
+    tenantId = ensured.tenantId;
+  } else {
+    const { data: tenant } = await supabaseAdmin
+      .from("tenants")
+      .select("id, clone_id, display_name")
+      .eq("billing_user_id", uid)
+      .maybeSingle();
+    if (!tenant) return { ok: false as const, error: "uid_unknown" };
+    tenantId = tenant.id;
+    cloneId = tenant.clone_id ?? null;
+    displayName = tenant.display_name ?? null;
+  }
+
+  return await startCardSetupCore({
+    cloneId,
+    tenantId: tenantId as string,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
     attribution: {

@@ -10,6 +10,11 @@ import {
   finalizePurchaseFromSession,
   markPurchaseRefunded,
 } from "@/server/purchases.server";
+import {
+  markDetachedByStripeId,
+  savePaymentMethodFromSetupSession,
+} from "@/server/payment-methods.server";
+import { upsertInvoiceRecord } from "@/server/invoices.server";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -101,7 +106,41 @@ async function notifyPurchaseCompleted(session: Stripe.Checkout.Session) {
 
 // ---------- Event handlers ----------
 
+// Setup-mode sessions vault a card (wallet flow) — no money moves and no
+// purchases row exists for them, so they bypass fulfilment entirely.
+async function handleSetupSessionCompleted(session: Stripe.Checkout.Session) {
+  const saved = await savePaymentMethodFromSetupSession(session);
+  if (!saved.ok) throw new PermanentError(`save_payment_method:${saved.error}`);
+
+  const md = (session.metadata ?? {}) as Record<string, string>;
+  const attr = attributionFromMetadata(md);
+  try {
+    await adminAny.from("notifications").insert({
+      kind: "tokens_alert",
+      severity: "info",
+      title: "Payment method saved",
+      body: `${attr.originUsername ?? attr.originUserId ?? "A user"} (${attr.originSource}) saved a ${saved.row.brand ?? "card"} •••• ${saved.row.last4 ?? "????"}.`,
+      clone_id: md.clone_id || null,
+      url: "/settings/billing",
+      metadata: {
+        session_id: session.id,
+        tenant_id: md.tenant_id || null,
+        payment_method_row_id: saved.row.id,
+        brand: saved.row.brand,
+        last4: saved.row.last4,
+        priority: saved.row.priority,
+      },
+    });
+  } catch (err) {
+    console.error("payment-method notification failed", err);
+  }
+}
+
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  if (session.mode === "setup") {
+    await handleSetupSessionCompleted(session);
+    return;
+  }
   // Fulfil first; then finalise the attribution row. Permanent fulfilment
   // failures mark the purchase 'failed' before re-throwing so the ledger
   // reflects reality even for unprocessable events.
@@ -270,6 +309,9 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  // Mirror every invoice into the invoices ledger (billing & usage page).
+  await upsertInvoiceRecord(invoice);
+
   // Renewal succeeded — clear past_due if it was set.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subId = (invoice as any).subscription as string | null | undefined;
@@ -285,6 +327,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 async function handleInvoiceFailed(invoice: Stripe.Invoice) {
+  await upsertInvoiceRecord(invoice);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subId = (invoice as any).subscription as string | null | undefined;
   if (!subId) return;
@@ -398,12 +442,23 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             case "invoice.payment_succeeded":
               await handleInvoicePaid(event.data.object as Stripe.Invoice);
               break;
+            case "invoice.finalized":
+            case "invoice.voided":
+            case "invoice.marked_uncollectible":
+              // Keep the mirrored ledger row in step with Stripe's lifecycle.
+              await upsertInvoiceRecord(event.data.object as Stripe.Invoice);
+              break;
             case "invoice.payment_failed":
             case "payment_intent.payment_failed":
               // payment_intent_failed lacks a subscription — best handled via invoice events.
               if (event.type === "invoice.payment_failed") {
                 await handleInvoiceFailed(event.data.object as Stripe.Invoice);
               }
+              break;
+            case "payment_method.detached":
+              // Card removed at Stripe out-of-band (e.g. via the Stripe
+              // dashboard) — retire the wallet row so the UI can't offer it.
+              await markDetachedByStripeId((event.data.object as Stripe.PaymentMethod).id);
               break;
             case "charge.refunded":
               await handleChargeRefunded(event.data.object as Stripe.Charge);

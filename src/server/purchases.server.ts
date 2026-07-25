@@ -70,6 +70,7 @@ export function purchaseRowFromSession(
     mode: md.mode ?? "unknown",
     item_id: md.item_id || null,
     item_slug: md.item_slug || null,
+    item_name: md.item_name || null,
     quantity: Math.max(1, Number(md.quantity ?? 1) || 1),
     clone_id: md.clone_id || null,
     tenant_id: md.tenant_id || null,
@@ -97,6 +98,7 @@ export async function recordPurchaseInitiated(input: {
   mode: string;
   itemId: string;
   itemSlug: string | null;
+  itemName?: string | null;
   quantity: number;
   cloneId: string | null;
   tenantId: string | null;
@@ -108,6 +110,7 @@ export async function recordPurchaseInitiated(input: {
       mode: input.mode,
       item_id: input.itemId,
       item_slug: input.itemSlug,
+      item_name: input.itemName ?? null,
       quantity: input.quantity,
       clone_id: input.cloneId,
       tenant_id: input.tenantId,
