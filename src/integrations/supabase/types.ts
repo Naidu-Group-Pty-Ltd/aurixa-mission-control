@@ -5869,7 +5869,7 @@ export type Database = {
       tenant_usage_summary: { Args: { _tenant_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "super_admin" | "admin" | "operator" | "user"
+      app_role: "super_admin" | "admin" | "operator" | "user" | "high_king"
       brand_assignment_status: "pending" | "applied" | "drifted" | "failed"
       brand_profile_status: "draft" | "published" | "archived"
       cascade_event_status:
@@ -6099,7 +6099,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "admin", "operator", "user"],
+      app_role: ["super_admin", "admin", "operator", "user", "high_king"],
       brand_assignment_status: ["pending", "applied", "drifted", "failed"],
       brand_profile_status: ["draft", "published", "archived"],
       cascade_event_status: [
