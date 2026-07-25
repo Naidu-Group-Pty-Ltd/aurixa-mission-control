@@ -3677,6 +3677,103 @@ export type Database = {
           },
         ]
       }
+      payment_methods: {
+        Row: {
+          brand: string | null
+          card_fingerprint: string | null
+          clone_id: string | null
+          created_at: string
+          detached_at: string | null
+          exp_month: number | null
+          exp_year: number | null
+          funding: string | null
+          id: string
+          last4: string | null
+          metadata: Json
+          origin_source: string
+          origin_user_id: string | null
+          origin_username: string | null
+          priority: number
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          stripe_setup_intent_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          card_fingerprint?: string | null
+          clone_id?: string | null
+          created_at?: string
+          detached_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          funding?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json
+          origin_source?: string
+          origin_user_id?: string | null
+          origin_username?: string | null
+          priority: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          stripe_setup_intent_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          card_fingerprint?: string | null
+          clone_id?: string | null
+          created_at?: string
+          detached_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          funding?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json
+          origin_source?: string
+          origin_user_id?: string | null
+          origin_username?: string | null
+          priority?: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string
+          stripe_payment_method_id?: string
+          stripe_setup_intent_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_methods_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "payment_methods_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_hosting_config: {
         Row: {
           auto_provision: boolean
@@ -5440,57 +5537,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_invites: {
-        Row: {
-          accepted_at: string | null
-          accepted_user_id: string | null
-          created_at: string
-          email: string | null
-          expires_at: string
-          id: string
-          invited_by: string
-          note: string | null
-          revoked_at: string | null
-          revoked_by: string | null
-          role: Database["public"]["Enums"]["app_role"]
-          token_hash: string
-          token_prefix: string
-          updated_at: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          accepted_user_id?: string | null
-          created_at?: string
-          email?: string | null
-          expires_at: string
-          id?: string
-          invited_by: string
-          note?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          role?: Database["public"]["Enums"]["app_role"]
-          token_hash: string
-          token_prefix: string
-          updated_at?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          accepted_user_id?: string | null
-          created_at?: string
-          email?: string | null
-          expires_at?: string
-          id?: string
-          invited_by?: string
-          note?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          role?: Database["public"]["Enums"]["app_role"]
-          token_hash?: string
-          token_prefix?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           assigned_at: string
@@ -5732,9 +5778,7 @@ export type Database = {
       heartbeat_device: { Args: { _device_id: string }; Returns: Json }
       highest_role_level: { Args: { _user_id: string }; Returns: number }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_high_king: { Args: { _user_id: string }; Returns: boolean }
       is_operator: { Args: { _user_id: string }; Returns: boolean }
-      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_security_partner_member: {
         Args: { _partner_id: string }
         Returns: boolean
@@ -5782,6 +5826,10 @@ export type Database = {
         Args: { _clone_id: string; _external_user_id: string; _reason?: string }
         Returns: Json
       }
+      reorder_payment_methods: {
+        Args: { _ordered_ids: string[]; _tenant_id: string }
+        Returns: Json
+      }
       reserve_seat: {
         Args: {
           _clone_id: string
@@ -5821,7 +5869,7 @@ export type Database = {
       tenant_usage_summary: { Args: { _tenant_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "high_king" | "super_admin" | "admin" | "operator" | "user"
+      app_role: "super_admin" | "admin" | "operator" | "user"
       brand_assignment_status: "pending" | "applied" | "drifted" | "failed"
       brand_profile_status: "draft" | "published" | "archived"
       cascade_event_status:
@@ -6051,7 +6099,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["high_king", "super_admin", "admin", "operator", "user"],
+      app_role: ["super_admin", "admin", "operator", "user"],
       brand_assignment_status: ["pending", "applied", "drifted", "failed"],
       brand_profile_status: ["draft", "published", "archived"],
       cascade_event_status: [
