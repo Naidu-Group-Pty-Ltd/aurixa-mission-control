@@ -1834,6 +1834,7 @@ export type Database = {
           billing_user_id: string | null
           cloudflare_enabled: boolean
           cloudflare_zone_id: string | null
+          codex_nightly_enabled: boolean
           commits_behind: number
           created_at: string
           default_branch: string
@@ -1867,6 +1868,7 @@ export type Database = {
           billing_user_id?: string | null
           cloudflare_enabled?: boolean
           cloudflare_zone_id?: string | null
+          codex_nightly_enabled?: boolean
           commits_behind?: number
           created_at?: string
           default_branch?: string
@@ -1900,6 +1902,7 @@ export type Database = {
           billing_user_id?: string | null
           cloudflare_enabled?: boolean
           cloudflare_zone_id?: string | null
+          codex_nightly_enabled?: boolean
           commits_behind?: number
           created_at?: string
           default_branch?: string
@@ -4264,6 +4267,11 @@ export type Database = {
       }
       prime_config: {
         Row: {
+          codex_nightly_cron: string
+          codex_nightly_enabled: boolean
+          codex_post_merge_revalidate: boolean
+          codex_pr_scan_enabled: boolean
+          codex_scan_dedup_hours: number
           created_at: string
           default_branch: string
           default_cascade_mode: Database["public"]["Enums"]["cascade_mode"]
@@ -4276,6 +4284,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          codex_nightly_cron?: string
+          codex_nightly_enabled?: boolean
+          codex_post_merge_revalidate?: boolean
+          codex_pr_scan_enabled?: boolean
+          codex_scan_dedup_hours?: number
           created_at?: string
           default_branch?: string
           default_cascade_mode?: Database["public"]["Enums"]["cascade_mode"]
@@ -4288,6 +4301,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          codex_nightly_cron?: string
+          codex_nightly_enabled?: boolean
+          codex_post_merge_revalidate?: boolean
+          codex_pr_scan_enabled?: boolean
+          codex_scan_dedup_hours?: number
           created_at?: string
           default_branch?: string
           default_cascade_mode?: Database["public"]["Enums"]["cascade_mode"]
