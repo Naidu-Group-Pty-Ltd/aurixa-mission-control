@@ -12,7 +12,11 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
-import { enqueueScan, listScanJobs, getScanDetail } from "@/lib/codex-security.functions";
+import { enqueueScan, listScanJobs, getScanDetail, getSchedulingConfig, updateSchedulingConfig, runNightlyNow } from "@/lib/codex-security.functions";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 import { draftRemediationPR, listRemediations } from "@/lib/codex-remediation.functions";
 import {
   reviewRemediation,
