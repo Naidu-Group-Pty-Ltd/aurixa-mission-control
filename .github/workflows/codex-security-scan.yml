@@ -45,14 +45,31 @@ jobs:
       PATH_GLOBS:      ${{ inputs.path_globs }}
       CALLBACK_URL:    ${{ inputs.callback_url }}
       CALLBACK_SECRET: ${{ inputs.callback_secret }}
-      # Reports live outside the workspace: actions/checkout wipes the
-      # workspace, and the scan.started callback fires before checkout.
-      REPORT_DIR:      ${{ runner.temp }}/codex-reports
-      HELPER_DIR:      ${{ runner.temp }}/codex-helpers
       GITLEAKS_VERSION: "8.28.0"
       OSV_VERSION: "1.9.2"
 
     steps:
+      # ── Report and helper directories ──────────────────────────────────
+      # These live outside the workspace on purpose: actions/checkout wipes
+      # the workspace, and the scan.started callback fires before checkout.
+      #
+      # They are resolved here rather than in `jobs.<id>.env` because the
+      # `runner` context does not exist at job level — it only becomes
+      # available from `jobs.<id>.steps.*` onwards. Referencing it above made
+      # GitHub reject the entire file when Mission Control dispatched it:
+      #
+      #   Invalid Argument - failed to parse workflow: (Line: 50, Col: 24):
+      #   Unrecognized named-value: 'runner'.
+      #
+      # $RUNNER_TEMP is the default environment variable equivalent and is
+      # always set for a step, so resolve the paths here and publish them to
+      # every later step through $GITHUB_ENV.
+      - name: Resolve report and helper directories
+        run: |
+          set -euo pipefail
+          echo "REPORT_DIR=$RUNNER_TEMP/codex-reports" >> "$GITHUB_ENV"
+          echo "HELPER_DIR=$RUNNER_TEMP/codex-helpers" >> "$GITHUB_ENV"
+
       # ── Callback helper ────────────────────────────────────────────────
       # Written once, reused by every notify step. Signs the body with
       # HMAC-SHA256 and retries transient failures so a blip in Mission
@@ -617,7 +634,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: codex-security-reports-${{ inputs.job_id }}
-          path: ${{ runner.temp }}/codex-reports
+          # `runner` is legal here (step level), but single-sourcing off
+          # REPORT_DIR keeps the upload from silently collecting nothing if
+          # the directory is ever moved.
+          path: ${{ env.REPORT_DIR }}
           retention-days: 14
           if-no-files-found: ignore
 
