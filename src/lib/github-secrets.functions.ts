@@ -1,39 +1,92 @@
 // @ts-nocheck
 // Admin-facing server functions to push GitHub Actions repository
 // secrets from Mission Control into the Prime repo or any clone repo.
+//
+// Three faults used to make this fail from the settings page:
+//
+//  1. The clone queries selected `github_app_installation_id`, a column that
+//     did not exist. PostgREST answered 400, the error was discarded, and
+//     `data` came back null — so a single-clone sync reported "no GitHub repo
+//     attached" and the fleet sync silently found zero clones.
+//  2. `return { ok: result.ok, ...result }` — the spread re-applied `ok` from
+//     the payload, so the fleet variant's boolean was overwritten by a
+//     *count*. Zero clones, or every clone failing, both produced `ok: 0`,
+//     which the card read as a falsy failure with no message.
+//  3. `recordSync` wrote through the request-scoped (authenticated) client,
+//     but `github_secret_syncs` only grants SELECT to `authenticated`. Every
+//     insert was denied, and the discarded error meant the history panel was
+//     permanently empty.
+//
+// Supabase errors are now surfaced rather than dropped, history is written
+// with the service-role client, and every handler returns one explicit shape.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
+/** Parallel repos per fleet sync. Each repo is 2 GitHub calls per secret. */
+const FLEET_CONCURRENCY = 4;
+
 async function assertAdmin(supabase: any, userId: string) {
-  const { data } = await supabase.rpc("is_admin", { _user_id: userId });
+  const { data, error } = await supabase.rpc("is_admin", { _user_id: userId });
+  if (error) throw new Error(`Could not verify admin role: ${error.message}`);
   if (!data) throw new Error("Forbidden: admin only");
 }
 
-async function recordSync(
-  supabase: any,
-  row: {
-    target_kind: "prime" | "clone";
-    clone_id: string | null;
-    owner: string;
-    repo: string;
-    result: { ok: boolean; written: string[]; skipped: any[]; failed: any[] };
-    trigger_source: string;
-    triggered_by: string | null;
-  },
-) {
-  await supabase.from("github_secret_syncs").insert({
-    target_kind: row.target_kind,
-    clone_id: row.clone_id,
-    owner: row.owner,
-    repo: row.repo,
-    written: row.result.written,
-    skipped: row.result.skipped,
-    failed: row.result.failed,
-    ok: row.result.ok,
-    trigger_source: row.trigger_source,
-    triggered_by: row.triggered_by,
-  });
+/**
+ * Append a sync-history row. Uses the service-role client because the table
+ * is deliberately service-role-write only; a failure here is logged but must
+ * never mask the outcome of the sync itself.
+ */
+async function recordSync(row: {
+  target_kind: "prime" | "clone";
+  clone_id: string | null;
+  owner: string;
+  repo: string;
+  result: { ok: boolean; written: string[]; skipped: any[]; failed: any[] };
+  trigger_source: string;
+  triggered_by: string | null;
+}): Promise<string | null> {
+  try {
+    const { error } = await supabaseAdmin.from("github_secret_syncs").insert({
+      target_kind: row.target_kind,
+      clone_id: row.clone_id,
+      owner: row.owner,
+      repo: row.repo,
+      written: row.result.written,
+      skipped: row.result.skipped,
+      failed: row.result.failed,
+      ok: row.result.ok,
+      trigger_source: row.trigger_source,
+      triggered_by: row.triggered_by,
+    });
+    if (error) {
+      console.error("[github-secrets] failed to record sync history:", error.message);
+      return error.message;
+    }
+    return null;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[github-secrets] failed to record sync history:", message);
+    return message;
+  }
+}
+
+/** Human-readable one-liner for a completed single-repo sync. */
+function summarize(
+  target: string,
+  result: { ok: boolean; written: string[]; failed: any[]; nothingConfigured: boolean },
+): string {
+  if (result.nothingConfigured) {
+    return `No secrets are configured in Mission Control, so nothing was pushed to ${target}.`;
+  }
+  if (result.ok) {
+    return `Wrote ${result.written.length} secret(s) to ${target}.`;
+  }
+  if (result.written.length === 0) {
+    return `Could not write any secret to ${target}. ${result.failed[0]?.error ?? ""}`.trim();
+  }
+  return `Wrote ${result.written.length} secret(s) to ${target}; ${result.failed.length} failed.`;
 }
 
 /** Push Codex Actions secrets to the Prime repo. Admin only. */
@@ -43,18 +96,24 @@ export const syncPrimeActionsSecrets = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
 
-    const { data: prime } = await supabase
+    const { data: prime, error: primeErr } = await supabase
       .from("prime_config")
       .select("github_owner, github_repo, github_app_installation_id")
       .limit(1)
       .maybeSingle();
+    if (primeErr) {
+      return { ok: false, error: `Could not read prime_config: ${primeErr.message}` };
+    }
     if (!prime?.github_owner || !prime?.github_repo) {
-      return { ok: false, error: "Prime repo not configured" };
+      return {
+        ok: false,
+        error: "Prime repo is not configured — set the GitHub owner and repo above first.",
+      };
     }
 
-    const { syncRepoSecrets, buildCodexRepoSecrets } = await import(
-      "@/server/github-secrets.server"
-    );
+    const { syncRepoSecrets, buildCodexRepoSecrets } =
+      await import("@/server/github-secrets.server");
+    const target = `${prime.github_owner}/${prime.github_repo}`;
     const result = await syncRepoSecrets({
       owner: prime.github_owner,
       repo: prime.github_repo,
@@ -62,7 +121,7 @@ export const syncPrimeActionsSecrets = createServerFn({ method: "POST" })
       secrets: await buildCodexRepoSecrets(),
     });
 
-    await recordSync(supabase, {
+    const historyError = await recordSync({
       target_kind: "prime",
       clone_id: null,
       owner: prime.github_owner,
@@ -72,7 +131,19 @@ export const syncPrimeActionsSecrets = createServerFn({ method: "POST" })
       triggered_by: userId,
     });
 
-    return { ok: result.ok, ...result };
+    // `ok` is assigned last, deliberately: spreading `result` after it is
+    // what previously clobbered this field.
+    return {
+      target,
+      written: result.written,
+      skipped: result.skipped,
+      failed: result.failed,
+      nothingConfigured: result.nothingConfigured,
+      message: summarize(target, result),
+      historyError,
+      ok: result.ok,
+      error: result.ok ? undefined : summarize(target, result),
+    };
   });
 
 const CloneInput = z.object({ cloneId: z.string().uuid() });
@@ -85,26 +156,30 @@ export const syncCloneActionsSecrets = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
 
-    const { data: clone } = await supabase
+    const { data: clone, error: cloneErr } = await supabase
       .from("clones")
-      .select("id, github_owner, github_repo, github_app_installation_id")
+      .select("id, name, github_owner, github_repo")
       .eq("id", data.cloneId)
       .maybeSingle();
+    if (cloneErr) {
+      return { ok: false, error: `Could not read clone: ${cloneErr.message}` };
+    }
     if (!clone?.github_owner || !clone?.github_repo) {
       return { ok: false, error: "Clone has no GitHub repo attached" };
     }
 
-    const { syncRepoSecrets, buildCodexRepoSecrets } = await import(
-      "@/server/github-secrets.server"
-    );
+    const { syncRepoSecrets, buildCodexRepoSecrets } =
+      await import("@/server/github-secrets.server");
+    const { loadCloneInstallationId } = await import("@/server/clone-installation.server");
+    const target = `${clone.github_owner}/${clone.github_repo}`;
     const result = await syncRepoSecrets({
       owner: clone.github_owner,
       repo: clone.github_repo,
-      installationId: clone.github_app_installation_id ?? null,
+      installationId: await loadCloneInstallationId(supabase, clone.id),
       secrets: await buildCodexRepoSecrets(),
     });
 
-    await recordSync(supabase, {
+    const historyError = await recordSync({
       target_kind: "clone",
       clone_id: clone.id,
       owner: clone.github_owner,
@@ -114,8 +189,36 @@ export const syncCloneActionsSecrets = createServerFn({ method: "POST" })
       triggered_by: userId,
     });
 
-    return { ok: result.ok, ...result };
+    return {
+      target,
+      written: result.written,
+      skipped: result.skipped,
+      failed: result.failed,
+      nothingConfigured: result.nothingConfigured,
+      message: summarize(target, result),
+      historyError,
+      ok: result.ok,
+      error: result.ok ? undefined : summarize(target, result),
+    };
   });
+
+/** Run `worker` over `items` with a bounded number of in-flight promises. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await worker(items[index]);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
 
 /** Fan out to every clone that has a GitHub repo. Admin only. */
 export const syncAllCloneActionsSecrets = createServerFn({ method: "POST" })
@@ -124,40 +227,105 @@ export const syncAllCloneActionsSecrets = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
 
-    const { data: clones } = await supabase
+    const { data: clones, error: clonesErr } = await supabase
       .from("clones")
-      .select("id, github_owner, github_repo, github_app_installation_id")
-      .not("github_owner", "is", null)
-      .not("github_repo", "is", null);
-
-    const { syncRepoSecrets, buildCodexRepoSecrets } = await import(
-      "@/server/github-secrets.server"
-    );
-    const secrets = await buildCodexRepoSecrets();
-
-    const summary = { attempted: 0, ok: 0, failed: 0 as number };
-    for (const c of clones ?? []) {
-      summary.attempted += 1;
-      const result = await syncRepoSecrets({
-        owner: c.github_owner,
-        repo: c.github_repo,
-        installationId: c.github_app_installation_id ?? null,
-        secrets,
-      });
-      if (result.ok) summary.ok += 1;
-      else summary.failed += 1;
-      await recordSync(supabase, {
-        target_kind: "clone",
-        clone_id: c.id,
-        owner: c.github_owner,
-        repo: c.github_repo,
-        result,
-        trigger_source: "fleet-rotation",
-        triggered_by: userId,
-      });
+      .select("id, name, github_owner, github_repo")
+      .order("name", { ascending: true });
+    if (clonesErr) {
+      return { ok: false, error: `Could not list clones: ${clonesErr.message}`, results: [] };
     }
 
-    return { ok: summary.failed === 0, ...summary };
+    const targets = (clones ?? []).filter((c: any) => c.github_owner && c.github_repo);
+    if (targets.length === 0) {
+      // An empty fleet is a valid state, not a failure — the previous code
+      // returned ok: 0 here and the card rendered it as "Sync failed".
+      return {
+        ok: true,
+        attempted: 0,
+        succeeded: 0,
+        failedCount: 0,
+        results: [],
+        message: "No clones with a GitHub repo attached — nothing to sync.",
+      };
+    }
+
+    const { syncRepoSecrets, buildCodexRepoSecrets } =
+      await import("@/server/github-secrets.server");
+    const { loadCloneInstallationIds } = await import("@/server/clone-installation.server");
+    const secrets = await buildCodexRepoSecrets();
+    const installations = await loadCloneInstallationIds(
+      supabase,
+      targets.map((c: any) => c.id),
+    );
+
+    // Serial fan-out used to make a large fleet exceed the request timeout
+    // well before it finished.
+    const results = await mapWithConcurrency(targets, FLEET_CONCURRENCY, async (c: any) => {
+      const target = `${c.github_owner}/${c.github_repo}`;
+      try {
+        const result = await syncRepoSecrets({
+          owner: c.github_owner,
+          repo: c.github_repo,
+          installationId: installations.get(c.id) ?? null,
+          secrets,
+        });
+        await recordSync({
+          target_kind: "clone",
+          clone_id: c.id,
+          owner: c.github_owner,
+          repo: c.github_repo,
+          result,
+          trigger_source: "fleet-rotation",
+          triggered_by: userId,
+        });
+        return {
+          cloneId: c.id,
+          name: c.name,
+          target,
+          ok: result.ok,
+          written: result.written.length,
+          error: result.ok ? undefined : (result.failed[0]?.error ?? "unknown error"),
+        };
+      } catch (e) {
+        // One unreachable repo must not abort the rest of the fleet.
+        return {
+          cloneId: c.id,
+          name: c.name,
+          target,
+          ok: false,
+          written: 0,
+          error: e instanceof Error ? e.message : String(e),
+        };
+      }
+    });
+
+    const succeeded = results.filter((r) => r.ok).length;
+    const failedCount = results.length - succeeded;
+
+    return {
+      attempted: results.length,
+      succeeded,
+      failedCount,
+      results,
+      message:
+        failedCount === 0
+          ? `Synced all ${succeeded} clone repo(s).`
+          : `Synced ${succeeded}/${results.length} clone repo(s); ${failedCount} failed.`,
+      ok: failedCount === 0,
+      error: failedCount === 0 ? undefined : `${failedCount} clone repo(s) failed — see below.`,
+    };
+  });
+
+/**
+ * Which secrets a sync would push, and which are missing. Names and
+ * configured/not only — values never leave the server.
+ */
+export const previewActionsSecrets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { previewCodexRepoSecrets } = await import("@/server/github-secrets.server");
+    return previewCodexRepoSecrets();
   });
 
 const ListInput = z.object({

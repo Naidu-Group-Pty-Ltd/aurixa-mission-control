@@ -37,18 +37,24 @@ async function resolveRepo(
     };
   }
   if (!cloneId) throw new Error("cloneId missing for clone remediation");
-  const { data: c } = await supabase
-    .from("clones")
-    .select("github_owner, github_repo, default_branch, github_app_installation_id")
-    .eq("id", cloneId)
-    .maybeSingle();
+  // Installation id fetched separately — see clone-installation.server.ts for
+  // why naming an optional column inline is unsafe here.
+  const { loadCloneInstallationId } = await import("@/server/clone-installation.server");
+  const [{ data: c }, installationId] = await Promise.all([
+    supabase
+      .from("clones")
+      .select("github_owner, github_repo, default_branch")
+      .eq("id", cloneId)
+      .maybeSingle(),
+    loadCloneInstallationId(supabase, cloneId),
+  ]);
   if (!c) throw new Error("clone not found");
   const [owner, repo] = (fallbackRepo || "").split("/");
   return {
     owner: c.github_owner || owner,
     repo: c.github_repo || repo,
     baseRef: c.default_branch || "main",
-    installationId: c.github_app_installation_id ?? null,
+    installationId,
   };
 }
 

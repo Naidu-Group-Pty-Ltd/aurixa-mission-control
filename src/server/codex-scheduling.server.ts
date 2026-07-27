@@ -174,15 +174,22 @@ export async function resolveDispatchTarget(opts: {
     };
   }
 
-  const { data: c } = await admin
-    .from("clones")
-    .select("github_owner, github_repo, default_branch, github_app_installation_id")
-    .eq("id", opts.cloneId)
-    .maybeSingle();
+  // The installation id is fetched separately: it is an optional column, and
+  // naming an unknown column fails the entire PostgREST select, which would
+  // take owner/repo/branch down with it.
+  const { loadCloneInstallationId } = await import("@/server/clone-installation.server");
+  const [{ data: c }, installationId] = await Promise.all([
+    admin
+      .from("clones")
+      .select("github_owner, github_repo, default_branch")
+      .eq("id", opts.cloneId)
+      .maybeSingle(),
+    loadCloneInstallationId(admin, opts.cloneId),
+  ]);
   return {
     owner: c?.github_owner || fallbackOwner || "",
     repo: c?.github_repo || fallbackRepo || "",
-    installationId: c?.github_app_installation_id ?? null,
+    installationId,
     defaultBranch: c?.default_branch || "main",
   };
 }
@@ -384,20 +391,19 @@ export async function runNightlyScans(): Promise<NightlyResult> {
     skipped.push({ target: "prime", reason: "nightly_disabled" });
   }
 
+  // owner/repo only — `repo_full_name` is a generated convenience column and
+  // naming it here would fail the whole select on an unmigrated deployment,
+  // silently yielding an empty fleet.
   const { data: clones } = await admin
     .from("clones")
-    .select(
-      "id, name, repo_full_name, github_owner, github_repo, default_branch, codex_nightly_enabled",
-    )
+    .select("id, name, github_owner, github_repo, default_branch, codex_nightly_enabled")
     .eq("codex_nightly_enabled", true);
 
   // Fan out across the fleet instead of dispatching one clone at a time —
   // a 40-clone fleet used to serialize 40 round-trips to GitHub.
   const outcomes = await mapWithConcurrency(clones ?? [], NIGHTLY_CONCURRENCY, async (c) => {
     const label = `clone:${c.name ?? c.id}`;
-    const repo =
-      c.repo_full_name ||
-      (c.github_owner && c.github_repo ? `${c.github_owner}/${c.github_repo}` : "");
+    const repo = c.github_owner && c.github_repo ? `${c.github_owner}/${c.github_repo}` : "";
     if (!repo) return { label, skipped: true, reason: "no_repo" } as const;
     try {
       const r = await enqueueScanNoAuth({
@@ -541,10 +547,15 @@ export async function resolveScanTarget(
     return { targetKind: "prime" };
   }
 
+  // Matched on owner/repo rather than the generated `repo_full_name` column:
+  // those two always exist, whereas an `.or()` naming a column a deployment
+  // has not migrated yet fails the whole query — which silently disabled
+  // PR-driven scans for every clone.
   const { data: clone } = await admin
     .from("clones")
     .select("id")
-    .or(`repo_full_name.eq.${repoFullName},and(github_owner.eq.${owner},github_repo.eq.${repo})`)
+    .ilike("github_owner", owner)
+    .ilike("github_repo", repo)
     .limit(1)
     .maybeSingle();
   if (clone?.id) return { targetKind: "clone", cloneId: clone.id };
