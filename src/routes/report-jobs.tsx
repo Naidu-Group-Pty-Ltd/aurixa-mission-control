@@ -259,14 +259,14 @@ function ReportJobsPage() {
                     <TableCell className="text-sm">
                       {j.tenants?.display_name ?? j.tenants?.external_ref ?? (
                         <span className="font-mono text-xs text-muted-foreground">
-                          {j.tenant_id.slice(0, 8)}
+                          {j.tenant_id ? j.tenant_id.slice(0, 8) : "—"}
                         </span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
                       {j.clones?.name ?? (
                         <span className="font-mono text-xs text-muted-foreground">
-                          {j.clone_id.slice(0, 8)}
+                          {j.clone_id ? j.clone_id.slice(0, 8) : "—"}
                         </span>
                       )}
                     </TableCell>
