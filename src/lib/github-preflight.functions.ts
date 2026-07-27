@@ -66,7 +66,16 @@ export const checkGithubAppPreflight = createServerFn({ method: "POST" })
       const { createAppAuth } = await import("@octokit/auth-app");
       const forge = (await import("node-forge")).default;
       const normalize = (pem: string) => {
-        const p = pem.replace(/\\n/g, "\n").trim();
+        let p = pem.replace(/\\n/g, "\n").trim();
+        if (!p.includes("\n")) {
+          const m = p.match(/-----BEGIN ([A-Z0-9 ]+?)-----([\s\S]+?)-----END \1-----/);
+          if (m) {
+            const label = m[1].trim();
+            const body = m[2].replace(/\s+/g, "");
+            const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+            p = `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----`;
+          }
+        }
         if (p.includes("-----BEGIN PRIVATE KEY-----")) return p;
         if (p.includes("-----BEGIN RSA PRIVATE KEY-----")) {
           const key = forge.pki.privateKeyFromPem(p);
@@ -76,6 +85,7 @@ export const checkGithubAppPreflight = createServerFn({ method: "POST" })
         }
         return p;
       };
+
       const auth = createAppAuth({ appId: appId!, privateKey: normalize(privateKeyRaw!) });
       const appAuth = await auth({ type: "app" });
       jwt = (appAuth as { token: string }).token;
