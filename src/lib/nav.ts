@@ -9,6 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   AlertTriangle,
+  ShieldAlert,
   ArrowRightLeft,
   BarChart3,
   Bell,
