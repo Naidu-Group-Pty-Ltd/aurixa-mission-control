@@ -1,0 +1,639 @@
+name: Codex Security Scan
+# Reference workflow: place this file at .github/workflows/codex-security-scan.yml
+# in every repo (Prime and clones) that Mission Control should scan.
+#
+# Mission Control triggers it via `workflow_dispatch` (see
+# src/server/codex-security-client.server.ts). The job runs a battery of
+# scanners, normalizes every result into the Mission Control finding shape,
+# and POSTs HMAC-signed lifecycle callbacks to
+# `<mission-control>/api/public/hooks/codex-security`.
+#
+# Secrets consumed (synced automatically by Mission Control's GitHub secret
+# sync — see src/server/github-secrets.server.ts):
+#   OPENAI_API_KEY  — optional. Enables the Codex CLI reasoning pass.
+# The callback URL and HMAC secret arrive as workflow inputs, so the scanner
+# needs no other configuration.
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:          { description: "Mission Control scan job id (UUID)", required: true }
+      scan_kind:       { description: "manual | nightly_full | pr_open | targeted_path | post_merge_revalidate", required: false, default: "manual" }
+      scan_ref:        { description: "Git ref / SHA to scan (defaults to the dispatch ref)", required: false, default: "" }
+      diff_base:       { description: "When set, only files changed against this ref are scanned", required: false, default: "" }
+      path_globs:      { description: "Newline- or comma-separated paths to restrict the scan to", required: false, default: "" }
+      callback_url:    { description: "Mission Control callback URL", required: true }
+      callback_secret: { description: "HMAC-SHA256 secret for the callback", required: true }
+      deep_scan:       { description: "Run the Codex CLI reasoning pass (true/false)", required: false, default: "true" }
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-security-scan-${{ inputs.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      JOB_ID:          ${{ inputs.job_id }}
+      SCAN_KIND:       ${{ inputs.scan_kind }}
+      SCAN_REF:        ${{ inputs.scan_ref }}
+      DIFF_BASE:       ${{ inputs.diff_base }}
+      PATH_GLOBS:      ${{ inputs.path_globs }}
+      CALLBACK_URL:    ${{ inputs.callback_url }}
+      CALLBACK_SECRET: ${{ inputs.callback_secret }}
+      # Reports live outside the workspace: actions/checkout wipes the
+      # workspace, and the scan.started callback fires before checkout.
+      REPORT_DIR:      ${{ runner.temp }}/codex-reports
+      HELPER_DIR:      ${{ runner.temp }}/codex-helpers
+      GITLEAKS_VERSION: "8.28.0"
+      OSV_VERSION: "1.9.2"
+
+    steps:
+      # ── Callback helper ────────────────────────────────────────────────
+      # Written once, reused by every notify step. Signs the body with
+      # HMAC-SHA256 and retries transient failures so a blip in Mission
+      # Control never orphans a scan job.
+      - name: Install callback helper
+        run: |
+          set -euo pipefail
+          mkdir -p "$HELPER_DIR" "$REPORT_DIR"
+          cat > "$HELPER_DIR/callback.mjs" <<'HELPER'
+          import crypto from "node:crypto";
+          import fs from "node:fs";
+
+          const url = process.env.CALLBACK_URL;
+          const secret = process.env.CALLBACK_SECRET;
+          const payloadFile = process.argv[2];
+          if (!url || !secret) {
+            console.error("callback: missing CALLBACK_URL/CALLBACK_SECRET");
+            process.exit(0);
+          }
+
+          const body = fs.readFileSync(payloadFile, "utf8");
+          const sig =
+            "sha256=" + crypto.createHmac("sha256", secret).update(body).digest("hex");
+
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+          for (let attempt = 1; attempt <= 4; attempt++) {
+            try {
+              const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-codex-signature": sig,
+                },
+                body,
+              });
+              const text = await res.text();
+              console.log(`callback [${res.status}] ${text.slice(0, 400)}`);
+              // 4xx other than 429 are terminal — retrying cannot help.
+              if (res.ok || (res.status < 500 && res.status !== 429)) process.exit(0);
+            } catch (err) {
+              console.error(`callback attempt ${attempt} failed: ${err.message}`);
+            }
+            if (attempt < 4) await sleep(attempt * 1500);
+          }
+          // Never fail the scan because the callback is unreachable — Mission
+          // Control's sweeper reconciles jobs that never report back.
+          console.error("callback: giving up after 4 attempts");
+          HELPER
+
+      - name: Notify scan.started
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs");
+            fs.writeFileSync(process.env.REPORT_DIR + "/started.json", JSON.stringify({
+              client_job_id: process.env.JOB_ID,
+              event: "scan.started",
+              engine: "github_actions",
+              external_scan_id: "gha-" + process.env.GITHUB_RUN_ID,
+              workflow_run_id: Number(process.env.GITHUB_RUN_ID),
+              workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+              summary: {
+                scan_kind: process.env.SCAN_KIND,
+                ref: process.env.SCAN_REF || process.env.GITHUB_SHA,
+              },
+            }));
+          '
+          node "$HELPER_DIR/callback.mjs" "$REPORT_DIR/started.json"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.scan_ref || github.ref }}
+          # Deep history only when we need to diff against a base ref.
+          # Quoted strings on both branches — `0` would be falsy and the
+          # `&&/||` idiom would silently collapse to the fallback.
+          fetch-depth: ${{ inputs.diff_base != '' && '0' || '1' }}
+
+      # ── Scope resolution ───────────────────────────────────────────────
+      # PR and targeted scans only look at what changed / what was asked
+      # for, which is what keeps per-PR scans fast enough to be useful.
+      - name: Resolve scan scope
+        id: scope
+        run: |
+          set -euo pipefail
+          SCOPE_FILE="$REPORT_DIR/scope.txt"
+          : > "$SCOPE_FILE"
+
+          if [ -n "${DIFF_BASE:-}" ]; then
+            git fetch --no-tags --depth=200 origin "$DIFF_BASE" || true
+            BASE_SHA=$(git rev-parse "origin/$DIFF_BASE" 2>/dev/null \
+              || git rev-parse "$DIFF_BASE" 2>/dev/null || echo "")
+            if [ -n "$BASE_SHA" ]; then
+              git diff --name-only --diff-filter=ACMR "$BASE_SHA...HEAD" > "$SCOPE_FILE" || true
+            fi
+          fi
+
+          # Explicit path globs win over the diff when both are supplied.
+          if [ -n "${PATH_GLOBS:-}" ]; then
+            printf '%s' "$PATH_GLOBS" | tr ',' '\n' | sed '/^[[:space:]]*$/d' > "$SCOPE_FILE"
+          fi
+
+          # Drop paths that no longer exist (deletes, renames).
+          if [ -s "$SCOPE_FILE" ]; then
+            while IFS= read -r p; do
+              [ -e "$p" ] && printf '%s\n' "$p"
+            done < "$SCOPE_FILE" > "$SCOPE_FILE.tmp" || true
+            mv "$SCOPE_FILE.tmp" "$SCOPE_FILE"
+          fi
+
+          if [ -s "$SCOPE_FILE" ]; then
+            echo "scoped=true" >> "$GITHUB_OUTPUT"
+            echo "Scoped scan: $(wc -l < "$SCOPE_FILE") file(s)"
+          else
+            echo "scoped=false" >> "$GITHUB_OUTPUT"
+            echo "Full-tree scan"
+          fi
+
+      # ── Scanner: secrets (gitleaks) ────────────────────────────────────
+      - name: gitleaks — secret detection
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -sSfL --retry 3 \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o "$RUNNER_TEMP/gitleaks.tgz"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+          chmod +x "$RUNNER_TEMP/gitleaks"
+          # `--no-git` scans the working tree rather than history, so findings
+          # map to the ref under scan instead of to ancient commits.
+          "$RUNNER_TEMP/gitleaks" detect \
+            --no-git \
+            --source . \
+            --report-format json \
+            --report-path "$REPORT_DIR/gitleaks.json" \
+            --redact \
+            --exit-code 0 \
+            --no-banner
+          [ -s "$REPORT_DIR/gitleaks.json" ] || echo '[]' > "$REPORT_DIR/gitleaks.json"
+
+      # ── Scanner: SAST (semgrep) ────────────────────────────────────────
+      - name: semgrep — static analysis
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          # pipx avoids PEP 668 "externally managed environment" on the runner.
+          pipx install semgrep >/dev/null 2>&1 || python3 -m pip install --quiet --user semgrep
+          command -v semgrep >/dev/null || export PATH="$HOME/.local/bin:$PATH"
+
+          ARGS=(scan --json --output "$REPORT_DIR/semgrep.json" --metrics=off
+                --timeout 90 --max-target-bytes 2000000 --quiet
+                --config p/security-audit --config p/secrets --config p/owasp-top-ten)
+
+          if [ "${{ steps.scope.outputs.scoped }}" = "true" ]; then
+            # xargs keeps the arg list under ARG_MAX on very large diffs.
+            xargs -a "$REPORT_DIR/scope.txt" -d '\n' semgrep "${ARGS[@]}" --
+          else
+            semgrep "${ARGS[@]}" .
+          fi
+          [ -s "$REPORT_DIR/semgrep.json" ] || echo '{"results":[],"errors":[]}' > "$REPORT_DIR/semgrep.json"
+
+      # ── Scanner: dependencies (osv-scanner) ────────────────────────────
+      - name: osv-scanner — dependency vulnerabilities
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -sSfL --retry 3 \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_${OSV_VERSION}_linux_amd64" \
+            -o "$RUNNER_TEMP/osv-scanner"
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+          # Exit code 1 only means "vulnerabilities found".
+          "$RUNNER_TEMP/osv-scanner" --format json --recursive . \
+            > "$REPORT_DIR/osv.json" 2> "$REPORT_DIR/osv.err" || true
+          [ -s "$REPORT_DIR/osv.json" ] || echo '{"results":[]}' > "$REPORT_DIR/osv.json"
+
+      # ── Scanner: Codex CLI reasoning pass (optional) ───────────────────
+      # Deterministic scanners find known patterns; the Codex pass catches
+      # logic-level issues (authz gaps, unsafe defaults, RLS holes) that
+      # rule engines cannot express. Skipped silently without an API key.
+      - name: Codex CLI — reasoning pass
+        continue-on-error: true
+        if: ${{ inputs.deep_scan != 'false' }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -uo pipefail
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "OPENAI_API_KEY not configured — skipping Codex reasoning pass."
+            exit 0
+          fi
+          if ! npm install -g @openai/codex@latest >/dev/null 2>&1; then
+            echo "Could not install @openai/codex — skipping reasoning pass."
+            exit 0
+          fi
+
+          if [ "${{ steps.scope.outputs.scoped }}" = "true" ]; then
+            TARGETS=$(head -c 4000 "$REPORT_DIR/scope.txt" | tr '\n' ' ')
+            SCOPE_LINE="Review only these files: ${TARGETS}"
+          else
+            SCOPE_LINE="Review the highest-risk application code in this repository (authentication, access control, data access, request handlers, secret handling, and infrastructure config)."
+          fi
+
+          # Codex writes inside the workspace sandbox; we copy the result out.
+          mkdir -p .codex-out
+          cat > "$RUNNER_TEMP/codex-prompt.txt" <<PROMPT
+          You are performing a security review of this repository.
+          ${SCOPE_LINE}
+
+          Report only concrete, exploitable issues you can point at in the code.
+          Do NOT report style problems, missing tests, or speculative concerns.
+
+          Write your answer to the file .codex-out/codex.json as a single JSON
+          object and nothing else:
+          {"findings":[{"title":"...","severity":"critical|high|medium|low|info",
+          "description":"why it is exploitable and how to fix it",
+          "file":"path/from/repo/root","line":123,"cwe":"CWE-89","confidence":0.0-1.0}]}
+
+          If you find nothing, write {"findings":[]}.
+          PROMPT
+
+          timeout 20m codex exec \
+            --sandbox workspace-write \
+            "$(cat "$RUNNER_TEMP/codex-prompt.txt")" || true
+
+          if [ -s .codex-out/codex.json ]; then
+            cp .codex-out/codex.json "$REPORT_DIR/codex.json"
+          else
+            echo '{"findings":[]}' > "$REPORT_DIR/codex.json"
+          fi
+
+      # ── Normalize + report ─────────────────────────────────────────────
+      - name: Normalize findings
+        run: |
+          set -euo pipefail
+          cat > "$HELPER_DIR/normalize.mjs" <<'NORMALIZE'
+          import crypto from "node:crypto";
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const dir = process.env.REPORT_DIR;
+          const repoRoot = process.env.GITHUB_WORKSPACE;
+          const scanners = {};
+
+          function read(file) {
+            const p = path.join(dir, file);
+            if (!fs.existsSync(p)) return null;
+            const txt = fs.readFileSync(p, "utf8").trim();
+            if (!txt) return null;
+            try {
+              return JSON.parse(txt);
+            } catch {
+              return null;
+            }
+          }
+
+          function rel(p) {
+            if (!p) return null;
+            const abs = path.isAbsolute(p) ? p : path.join(repoRoot, p);
+            const r = path.relative(repoRoot, abs);
+            return r.startsWith("..") ? p : r || p;
+          }
+
+          function clamp(s, n) {
+            if (!s) return null;
+            const t = String(s).trim();
+            return t.length > n ? t.slice(0, n - 1) + "…" : t;
+          }
+
+          function cweOf(value) {
+            if (typeof value !== "string") return null;
+            const m = value.match(/CWE-\d+/);
+            return m ? m[0] : null;
+          }
+
+          // Stable across scans: the same issue keeps the same id, which is
+          // what lets Mission Control diff runs and auto-resolve fixed items.
+          function fingerprint(parts) {
+            return crypto
+              .createHash("sha256")
+              .update(parts.filter(Boolean).join(" "))
+              .digest("hex")
+              .slice(0, 32);
+          }
+
+          const findings = [];
+          const seen = new Set();
+          function push(f) {
+            if (!f.title || !f.id || seen.has(f.id)) return;
+            seen.add(f.id);
+            findings.push(f);
+          }
+
+          // ── gitleaks ────────────────────────────────────────────────────
+          const gitleaks = read("gitleaks.json");
+          if (Array.isArray(gitleaks)) {
+            scanners.gitleaks = { ok: true, count: gitleaks.length };
+            for (const g of gitleaks) {
+              const file = rel(g.File);
+              const rule = g.RuleID || "secret";
+              push({
+                id: fingerprint(["gitleaks", rule, file, String(g.StartLine ?? "")]),
+                title: `Hardcoded secret: ${g.Description || rule}`,
+                // A committed live credential is always top severity.
+                severity: "critical",
+                description: clamp(
+                  `${g.Description || "Potential secret"} detected in ${file}.` +
+                    (g.Match ? `\n\nMatch (redacted): ${g.Match}` : "") +
+                    `\n\nRotate the credential, remove it from the tree, and load it from a secret store instead.`,
+                  4000,
+                ),
+                file,
+                line: g.StartLine ?? null,
+                cwe: "CWE-798",
+                scanner: "gitleaks",
+                rule_id: rule,
+                auto_fix_confidence: 0.35,
+                raw: { entropy: g.Entropy, commit: g.Commit },
+              });
+            }
+          } else {
+            scanners.gitleaks = { ok: false, count: 0 };
+          }
+
+          // ── semgrep ─────────────────────────────────────────────────────
+          const semgrep = read("semgrep.json");
+          if (semgrep && Array.isArray(semgrep.results)) {
+            scanners.semgrep = {
+              ok: true,
+              count: semgrep.results.length,
+              errors: (semgrep.errors || []).length,
+            };
+            const sevMap = { ERROR: "high", WARNING: "medium", INFO: "low" };
+            for (const r of semgrep.results) {
+              const extra = r.extra || {};
+              const meta = extra.metadata || {};
+              const file = rel(r.path);
+              // Semgrep's impact/likelihood metadata is a better signal than
+              // the raw ERROR/WARNING level when it is present.
+              let severity = sevMap[extra.severity] || "medium";
+              if (meta.impact === "HIGH" && meta.likelihood === "HIGH") severity = "critical";
+              else if (meta.impact === "LOW") severity = "low";
+              const cwe = Array.isArray(meta.cwe) ? meta.cwe[0] : meta.cwe;
+              push({
+                id: fingerprint(["semgrep", r.check_id, file, String(r.start?.line ?? "")]),
+                title: clamp(meta.shortDescription || extra.message || r.check_id, 200),
+                severity,
+                description: clamp(
+                  [
+                    extra.message,
+                    extra.fix ? `\nSuggested fix: ${extra.fix}` : "",
+                    meta.references?.length
+                      ? `\nReferences: ${meta.references.slice(0, 3).join(", ")}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("\n"),
+                  4000,
+                ),
+                file,
+                line: r.start?.line ?? null,
+                cwe: cweOf(cwe),
+                scanner: "semgrep",
+                rule_id: r.check_id,
+                // Semgrep autofix means a machine-applicable patch exists.
+                auto_fix_confidence: extra.fix ? 0.8 : 0.4,
+                snippet: clamp(extra.lines, 600),
+                raw: { confidence: meta.confidence, owasp: meta.owasp, category: meta.category },
+              });
+            }
+          } else {
+            scanners.semgrep = { ok: false, count: 0 };
+          }
+
+          // ── osv-scanner ─────────────────────────────────────────────────
+          function parseCvss(score) {
+            if (typeof score === "number") return score;
+            const n = Number(score);
+            // CVSS vector strings carry no numeric score — treat as unknown.
+            return Number.isNaN(n) ? null : n;
+          }
+
+          function fixedVersion(vuln, name, ecosystem) {
+            for (const a of vuln.affected || []) {
+              if (a.package?.name !== name) continue;
+              if (ecosystem && a.package?.ecosystem !== ecosystem) continue;
+              for (const r of a.ranges || []) {
+                const fixed = (r.events || []).map((e) => e.fixed).filter(Boolean);
+                if (fixed.length) return fixed[fixed.length - 1];
+              }
+            }
+            return null;
+          }
+
+          const osv = read("osv.json");
+          if (osv && Array.isArray(osv.results)) {
+            let count = 0;
+            const sevFromCvss = (s) =>
+              s >= 9 ? "critical" : s >= 7 ? "high" : s >= 4 ? "medium" : "low";
+            for (const result of osv.results) {
+              const source = rel(result.source?.path);
+              for (const pkg of result.packages || []) {
+                const name = pkg.package?.name;
+                const version = pkg.package?.version;
+                const ecosystem = pkg.package?.ecosystem;
+                for (const v of pkg.vulnerabilities || []) {
+                  count += 1;
+                  const cvssEntry = (v.severity || []).find((s) =>
+                    String(s.type).startsWith("CVSS"),
+                  );
+                  const score = cvssEntry ? parseCvss(cvssEntry.score) : null;
+                  const aliases = (v.aliases || []).filter((a) => a.startsWith("CVE-"));
+                  const fixedIn = fixedVersion(v, name, ecosystem);
+                  push({
+                    id: fingerprint(["osv", v.id, name, version, source]),
+                    title: `Vulnerable dependency: ${name}@${version} (${v.id})`,
+                    severity: score != null ? sevFromCvss(score) : "medium",
+                    description: clamp(
+                      [
+                        v.summary || v.details || v.id,
+                        aliases.length ? `\nAliases: ${aliases.join(", ")}` : "",
+                        fixedIn ? `\nFixed in: ${fixedIn}` : "\nNo fixed version published yet.",
+                        source ? `\nManifest: ${source}` : "",
+                      ]
+                        .filter(Boolean)
+                        .join("\n"),
+                      4000,
+                    ),
+                    file: source,
+                    line: null,
+                    cwe: (v.database_specific?.cwe_ids || [])[0] || null,
+                    cvss: score,
+                    scanner: "osv-scanner",
+                    rule_id: v.id,
+                    // A published fixed version is a near-mechanical bump.
+                    auto_fix_confidence: fixedIn ? 0.9 : 0.2,
+                    raw: { ecosystem, package: name, version, fixed_in: fixedIn, aliases },
+                  });
+                }
+              }
+            }
+            scanners["osv-scanner"] = { ok: true, count };
+          } else {
+            scanners["osv-scanner"] = { ok: false, count: 0 };
+          }
+
+          // ── Codex CLI ───────────────────────────────────────────────────
+          const codex = read("codex.json");
+          const codexFindings = Array.isArray(codex?.findings) ? codex.findings : [];
+          if (codex) {
+            scanners.codex = { ok: true, count: codexFindings.length };
+            const allowed = new Set(["critical", "high", "medium", "low", "info"]);
+            for (const c of codexFindings) {
+              const file = rel(c.file);
+              const sev = String(c.severity || "").toLowerCase();
+              push({
+                id: fingerprint(["codex", c.title, file, String(c.line ?? "")]),
+                title: clamp(c.title, 200),
+                severity: allowed.has(sev) ? sev : "medium",
+                description: clamp(c.description, 4000),
+                file,
+                line: Number.isInteger(c.line) ? c.line : null,
+                cwe: cweOf(c.cwe),
+                scanner: "codex",
+                rule_id: "codex-review",
+                auto_fix_confidence:
+                  typeof c.confidence === "number"
+                    ? Math.max(0, Math.min(1, c.confidence))
+                    : 0.5,
+                raw: {},
+              });
+            }
+          } else {
+            scanners.codex = { ok: false, count: 0, skipped: true };
+          }
+
+          const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+          findings.sort((a, b) => order[a.severity] - order[b.severity]);
+
+          const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+          for (const f of findings) counts[f.severity] += 1;
+
+          fs.writeFileSync(
+            path.join(dir, "normalized.json"),
+            JSON.stringify({
+              findings,
+              summary: { ...counts, total: findings.length, scanners },
+            }),
+          );
+
+          console.log(
+            `Normalized ${findings.length} finding(s): ` +
+              Object.entries(counts)
+                .map(([k, v]) => `${k}=${v}`)
+                .join(" "),
+          );
+          NORMALIZE
+          node "$HELPER_DIR/normalize.mjs"
+
+      - name: Report findings to Mission Control
+        run: |
+          set -euo pipefail
+          cat > "$HELPER_DIR/report.mjs" <<'REPORT'
+          import fs from "node:fs";
+          import path from "node:path";
+          import { execFileSync } from "node:child_process";
+
+          const dir = process.env.REPORT_DIR;
+          const { findings, summary } = JSON.parse(
+            fs.readFileSync(path.join(dir, "normalized.json"), "utf8"),
+          );
+
+          const base = {
+            client_job_id: process.env.JOB_ID,
+            external_scan_id: "gha-" + process.env.GITHUB_RUN_ID,
+            engine: "github_actions",
+            workflow_run_id: Number(process.env.GITHUB_RUN_ID),
+            workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+          };
+
+          const finalSummary = {
+            ...summary,
+            ref: process.env.SCAN_REF || process.env.GITHUB_SHA,
+            scan_kind: process.env.SCAN_KIND,
+          };
+
+          function send(payload, name) {
+            const file = path.join(dir, name);
+            fs.writeFileSync(file, JSON.stringify(payload));
+            execFileSync("node", [path.join(process.env.HELPER_DIR, "callback.mjs"), file], {
+              stdio: "inherit",
+            });
+          }
+
+          // Large scans stream in batches so a single request never exceeds
+          // the receiver's body limit. Only the last call completes the job.
+          const BATCH = 100;
+          if (findings.length === 0) {
+            send(
+              { ...base, event: "scan.completed", findings: [], summary: finalSummary, findings_complete: true },
+              "report-empty.json",
+            );
+          } else {
+            for (let i = 0; i < findings.length; i += BATCH) {
+              const last = i + BATCH >= findings.length;
+              send(
+                {
+                  ...base,
+                  event: last ? "scan.completed" : "scan.progress",
+                  findings: findings.slice(i, i + BATCH),
+                  ...(last ? { summary: finalSummary } : {}),
+                  findings_complete: last,
+                },
+                `report-${i}.json`,
+              );
+            }
+          }
+          REPORT
+          node "$HELPER_DIR/report.mjs"
+
+      - name: Upload scanner reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-security-reports-${{ inputs.job_id }}
+          path: ${{ runner.temp }}/codex-reports
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Notify scan.failed
+        if: failure()
+        run: |
+          node -e '
+            const fs = require("fs");
+            fs.writeFileSync(process.env.REPORT_DIR + "/failed.json", JSON.stringify({
+              client_job_id: process.env.JOB_ID,
+              event: "scan.failed",
+              engine: "github_actions",
+              external_scan_id: "gha-" + process.env.GITHUB_RUN_ID,
+              workflow_run_id: Number(process.env.GITHUB_RUN_ID),
+              workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+              error: "Codex security scan workflow failed — see the run log.",
+            }));
+          '
+          node "$HELPER_DIR/callback.mjs" "$REPORT_DIR/failed.json"

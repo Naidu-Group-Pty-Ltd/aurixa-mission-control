@@ -60,7 +60,14 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
         const sig =
           request.headers.get("x-codex-signature") ||
           request.headers.get("x-webhook-signature");
-        const ok = await verifyRemediationSignature(raw, sig);
+        // Same fallback chain the dispatcher uses when handing the secret to
+        // the workflow, so both ends always agree on the key in play.
+        const { resolveRemediationWebhookSecret } = await import(
+          "@/server/codex-scheduling.server"
+        );
+        const ok = await verifyRemediationSignature(raw, sig, [
+          await resolveRemediationWebhookSecret(),
+        ]);
         if (!ok) return json({ error: "invalid signature" }, 401);
 
         let payload: z.infer<typeof PayloadSchema>;

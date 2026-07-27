@@ -68,6 +68,7 @@ import { Route as HooksExpireReservationsRouteImport } from './routes/hooks.expi
 import { Route as HooksEdgeDriftRouteImport } from './routes/hooks.edge-drift'
 import { Route as HooksEdgeDrainRouteImport } from './routes/hooks.edge-drain'
 import { Route as HooksDriftRefreshRouteImport } from './routes/hooks.drift-refresh'
+import { Route as HooksCodexSweepRouteImport } from './routes/hooks.codex-sweep'
 import { Route as HooksCodexNightlyRouteImport } from './routes/hooks.codex-nightly'
 import { Route as HooksCascadeDrainRouteImport } from './routes/hooks.cascade-drain'
 import { Route as HooksBrandDriftRouteImport } from './routes/hooks.brand-drift'
@@ -424,6 +425,11 @@ const HooksEdgeDrainRoute = HooksEdgeDrainRouteImport.update({
 const HooksDriftRefreshRoute = HooksDriftRefreshRouteImport.update({
   id: '/hooks/drift-refresh',
   path: '/hooks/drift-refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HooksCodexSweepRoute = HooksCodexSweepRouteImport.update({
+  id: '/hooks/codex-sweep',
+  path: '/hooks/codex-sweep',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksCodexNightlyRoute = HooksCodexNightlyRouteImport.update({
@@ -785,6 +791,7 @@ export interface FileRoutesByFullPath {
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
+  '/hooks/codex-sweep': typeof HooksCodexSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -903,6 +910,7 @@ export interface FileRoutesByTo {
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
+  '/hooks/codex-sweep': typeof HooksCodexSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1023,6 +1031,7 @@ export interface FileRoutesById {
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
+  '/hooks/codex-sweep': typeof HooksCodexSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1144,6 +1153,7 @@ export interface FileRouteTypes {
     | '/hooks/brand-drift'
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
+    | '/hooks/codex-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1262,6 +1272,7 @@ export interface FileRouteTypes {
     | '/hooks/brand-drift'
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
+    | '/hooks/codex-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1381,6 +1392,7 @@ export interface FileRouteTypes {
     | '/hooks/brand-drift'
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
+    | '/hooks/codex-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1498,6 +1510,7 @@ export interface RootRouteChildren {
   HooksBrandDriftRoute: typeof HooksBrandDriftRoute
   HooksCascadeDrainRoute: typeof HooksCascadeDrainRoute
   HooksCodexNightlyRoute: typeof HooksCodexNightlyRoute
+  HooksCodexSweepRoute: typeof HooksCodexSweepRoute
   HooksDriftRefreshRoute: typeof HooksDriftRefreshRoute
   HooksEdgeDrainRoute: typeof HooksEdgeDrainRoute
   HooksEdgeDriftRoute: typeof HooksEdgeDriftRoute
@@ -1965,6 +1978,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/drift-refresh'
       fullPath: '/hooks/drift-refresh'
       preLoaderRoute: typeof HooksDriftRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/codex-sweep': {
+      id: '/hooks/codex-sweep'
+      path: '/hooks/codex-sweep'
+      fullPath: '/hooks/codex-sweep'
+      preLoaderRoute: typeof HooksCodexSweepRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/codex-nightly': {
@@ -2525,6 +2545,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksBrandDriftRoute: HooksBrandDriftRoute,
   HooksCascadeDrainRoute: HooksCascadeDrainRoute,
   HooksCodexNightlyRoute: HooksCodexNightlyRoute,
+  HooksCodexSweepRoute: HooksCodexSweepRoute,
   HooksDriftRefreshRoute: HooksDriftRefreshRoute,
   HooksEdgeDrainRoute: HooksEdgeDrainRoute,
   HooksEdgeDriftRoute: HooksEdgeDriftRoute,
@@ -2581,3 +2602,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

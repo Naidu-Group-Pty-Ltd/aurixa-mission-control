@@ -76,6 +76,7 @@ export const Route = createFileRoute("/hooks/github")({
           const repoFullName = repoOwner && repoName ? `${repoOwner}/${repoName}` : "";
           const headSha = prPayload?.pull_request?.head?.sha ?? null;
           const prNumber = prPayload?.pull_request?.number ?? null;
+          const baseRef = prPayload?.pull_request?.base?.ref ?? null;
 
           const { data: primeCfg } = await supabaseAdmin
             .from("prime_config")
@@ -102,8 +103,18 @@ export const Route = createFileRoute("/hooks/github")({
               cloneId: target.cloneId ?? null,
               repoFullName,
               ref: headSha,
+              // Scope the scan to the PR's own diff: a full-tree scan on
+              // every push would take minutes and drown the PR in findings
+              // the author did not introduce.
+              diffBase: baseRef,
               dedupWindowHours: primeCfg.codex_scan_dedup_hours ?? 6,
-              requestPayload: { source: "github_pr", delivery: deliveryId, action, pr: prNumber },
+              requestPayload: {
+                source: "github_pr",
+                delivery: deliveryId,
+                action,
+                pr: prNumber,
+                baseRef,
+              },
             });
             return new Response(JSON.stringify({ success: true, ...r }), {
               headers: { "Content-Type": "application/json" },
@@ -216,14 +227,20 @@ export const Route = createFileRoute("/hooks/github")({
         // the freshly merged SHA so drift/fix regressions are caught fast.
         if (prime.codex_post_merge_revalidate !== false) {
           const primeRepo = `${prime.github_owner}/${prime.github_repo}`;
-          enqueueScanNoAuth({
-            kind: "post_merge_revalidate",
-            targetKind: "prime",
-            repoFullName: primeRepo,
-            ref: sourceSha,
-            dedupWindowHours: prime.codex_scan_dedup_hours ?? 6,
-            requestPayload: { source: "post_merge", delivery: deliveryId, sha: sourceSha },
-          }).catch((e) => console.error("post-merge codex scan enqueue failed:", e));
+          // Awaited: dispatch is a couple of GitHub calls, and a floating
+          // promise here dies with the isolate before the scan is ever sent.
+          try {
+            await enqueueScanNoAuth({
+              kind: "post_merge_revalidate",
+              targetKind: "prime",
+              repoFullName: primeRepo,
+              ref: sourceSha,
+              dedupWindowHours: prime.codex_scan_dedup_hours ?? 6,
+              requestPayload: { source: "post_merge", delivery: deliveryId, sha: sourceSha },
+            });
+          } catch (e) {
+            console.error("post-merge codex scan enqueue failed:", e);
+          }
         }
 
 

@@ -15,3 +15,8 @@
 
 ## Next
 Phase 1 wires GitHub Actions `workflow_dispatch` to open a draft remediation PR per finding.
+
+> **Superseded.** The Codex Security HTTP API described here was never
+> shipped by OpenAI, so this design could not execute. See
+> [`live-architecture.md`](./live-architecture.md) for the pipeline that
+> actually runs.

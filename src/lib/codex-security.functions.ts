@@ -16,7 +16,9 @@ export const getSchedulingConfig = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("prime_config")
-      .select("id, codex_nightly_enabled, codex_nightly_cron, codex_pr_scan_enabled, codex_post_merge_revalidate, codex_scan_dedup_hours")
+      .select(
+        "id, codex_nightly_enabled, codex_nightly_cron, codex_pr_scan_enabled, codex_post_merge_revalidate, codex_scan_dedup_hours",
+      )
       .limit(1)
       .maybeSingle();
     if (error) throw error;
@@ -30,7 +32,11 @@ export const updateSchedulingConfig = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: userId });
     if (!isAdmin) throw new Error("Forbidden: admin only");
-    const { data: existing } = await supabase.from("prime_config").select("id").limit(1).maybeSingle();
+    const { data: existing } = await supabase
+      .from("prime_config")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
     if (!existing) throw new Error("prime_config not initialized");
     const { error } = await supabase.from("prime_config").update(data).eq("id", existing.id);
     if (error) throw error;
@@ -46,7 +52,6 @@ export const runNightlyNow = createServerFn({ method: "POST" })
     return await runNightlyScans();
   });
 
-
 const EnqueueInput = z.object({
   kind: z
     .enum(["manual", "nightly_full", "pr_open", "targeted_path", "post_merge_revalidate"])
@@ -58,6 +63,14 @@ const EnqueueInput = z.object({
   pathGlobs: z.array(z.string()).optional(),
 });
 
+/**
+ * Queue a scan as an authenticated admin.
+ *
+ * The insert-and-dispatch mechanics live in `enqueueScanNoAuth` so there is
+ * exactly one implementation; this fn only adds the auth gate and repo
+ * resolution. (The two used to be separate copies and had already drifted —
+ * only one of them recorded dispatch failures.)
+ */
 export const enqueueScan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => EnqueueInput.parse(d))
@@ -68,7 +81,6 @@ export const enqueueScan = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: userId });
     if (!isAdmin) throw new Error("Forbidden: admin only");
 
-    // Resolve repo. Prime uses prime_config; clone rows have repo_full_name.
     let repoFullName = data.repoFullName || "";
     if (!repoFullName) {
       if (data.targetKind === "prime") {
@@ -83,72 +95,34 @@ export const enqueueScan = createServerFn({ method: "POST" })
         if (!data.cloneId) throw new Error("cloneId required for clone scans");
         const { data: c } = await supabase
           .from("clones")
-          .select("repo_full_name, github_owner, github_repo")
+          .select("github_owner, github_repo")
           .eq("id", data.cloneId)
           .maybeSingle();
         if (!c) throw new Error("clone not found");
-        repoFullName = c.repo_full_name || `${c.github_owner}/${c.github_repo}`;
+        repoFullName = `${c.github_owner}/${c.github_repo}`;
       }
     }
 
-    const { data: job, error } = await supabase
-      .from("codex_scan_jobs")
-      .insert({
-        kind: data.kind,
-        target_kind: data.targetKind,
-        clone_id: data.cloneId ?? null,
-        repo_full_name: repoFullName,
-        ref: data.ref ?? null,
-        path_globs: data.pathGlobs ?? null,
-        requested_by: userId,
-        request_payload: { source: "manual", ref: data.ref, globs: data.pathGlobs },
-      })
-      .select()
-      .single();
-    if (error) throw error;
+    const { enqueueScanNoAuth } = await import("@/server/codex-scheduling.server");
+    const result = await enqueueScanNoAuth({
+      kind: data.kind,
+      targetKind: data.targetKind,
+      cloneId: data.cloneId ?? null,
+      repoFullName,
+      ref: data.ref ?? null,
+      pathGlobs: data.pathGlobs ?? null,
+      requestedBy: userId,
+      // Manual scans are explicit operator intent — never dedup them away.
+      dedupWindowHours: 0,
+      requestPayload: { source: "manual", requestedBy: userId },
+    });
 
-    // Fire-and-forget dispatch to Codex.
-    (async () => {
-      try {
-        const { enqueueCodexScan } = await import("@/server/codex-security-client.server");
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const origin =
-          process.env.APP_PUBLIC_URL || "https://mission-control.aurixasystems.com.au";
-        const callbackSecret = process.env.CODEX_SECURITY_WEBHOOK_SECRET || "";
-        const res = await enqueueCodexScan({
-          jobId: job.id,
-          repoFullName,
-          ref: data.ref ?? null,
-          pathGlobs: data.pathGlobs ?? null,
-          kind: data.kind,
-          callbackUrl: `${origin}/api/public/hooks/codex-security`,
-          callbackSecret,
-        });
-        await supabaseAdmin
-          .from("codex_scan_jobs")
-          .update({ external_scan_id: res.externalScanId, status: "running", started_at: new Date().toISOString() })
-          .eq("id", job.id);
-        await supabaseAdmin
-          .from("codex_scan_events")
-          .insert({ job_id: job.id, event_type: "dispatched", payload: { externalScanId: res.externalScanId } });
-      } catch (err) {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        await supabaseAdmin
-          .from("codex_scan_jobs")
-          .update({
-            status: "failed",
-            failure_count: 1,
-            last_error: (err as Error).message,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", job.id);
-        await supabaseAdmin
-          .from("codex_scan_events")
-          .insert({ job_id: job.id, event_type: "dispatch_failed", payload: { error: (err as Error).message } });
-      }
-    })();
-
-    return { jobId: job.id };
+    if (result.skipped) throw new Error(result.reason);
+    return {
+      jobId: result.jobId,
+      engine: result.engine,
+      dispatchError: result.dispatchError ?? null,
+    };
   });
 
 export const listScanJobs = createServerFn({ method: "GET" })
@@ -156,7 +130,9 @@ export const listScanJobs = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("codex_scan_jobs")
-      .select("id, kind, target_kind, clone_id, repo_full_name, ref, status, failure_count, last_error, started_at, completed_at, created_at, result_summary")
+      .select(
+        "id, kind, target_kind, clone_id, repo_full_name, ref, status, failure_count, last_error, started_at, completed_at, created_at, result_summary",
+      )
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw error;
@@ -190,47 +166,40 @@ export const getScanDetail = createServerFn({ method: "GET" })
 
 // -------- Phase 5: fleet views + per-clone controls --------
 
+/**
+ * Fleet overview, aggregated in Postgres.
+ *
+ * This used to pull the last 500 clone scan jobs and *every* open finding
+ * across the fleet into the server function on each 30s poll, then group
+ * them in JavaScript. `codex_fleet_overview()` does the DISTINCT ON and the
+ * severity roll-up in one indexed query and returns one row per clone.
+ */
 export const listCloneCodexOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase } = context;
-    const [clonesRes, jobsRes, findingsRes] = await Promise.all([
-      supabase
-        .from("clones")
-        .select("id, name, slug, repo_full_name, github_owner, github_repo, codex_nightly_enabled, status")
-        .order("name", { ascending: true }),
-      supabase
-        .from("codex_scan_jobs")
-        .select("id, clone_id, target_kind, status, kind, started_at, completed_at, created_at, result_summary")
-        .eq("target_kind", "clone")
-        .order("created_at", { ascending: false })
-        .limit(500),
-      supabase
-        .from("codex_findings")
-        .select("clone_id, severity, state")
-        .eq("state", "open"),
-    ]);
-    if (clonesRes.error) throw clonesRes.error;
+    const { data, error } = await context.supabase.rpc("codex_fleet_overview");
+    if (error) throw error;
 
-    const lastByClone = new Map();
-    for (const j of jobsRes.data ?? []) {
-      if (j.clone_id && !lastByClone.has(j.clone_id)) lastByClone.set(j.clone_id, j);
-    }
-    const countsByClone = new Map();
-    for (const f of findingsRes.data ?? []) {
-      if (!f.clone_id) continue;
-      const bucket = countsByClone.get(f.clone_id) ?? { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-      bucket[f.severity] = (bucket[f.severity] ?? 0) + 1;
-      countsByClone.set(f.clone_id, bucket);
-    }
-
-    const rows = (clonesRes.data ?? []).map((c) => ({
-      ...c,
-      lastScan: lastByClone.get(c.id) ?? null,
-      openFindings: countsByClone.get(c.id) ?? { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+    const clones = (data ?? []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      repo_full_name: row.repo_full_name,
+      github_owner: row.github_owner,
+      github_repo: row.github_repo,
+      codex_nightly_enabled: row.codex_nightly_enabled,
+      sync_status: row.sync_status,
+      lastScan: row.last_scan,
+      openFindings: row.open_findings ?? {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        info: 0,
+      },
     }));
 
-    return { clones: rows };
+    return { clones };
   });
 
 const CloneNightlyInput = z.object({
@@ -263,11 +232,11 @@ export const runCloneScanNow = createServerFn({ method: "POST" })
     const { enqueueScanNoAuth } = await import("@/server/codex-scheduling.server");
     const { data: clone } = await context.supabase
       .from("clones")
-      .select("repo_full_name, github_owner, github_repo")
+      .select("github_owner, github_repo")
       .eq("id", data.cloneId)
       .maybeSingle();
     if (!clone) throw new Error("clone not found");
-    const repo = clone.repo_full_name || `${clone.github_owner}/${clone.github_repo}`;
+    const repo = `${clone.github_owner}/${clone.github_repo}`;
     const r = await enqueueScanNoAuth({
       kind: "manual",
       targetKind: "clone",
@@ -285,7 +254,9 @@ export const listCloneScanJobs = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: jobs, error } = await context.supabase
       .from("codex_scan_jobs")
-      .select("id, kind, status, started_at, completed_at, created_at, result_summary, last_error, ref")
+      .select(
+        "id, kind, status, started_at, completed_at, created_at, result_summary, last_error, ref",
+      )
       .eq("clone_id", data.cloneId)
       .order("created_at", { ascending: false })
       .limit(25);

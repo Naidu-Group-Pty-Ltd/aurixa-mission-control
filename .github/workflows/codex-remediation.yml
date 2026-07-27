@@ -1,10 +1,21 @@
 name: Codex Security Remediation
 # Reference workflow: place this file at .github/workflows/codex-remediation.yml
 # in every repo (Prime and clones) that should accept Mission Control's
-# draft-fix dispatches. Mission Control triggers it via workflow_dispatch
-# with the inputs below, then the workflow uses Codex Security to author
-# the patch, opens a draft PR, and reports state back to the remediation
-# callback URL. The callback is HMAC-signed with CODEX_REMEDIATION_SECRET.
+# draft-fix dispatches.
+#
+# Mission Control triggers it via workflow_dispatch with the inputs below.
+# The job asks the Codex CLI to fix the finding in the working tree, commits
+# whatever it changed, opens a DRAFT pull request, and reports each lifecycle
+# event back to the callback URL (HMAC-SHA256 signed with callback_secret).
+#
+# Secrets consumed (synced by Mission Control — see
+# src/server/github-secrets.server.ts):
+#   OPENAI_API_KEY  — required. Authenticates the Codex CLI.
+#                     CODEX_SECURITY_API_KEY is accepted as a legacy alias.
+#   GITHUB_TOKEN    — provided automatically; used to push and open the PR.
+#
+# Note: pushes made with GITHUB_TOKEN do not trigger further workflow runs,
+# which is deliberate — a remediation PR must not recursively dispatch.
 
 on:
   workflow_dispatch:
@@ -33,29 +44,77 @@ concurrency:
 jobs:
   draft-fix:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     env:
-      REMEDIATION_ID:   ${{ inputs.remediation_id }}
-      BRANCH_NAME:      ${{ inputs.branch_name }}
-      BASE_REF:         ${{ inputs.base_ref }}
-      CALLBACK_URL:     ${{ inputs.callback_url }}
-      CALLBACK_SECRET:  ${{ inputs.callback_secret }}
-      CODEX_API_KEY:    ${{ secrets.CODEX_SECURITY_API_KEY }}
+      REMEDIATION_ID:  ${{ inputs.remediation_id }}
+      BRANCH_NAME:     ${{ inputs.branch_name }}
+      BASE_REF:        ${{ inputs.base_ref }}
+      CALLBACK_URL:    ${{ inputs.callback_url }}
+      CALLBACK_SECRET: ${{ inputs.callback_secret }}
+      HELPER_DIR:      ${{ runner.temp }}/codex-helpers
+      OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY || secrets.CODEX_SECURITY_API_KEY }}
+
     steps:
-      - name: Notify Mission Control (workflow.started)
+      - name: Install callback helper
         run: |
-          node -e '
-            const crypto = require("crypto");
-            const body = JSON.stringify({
-              remediation_id: process.env.REMEDIATION_ID,
-              event: "workflow.started",
-              workflow_run_id: Number(process.env.GITHUB_RUN_ID),
-              workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-              branch_name: process.env.BRANCH_NAME,
-            });
-            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
-            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body })
-              .then(r => r.text()).then(t => console.log("callback:", t));
-          '
+          set -euo pipefail
+          mkdir -p "$HELPER_DIR"
+          cat > "$HELPER_DIR/callback.mjs" <<'HELPER'
+          import crypto from "node:crypto";
+          import fs from "node:fs";
+
+          const url = process.env.CALLBACK_URL;
+          const secret = process.env.CALLBACK_SECRET;
+          const body = fs.readFileSync(process.argv[2], "utf8");
+          if (!url || !secret) {
+            console.error("callback: missing CALLBACK_URL/CALLBACK_SECRET");
+            process.exit(0);
+          }
+          const sig =
+            "sha256=" + crypto.createHmac("sha256", secret).update(body).digest("hex");
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+          for (let attempt = 1; attempt <= 4; attempt++) {
+            try {
+              const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "x-codex-signature": sig },
+                body,
+              });
+              const text = await res.text();
+              console.log(`callback [${res.status}] ${text.slice(0, 400)}`);
+              if (res.ok || (res.status < 500 && res.status !== 429)) process.exit(0);
+            } catch (err) {
+              console.error(`callback attempt ${attempt} failed: ${err.message}`);
+            }
+            if (attempt < 4) await sleep(attempt * 1500);
+          }
+          console.error("callback: giving up after 4 attempts");
+          HELPER
+
+          cat > "$HELPER_DIR/notify.mjs" <<'NOTIFY'
+          // Usage: node notify.mjs '<json fragment>'
+          import fs from "node:fs";
+          import path from "node:path";
+          import { execFileSync } from "node:child_process";
+
+          const extra = JSON.parse(process.argv[2] || "{}");
+          const payload = {
+            remediation_id: process.env.REMEDIATION_ID,
+            branch_name: process.env.BRANCH_NAME,
+            workflow_run_id: Number(process.env.GITHUB_RUN_ID),
+            workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            ...extra,
+          };
+          const file = path.join(process.env.HELPER_DIR, `payload-${Date.now()}.json`);
+          fs.writeFileSync(file, JSON.stringify(payload));
+          execFileSync("node", [path.join(process.env.HELPER_DIR, "callback.mjs"), file], {
+            stdio: "inherit",
+          });
+          NOTIFY
+
+      - name: Notify workflow.started
+        run: node "$HELPER_DIR/notify.mjs" '{"event":"workflow.started"}'
 
       - uses: actions/checkout@v4
         with:
@@ -65,121 +124,146 @@ jobs:
 
       - name: Set up branch
         run: |
+          set -euo pipefail
           git config user.name  "codex-security[bot]"
           git config user.email "codex-security@aurixasystems.com.au"
           git checkout -b "$BRANCH_NAME"
 
-      - name: Request patch from Codex Security
+      - name: Author the fix with Codex
         id: codex
         run: |
-          # Ask Codex Security for a unified diff addressing the finding.
-          # The endpoint shape below is the Mission Control adapter contract;
-          # swap the URL/headers if you use a different Codex integration.
-          RESPONSE=$(curl -sS -X POST "https://api.openai.com/v1/security/remediations" \
-            -H "Authorization: Bearer ${CODEX_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d @- <<EOF
-          {
-            "finding_id":   "${{ inputs.finding_id }}",
-            "title":        ${{ toJSON(inputs.finding_title) }},
-            "severity":     "${{ inputs.finding_severity }}",
-            "file":         ${{ toJSON(inputs.finding_file) }},
-            "line":         "${{ inputs.finding_line }}",
-            "cwe":          ${{ toJSON(inputs.finding_cwe) }},
-            "description":  ${{ toJSON(inputs.finding_description) }},
-            "repository":   "${{ github.repository }}",
-            "base_ref":     "${{ inputs.base_ref }}"
-          }
-          EOF
-          )
-          echo "$RESPONSE" > /tmp/codex-response.json
-          jq -r '.patch // empty' /tmp/codex-response.json > /tmp/codex.patch
-          jq -r '.summary // ""' /tmp/codex-response.json > /tmp/codex-summary.txt
-          if [ ! -s /tmp/codex.patch ]; then
-            echo "No patch returned from Codex" >&2
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "::error::OPENAI_API_KEY is not configured on this repository."
             exit 1
           fi
+          npm install -g @openai/codex@latest >/dev/null 2>&1
 
-      - name: Apply patch
+          cat > "$RUNNER_TEMP/prompt.txt" <<'PROMPT'
+          Fix the following security finding in this repository.
+          PROMPT
+          cat >> "$RUNNER_TEMP/prompt.txt" <<EOF
+
+          Title:       ${{ inputs.finding_title }}
+          Severity:    ${{ inputs.finding_severity }}
+          Location:    ${{ inputs.finding_file }}:${{ inputs.finding_line }}
+          CWE:         ${{ inputs.finding_cwe }}
+
+          Details:
+          ${{ inputs.finding_description }}
+          EOF
+          cat >> "$RUNNER_TEMP/prompt.txt" <<'PROMPT'
+
+          Rules:
+          - Make the smallest change that actually removes the vulnerability.
+          - Do not reformat unrelated code, bump unrelated dependencies, or
+            rename things beyond what the fix requires.
+          - Do not add or modify tests unless the fix is untestable without it.
+          - If the finding is a false positive, change nothing and write your
+            reasoning to CODEX_FIX_NOTES.md instead.
+          - When you are done, write a 3-6 line summary of exactly what you
+            changed and why it closes the finding to CODEX_FIX_SUMMARY.md.
+          PROMPT
+
+          timeout 25m codex exec \
+            --sandbox workspace-write \
+            "$(cat "$RUNNER_TEMP/prompt.txt")"
+
+          # CODEX_FIX_SUMMARY.md is a report artifact, not part of the patch.
+          if [ -f CODEX_FIX_SUMMARY.md ]; then
+            cp CODEX_FIX_SUMMARY.md "$RUNNER_TEMP/summary.md"
+            rm -f CODEX_FIX_SUMMARY.md
+          else
+            echo "Codex produced no summary." > "$RUNNER_TEMP/summary.md"
+          fi
+          if [ -f CODEX_FIX_NOTES.md ]; then
+            cp CODEX_FIX_NOTES.md "$RUNNER_TEMP/notes.md"
+            rm -f CODEX_FIX_NOTES.md
+          fi
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A no-op run is a real outcome, not a crash: report it and stop
+      # cleanly so the finding does not sit in a phantom "in flight" state.
+      - name: Report no-change outcome
+        if: steps.codex.outputs.changed != 'true'
         run: |
-          git apply --whitespace=fix /tmp/codex.patch
+          set -euo pipefail
+          ARG=$(node -e '
+            const fs = require("fs");
+            let notes = "Codex made no changes.";
+            try { notes = fs.readFileSync(process.env.RUNNER_TEMP + "/notes.md", "utf8"); } catch {}
+            process.stdout.write(JSON.stringify({
+              event: "workflow.failed",
+              error: "Codex produced no change for this finding: " + notes.trim().slice(0, 1000),
+            }));
+          ')
+          node "$HELPER_DIR/notify.mjs" "$ARG"
+          echo "::warning::Codex produced no change; no PR was opened."
+
+      - name: Commit and push
+        if: steps.codex.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
           git add -A
-          git commit -m "codex: draft fix for ${{ inputs.finding_title }} (${{ inputs.finding_severity }})" -m "Finding: ${{ inputs.finding_id }}"
+          git commit \
+            -m "codex: draft fix for ${{ inputs.finding_title }} (${{ inputs.finding_severity }})" \
+            -m "Finding: ${{ inputs.finding_id }}"
           git push origin "$BRANCH_NAME"
-
-      - name: Notify branch pushed
-        run: |
-          node -e '
-            const crypto = require("crypto");
-            const body = JSON.stringify({
-              remediation_id: process.env.REMEDIATION_ID,
-              event: "branch.pushed",
-              branch_name: process.env.BRANCH_NAME,
-            });
-            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
-            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body });
-          '
+          node "$HELPER_DIR/notify.mjs" '{"event":"branch.pushed"}'
 
       - name: Open draft PR
         id: openpr
+        if: steps.codex.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          SUMMARY=$(cat /tmp/codex-summary.txt)
+          set -euo pipefail
+          {
+            echo "Autogenerated by Codex Security via Mission Control."
+            echo
+            echo "- Finding: \`${{ inputs.finding_id }}\`"
+            echo "- Severity: **${{ inputs.finding_severity }}**"
+            echo "- Location: \`${{ inputs.finding_file }}:${{ inputs.finding_line }}\`"
+            echo "- CWE: ${{ inputs.finding_cwe }}"
+            echo
+            echo "## What changed"
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "> Opened as a **draft**. Human review is required before merge."
+          } > "$RUNNER_TEMP/pr-body.md"
+
           PR_URL=$(gh pr create \
             --draft \
             --base "$BASE_REF" \
             --head "$BRANCH_NAME" \
             --title "codex: ${{ inputs.finding_severity }} — ${{ inputs.finding_title }}" \
-            --body "$(cat <<EOF
-          Autogenerated by Codex Security via Mission Control.
-
-          - Finding: \`${{ inputs.finding_id }}\`
-          - Severity: **${{ inputs.finding_severity }}**
-          - File: \`${{ inputs.finding_file }}:${{ inputs.finding_line }}\`
-          - CWE: ${{ inputs.finding_cwe }}
-
-          ## Summary
-          ${SUMMARY}
-
-          > This PR is opened as **draft**. Human review is required before merge.
-          EOF
-          )")
+            --body-file "$RUNNER_TEMP/pr-body.md")
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
-          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$(basename "$PR_URL")" >> "$GITHUB_OUTPUT"
 
       - name: Notify PR opened
-        env:
-          PR_URL:    ${{ steps.openpr.outputs.pr_url }}
-          PR_NUMBER: ${{ steps.openpr.outputs.pr_number }}
+        if: steps.openpr.outcome == 'success' && steps.codex.outputs.changed == 'true'
         run: |
-          node -e '
-            const crypto = require("crypto");
-            const body = JSON.stringify({
-              remediation_id: process.env.REMEDIATION_ID,
+          set -euo pipefail
+          ARG=$(node -e '
+            process.stdout.write(JSON.stringify({
               event: "pr.opened",
               pr_number: Number(process.env.PR_NUMBER),
               pr_url: process.env.PR_URL,
               pr_state: "draft_open",
-              branch_name: process.env.BRANCH_NAME,
-            });
-            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
-            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body });
-          '
+            }));
+          ')
+          node "$HELPER_DIR/notify.mjs" "$ARG"
+        env:
+          PR_URL:    ${{ steps.openpr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.openpr.outputs.pr_number }}
 
       - name: Notify failure
         if: failure()
         run: |
-          node -e '
-            const crypto = require("crypto");
-            const body = JSON.stringify({
-              remediation_id: process.env.REMEDIATION_ID,
-              event: "workflow.failed",
-              workflow_run_id: Number(process.env.GITHUB_RUN_ID),
-              workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-              error: "Codex remediation workflow failed. See run logs.",
-            });
-            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
-            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body });
-          '
+          node "$HELPER_DIR/notify.mjs" '{"event":"workflow.failed","error":"Codex remediation workflow failed. See the run log."}'

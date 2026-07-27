@@ -61,3 +61,8 @@ to `/api/public/hooks/codex-remediation` (HMAC-signed with
 - No fleet cascade — the workflow only affects the finding's repo.
   Phase 3 wires cascades.
 - No perpetual scheduler; Phase 4 covers nightly + PR-open scans.
+
+> **Partly superseded.** The database schema, callback contract, review
+> gating, and UI described here are current. The patch-generation step no
+> longer calls a hosted API — `codex-remediation.yml` now drives the Codex
+> CLI directly. See [`live-architecture.md`](./live-architecture.md).
