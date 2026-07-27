@@ -22,6 +22,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { KeyRound, Plus, Trash2, Copy, PlugZap } from "lucide-react";
+import { ProtectedRoute } from "@/components/protected-route";
+import { AppShell } from "@/components/app-shell";
 import {
   listSecurityIntakeSources,
   upsertSecurityIntakeSource,
@@ -30,9 +32,16 @@ import {
 } from "@/lib/security-intake.functions";
 
 export const Route = createFileRoute("/security/intake")({
-  component: () => <SecurityIntakePage />,
+  component: () => (
+    <ProtectedRoute>
+      <AppShell>
+        <SecurityIntakePage />
+      </AppShell>
+    </ProtectedRoute>
+  ),
   head: () => ({ meta: [{ title: "Security Intake Sources — Aurixa Systems" }] }),
 });
+
 
 const KIND_LABELS: Record<string, string> = {
   codex: "Codex Security",
