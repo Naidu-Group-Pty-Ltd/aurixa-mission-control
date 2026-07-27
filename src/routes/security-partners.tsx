@@ -726,6 +726,24 @@ function SecurityPartnersPage() {
                       Send note
                     </Button>
                   </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => syncCodex(assessment.id)}
+                      disabled={busy === `codex:${assessment.id}`}
+                    >
+                      {busy === `codex:${assessment.id}` ? "Syncing Codex…" : "Mirror Codex findings"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => exportBundle(assessment.id)}
+                      disabled={busy === `bundle:${assessment.id}`}
+                    >
+                      {busy === `bundle:${assessment.id}` ? "Exporting…" : "Export sign-off bundle"}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
