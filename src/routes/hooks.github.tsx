@@ -212,6 +212,21 @@ export const Route = createFileRoute("/hooks/github")({
           console.error("Webhook-triggered cascade failed:", e);
         });
 
+        // Phase 4 — post-merge revalidate: run a Codex Security scan against
+        // the freshly merged SHA so drift/fix regressions are caught fast.
+        if (prime.codex_post_merge_revalidate !== false) {
+          const primeRepo = `${prime.github_owner}/${prime.github_repo}`;
+          enqueueScanNoAuth({
+            kind: "post_merge_revalidate",
+            targetKind: "prime",
+            repoFullName: primeRepo,
+            ref: sourceSha,
+            dedupWindowHours: prime.codex_scan_dedup_hours ?? 6,
+            requestPayload: { source: "post_merge", delivery: deliveryId, sha: sourceSha },
+          }).catch((e) => console.error("post-merge codex scan enqueue failed:", e));
+        }
+
+
         return new Response(
           JSON.stringify({
             success: true,
