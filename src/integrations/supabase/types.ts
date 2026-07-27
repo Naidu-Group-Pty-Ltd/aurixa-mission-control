@@ -2073,6 +2073,7 @@ export type Database = {
           cvss: number | null
           cwe: string | null
           description: string | null
+          external_ticket_url: string | null
           id: string
           raw: Json
           remediation_pr_state: string | null
@@ -2080,6 +2081,7 @@ export type Database = {
           resolved_at: string | null
           scan_job_id: string
           severity: Database["public"]["Enums"]["codex_finding_severity"]
+          source_slug: string | null
           state: Database["public"]["Enums"]["codex_finding_state"]
           title: string
           updated_at: string
@@ -2094,6 +2096,7 @@ export type Database = {
           cvss?: number | null
           cwe?: string | null
           description?: string | null
+          external_ticket_url?: string | null
           id?: string
           raw?: Json
           remediation_pr_state?: string | null
@@ -2101,6 +2104,7 @@ export type Database = {
           resolved_at?: string | null
           scan_job_id: string
           severity?: Database["public"]["Enums"]["codex_finding_severity"]
+          source_slug?: string | null
           state?: Database["public"]["Enums"]["codex_finding_state"]
           title: string
           updated_at?: string
@@ -2115,6 +2119,7 @@ export type Database = {
           cvss?: number | null
           cwe?: string | null
           description?: string | null
+          external_ticket_url?: string | null
           id?: string
           raw?: Json
           remediation_pr_state?: string | null
@@ -2122,6 +2127,7 @@ export type Database = {
           resolved_at?: string | null
           scan_job_id?: string
           severity?: Database["public"]["Enums"]["codex_finding_severity"]
+          source_slug?: string | null
           state?: Database["public"]["Enums"]["codex_finding_state"]
           title?: string
           updated_at?: string
@@ -5081,6 +5087,63 @@ export type Database = {
           },
         ]
       }
+      security_external_tickets: {
+        Row: {
+          codex_finding_id: string | null
+          created_at: string
+          created_by: string | null
+          external_id: string
+          id: string
+          metadata: Json
+          provider: string
+          source_slug: string
+          status: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          codex_finding_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_id: string
+          id?: string
+          metadata?: Json
+          provider: string
+          source_slug: string
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          codex_finding_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_id?: string
+          id?: string
+          metadata?: Json
+          provider?: string
+          source_slug?: string
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_external_tickets_codex_finding_id_fkey"
+            columns: ["codex_finding_id"]
+            isOneToOne: false
+            referencedRelation: "codex_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_external_tickets_source_slug_fkey"
+            columns: ["source_slug"]
+            isOneToOne: false
+            referencedRelation: "security_intake_sources"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       security_findings: {
         Row: {
           affected_asset: string | null
@@ -5188,6 +5251,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      security_intake_sources: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          hmac_secret: string | null
+          id: string
+          kind: string
+          metadata: Json
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          hmac_secret?: string | null
+          id?: string
+          kind: string
+          metadata?: Json
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          hmac_secret?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       security_partner_assignments: {
         Row: {
