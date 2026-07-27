@@ -1,0 +1,185 @@
+name: Codex Security Remediation
+# Reference workflow: place this file at .github/workflows/codex-remediation.yml
+# in every repo (Prime and clones) that should accept Mission Control's
+# draft-fix dispatches. Mission Control triggers it via workflow_dispatch
+# with the inputs below, then the workflow uses Codex Security to author
+# the patch, opens a draft PR, and reports state back to the remediation
+# callback URL. The callback is HMAC-signed with CODEX_REMEDIATION_SECRET.
+
+on:
+  workflow_dispatch:
+    inputs:
+      remediation_id:      { description: "Mission Control remediation id (UUID)", required: true }
+      finding_id:          { description: "Codex finding id", required: true }
+      finding_title:       { description: "Finding title", required: true }
+      finding_severity:    { description: "Finding severity", required: true }
+      finding_file:        { description: "Affected file path", required: false, default: "" }
+      finding_line:        { description: "Affected line", required: false, default: "" }
+      finding_cwe:         { description: "CWE identifier", required: false, default: "" }
+      finding_description: { description: "Finding description (<= 4000 chars)", required: false, default: "" }
+      base_ref:            { description: "Base ref / branch to fork from", required: true }
+      branch_name:         { description: "Branch name to push the fix to", required: true }
+      callback_url:        { description: "Mission Control callback URL", required: true }
+      callback_secret:     { description: "HMAC secret for the callback", required: true }
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: codex-remediation-${{ inputs.remediation_id }}
+  cancel-in-progress: false
+
+jobs:
+  draft-fix:
+    runs-on: ubuntu-latest
+    env:
+      REMEDIATION_ID:   ${{ inputs.remediation_id }}
+      BRANCH_NAME:      ${{ inputs.branch_name }}
+      BASE_REF:         ${{ inputs.base_ref }}
+      CALLBACK_URL:     ${{ inputs.callback_url }}
+      CALLBACK_SECRET:  ${{ inputs.callback_secret }}
+      CODEX_API_KEY:    ${{ secrets.CODEX_SECURITY_API_KEY }}
+    steps:
+      - name: Notify Mission Control (workflow.started)
+        run: |
+          node -e '
+            const crypto = require("crypto");
+            const body = JSON.stringify({
+              remediation_id: process.env.REMEDIATION_ID,
+              event: "workflow.started",
+              workflow_run_id: Number(process.env.GITHUB_RUN_ID),
+              workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+              branch_name: process.env.BRANCH_NAME,
+            });
+            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
+            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body })
+              .then(r => r.text()).then(t => console.log("callback:", t));
+          '
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up branch
+        run: |
+          git config user.name  "codex-security[bot]"
+          git config user.email "codex-security@aurixasystems.com.au"
+          git checkout -b "$BRANCH_NAME"
+
+      - name: Request patch from Codex Security
+        id: codex
+        run: |
+          # Ask Codex Security for a unified diff addressing the finding.
+          # The endpoint shape below is the Mission Control adapter contract;
+          # swap the URL/headers if you use a different Codex integration.
+          RESPONSE=$(curl -sS -X POST "https://api.openai.com/v1/security/remediations" \
+            -H "Authorization: Bearer ${CODEX_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "finding_id":   "${{ inputs.finding_id }}",
+            "title":        ${{ toJSON(inputs.finding_title) }},
+            "severity":     "${{ inputs.finding_severity }}",
+            "file":         ${{ toJSON(inputs.finding_file) }},
+            "line":         "${{ inputs.finding_line }}",
+            "cwe":          ${{ toJSON(inputs.finding_cwe) }},
+            "description":  ${{ toJSON(inputs.finding_description) }},
+            "repository":   "${{ github.repository }}",
+            "base_ref":     "${{ inputs.base_ref }}"
+          }
+          EOF
+          )
+          echo "$RESPONSE" > /tmp/codex-response.json
+          jq -r '.patch // empty' /tmp/codex-response.json > /tmp/codex.patch
+          jq -r '.summary // ""' /tmp/codex-response.json > /tmp/codex-summary.txt
+          if [ ! -s /tmp/codex.patch ]; then
+            echo "No patch returned from Codex" >&2
+            exit 1
+          fi
+
+      - name: Apply patch
+        run: |
+          git apply --whitespace=fix /tmp/codex.patch
+          git add -A
+          git commit -m "codex: draft fix for ${{ inputs.finding_title }} (${{ inputs.finding_severity }})" -m "Finding: ${{ inputs.finding_id }}"
+          git push origin "$BRANCH_NAME"
+
+      - name: Notify branch pushed
+        run: |
+          node -e '
+            const crypto = require("crypto");
+            const body = JSON.stringify({
+              remediation_id: process.env.REMEDIATION_ID,
+              event: "branch.pushed",
+              branch_name: process.env.BRANCH_NAME,
+            });
+            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
+            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body });
+          '
+
+      - name: Open draft PR
+        id: openpr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SUMMARY=$(cat /tmp/codex-summary.txt)
+          PR_URL=$(gh pr create \
+            --draft \
+            --base "$BASE_REF" \
+            --head "$BRANCH_NAME" \
+            --title "codex: ${{ inputs.finding_severity }} — ${{ inputs.finding_title }}" \
+            --body "$(cat <<EOF
+          Autogenerated by Codex Security via Mission Control.
+
+          - Finding: \`${{ inputs.finding_id }}\`
+          - Severity: **${{ inputs.finding_severity }}**
+          - File: \`${{ inputs.finding_file }}:${{ inputs.finding_line }}\`
+          - CWE: ${{ inputs.finding_cwe }}
+
+          ## Summary
+          ${SUMMARY}
+
+          > This PR is opened as **draft**. Human review is required before merge.
+          EOF
+          )")
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Notify PR opened
+        env:
+          PR_URL:    ${{ steps.openpr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.openpr.outputs.pr_number }}
+        run: |
+          node -e '
+            const crypto = require("crypto");
+            const body = JSON.stringify({
+              remediation_id: process.env.REMEDIATION_ID,
+              event: "pr.opened",
+              pr_number: Number(process.env.PR_NUMBER),
+              pr_url: process.env.PR_URL,
+              pr_state: "draft_open",
+              branch_name: process.env.BRANCH_NAME,
+            });
+            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
+            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body });
+          '
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          node -e '
+            const crypto = require("crypto");
+            const body = JSON.stringify({
+              remediation_id: process.env.REMEDIATION_ID,
+              event: "workflow.failed",
+              workflow_run_id: Number(process.env.GITHUB_RUN_ID),
+              workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+              error: "Codex remediation workflow failed. See run logs.",
+            });
+            const sig = "sha256=" + crypto.createHmac("sha256", process.env.CALLBACK_SECRET).update(body).digest("hex");
+            fetch(process.env.CALLBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-codex-signature": sig }, body });
+          '

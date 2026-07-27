@@ -2147,6 +2147,107 @@ export type Database = {
           },
         ]
       }
+      codex_remediations: {
+        Row: {
+          base_ref: string
+          branch_name: string | null
+          clone_id: string | null
+          completed_at: string | null
+          created_at: string
+          dispatch_payload: Json
+          dispatched_at: string | null
+          finding_id: string
+          id: string
+          last_error: string | null
+          last_event: Json
+          pr_number: number | null
+          pr_state: string | null
+          pr_url: string | null
+          repo_full_name: string
+          requested_by: string | null
+          scan_job_id: string
+          status: Database["public"]["Enums"]["codex_remediation_status"]
+          updated_at: string
+          workflow_run_id: number | null
+          workflow_run_url: string | null
+        }
+        Insert: {
+          base_ref: string
+          branch_name?: string | null
+          clone_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dispatch_payload?: Json
+          dispatched_at?: string | null
+          finding_id: string
+          id?: string
+          last_error?: string | null
+          last_event?: Json
+          pr_number?: number | null
+          pr_state?: string | null
+          pr_url?: string | null
+          repo_full_name: string
+          requested_by?: string | null
+          scan_job_id: string
+          status?: Database["public"]["Enums"]["codex_remediation_status"]
+          updated_at?: string
+          workflow_run_id?: number | null
+          workflow_run_url?: string | null
+        }
+        Update: {
+          base_ref?: string
+          branch_name?: string | null
+          clone_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dispatch_payload?: Json
+          dispatched_at?: string | null
+          finding_id?: string
+          id?: string
+          last_error?: string | null
+          last_event?: Json
+          pr_number?: number | null
+          pr_state?: string | null
+          pr_url?: string | null
+          repo_full_name?: string
+          requested_by?: string | null
+          scan_job_id?: string
+          status?: Database["public"]["Enums"]["codex_remediation_status"]
+          updated_at?: string
+          workflow_run_id?: number | null
+          workflow_run_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "codex_remediations_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "codex_remediations_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "codex_remediations_finding_id_fkey"
+            columns: ["finding_id"]
+            isOneToOne: false
+            referencedRelation: "codex_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "codex_remediations_scan_job_id_fkey"
+            columns: ["scan_job_id"]
+            isOneToOne: false
+            referencedRelation: "codex_scan_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       codex_scan_events: {
         Row: {
           actor: string | null
@@ -6112,6 +6213,15 @@ export type Database = {
         | "resolved"
         | "dismissed"
         | "false_positive"
+      codex_remediation_status:
+        | "queued"
+        | "dispatched"
+        | "pr_opened"
+        | "pr_updated"
+        | "merged"
+        | "closed"
+        | "failed"
+        | "canceled"
       codex_scan_kind:
         | "manual"
         | "nightly_full"
@@ -6367,6 +6477,16 @@ export const Constants = {
         "resolved",
         "dismissed",
         "false_positive",
+      ],
+      codex_remediation_status: [
+        "queued",
+        "dispatched",
+        "pr_opened",
+        "pr_updated",
+        "merged",
+        "closed",
+        "failed",
+        "canceled",
       ],
       codex_scan_kind: [
         "manual",
