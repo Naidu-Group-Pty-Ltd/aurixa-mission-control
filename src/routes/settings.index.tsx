@@ -19,6 +19,7 @@ import { Github, Cloud, Sparkles, Zap } from "lucide-react";
 import { GitHubStatusCard } from "@/components/github-status-card";
 import { GitHubSetupWizard } from "@/components/github-setup-wizard";
 import { WebhookDeliveriesPanel } from "@/components/webhook-deliveries-panel";
+import { GitHubSecretSyncCard } from "@/components/github-secret-sync-card";
 import { PemKeyHelper } from "@/components/pem-key-helper";
 import { ProfileEditorCard } from "@/components/profile-editor-card";
 import { useUserRoles } from "@/lib/use-user-roles";
