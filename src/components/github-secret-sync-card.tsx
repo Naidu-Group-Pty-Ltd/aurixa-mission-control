@@ -108,8 +108,8 @@ export function GitHubSecretSyncCard(props: Props) {
         </CardTitle>
         <CardDescription>
           Pushes the Codex Security workflow secrets into the target repository using the Aurixa
-          GitHub App and libsodium sealed-box encryption — values never appear in the browser.
-          Requires the App installation to hold <strong>Secrets: read &amp; write</strong>.
+          GitHub App and sealed-box encryption — values never appear in the browser. Requires the
+          App installation to hold <strong>Secrets: read &amp; write</strong>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

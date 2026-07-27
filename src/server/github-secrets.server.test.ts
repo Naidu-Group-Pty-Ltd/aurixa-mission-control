@@ -1,10 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SealedBoxError } from "@/server/github-sealed-box.server";
 import {
   buildCodexRepoSecrets,
   describeSecretError,
   previewCodexRepoSecrets,
+  syncRepoSecrets,
   validateSecretName,
 } from "@/server/github-secrets.server";
+
+/** Every GitHub call in this module goes through the App-authenticated client. */
+const request = vi.fn();
+vi.mock("@/server/github-app.server", () => ({
+  getAppOctokit: () => ({ request: (...args: unknown[]) => request(...args) }),
+}));
 
 const TOUCHED = [
   "OPENAI_API_KEY",
@@ -18,6 +26,7 @@ const TOUCHED = [
 let saved: Record<string, string | undefined>;
 
 beforeEach(() => {
+  request.mockReset();
   saved = Object.fromEntries(TOUCHED.map((k) => [k, process.env[k]]));
   for (const k of TOUCHED) delete process.env[k];
 });
@@ -81,6 +90,118 @@ describe("describeSecretError", () => {
     const { status, message } = describeSecretError(new Error("socket hang up"), "a", "b");
     expect(status).toBeNull();
     expect(message).toBe("socket hang up");
+  });
+
+  it("separates a local encryption failure from a GitHub permission problem", () => {
+    // The whole point: an operator seeing this must not go hunting through
+    // GitHub App permissions for a fault that lives in our own runtime.
+    const { status, message, fatal } = describeSecretError(
+      new SealedBoxError("no cryptographic random source"),
+      "acme",
+      "widgets",
+    );
+    expect(status).toBeNull();
+    expect(fatal).toBe(true);
+    expect(message).toContain("before GitHub was contacted");
+    expect(message).toContain("not a repository or App-permission problem");
+    expect(message).toContain("no cryptographic random source");
+  });
+
+  it("recognises a reintroduced Wasm crypto dependency by its abort message", () => {
+    // The exact production failure: libsodium-wrappers on Cloudflare Workers.
+    const { fatal, message } = describeSecretError(
+      new Error(
+        "Aborted(CompileError: WebAssembly.instantiate(): Wasm code generation disallowed " +
+          "by embedder). Build with -sASSERTIONS for more info.",
+      ),
+      "acme",
+      "widgets",
+    );
+    expect(fatal).toBe(true);
+    expect(message).toContain("could not encrypt");
+    expect(message).toContain("Workers runtime");
+  });
+
+  it("marks repo-wide faults fatal and per-secret faults not", () => {
+    const target = ["acme", "widgets"] as const;
+    for (const status of [401, 403, 404]) {
+      expect(describeSecretError({ status }, ...target).fatal).toBe(true);
+    }
+    // A 422 is about this name or value, so the remaining secrets deserve a try.
+    expect(describeSecretError({ status: 422 }, ...target).fatal).toBe(false);
+    expect(describeSecretError(new Error("socket hang up"), ...target).fatal).toBe(false);
+  });
+});
+
+describe("syncRepoSecrets", () => {
+  const secrets = { ALPHA: "a", BRAVO: "b", CHARLIE: "c" };
+
+  it("encrypts and writes every configured secret", async () => {
+    // 32 zero bytes is a structurally valid X25519 public key for sealing.
+    const publicKey = btoa(String.fromCharCode(...new Uint8Array(32)));
+    request.mockImplementation((route: string) =>
+      route.startsWith("GET") ? { data: { key: publicKey, key_id: "kid" } } : { data: {} },
+    );
+
+    const result = await syncRepoSecrets({ owner: "acme", repo: "widgets", secrets });
+
+    expect(result.ok).toBe(true);
+    expect(result.written).toEqual(["ALPHA", "BRAVO", "CHARLIE"]);
+    const put = request.mock.calls.find(([route]) => String(route).startsWith("PUT"))?.[1] as {
+      encrypted_value: string;
+    };
+    // Never the plaintext, and always ephemeral key + value + MAC.
+    expect(put.encrypted_value).not.toBe("a");
+    expect(atob(put.encrypted_value)).toHaveLength(32 + 1 + 16);
+  });
+
+  it("stops after a repo-wide fault instead of repeating it for every name", async () => {
+    // This is the shape of the reported bug: one broken thing rendered as one
+    // identical error line per secret, which read as six separate problems.
+    request.mockRejectedValue(
+      Object.assign(new Error("Resource not accessible by integration"), { status: 403 }),
+    );
+
+    const result = await syncRepoSecrets({ owner: "acme", repo: "widgets", secrets });
+
+    expect(result.ok).toBe(false);
+    expect(result.failed).toHaveLength(3);
+    expect(result.failed[0].error).toContain("Secrets: Read & write");
+    expect(result.failed.slice(1).map((f) => f.error)).toEqual([
+      "not attempted — see the failure above, it affects every secret",
+      "not attempted — see the failure above, it affects every secret",
+    ]);
+    // One GET, and no further round trips once the cause was known.
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps going when only one secret is rejected", async () => {
+    const publicKey = btoa(String.fromCharCode(...new Uint8Array(32)));
+    request.mockImplementation((route: string, params: { secret_name?: string }) => {
+      if (String(route).startsWith("GET")) return { data: { key: publicKey, key_id: "kid" } };
+      if (params.secret_name === "BRAVO") {
+        throw Object.assign(new Error("secret value too large"), { status: 422 });
+      }
+      return { data: {} };
+    });
+
+    const result = await syncRepoSecrets({ owner: "acme", repo: "widgets", secrets });
+
+    expect(result.written).toEqual(["ALPHA", "CHARLIE"]);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0]).toMatchObject({ name: "BRAVO" });
+  });
+
+  it("skips unconfigured secrets without calling GitHub", async () => {
+    const result = await syncRepoSecrets({
+      owner: "acme",
+      repo: "widgets",
+      secrets: { ALPHA: undefined, BRAVO: null, CHARLIE: "" },
+    });
+
+    expect(result.nothingConfigured).toBe(true);
+    expect(result.skipped).toHaveLength(3);
+    expect(request).not.toHaveBeenCalled();
   });
 });
 
