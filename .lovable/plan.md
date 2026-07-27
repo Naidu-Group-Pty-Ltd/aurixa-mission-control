@@ -52,10 +52,12 @@ Goal: an always-on security control plane inside Mission Control that scans the 
 - Map Codex severity → `security_findings.severity`; allow partner to add comments (`security_assessment_comments`).
 - Export signed report bundle to `security-reports` bucket on partner sign-off.
 
-### Phase 7 — Provider-neutral intake + ticketing hooks
-- `SecurityIntakeAdapter` interface (`ingestFinding`, `updateStatus`, `linkExternalTicket`).
-- Concrete adapters: `CodexAdapter`, `ManualAdapter`, stub `TicketingAdapter` (Linear/Jira-ready).
-- Public API `POST /api/public/security/intake` (per-source HMAC) so future scanners plug in.
+### Phase 7 — Provider-neutral intake + ticketing hooks ✅
+- `SecurityIntakeAdapter` interface (`ingestFinding`, `updateStatus`, `linkExternalTicket`) in `src/server/security-intake/adapters.ts`.
+- Concrete adapters: `CodexAdapter`, `ManualAdapter`, `GenericAdapter`, stub `TicketingAdapter`.
+- Public API `POST /api/public/security/intake` with per-source HMAC (`x-intake-source` + `x-intake-signature`).
+- Tables: `security_intake_sources` (rotatable HMAC secrets, admin-only) + `security_external_tickets` (linked to `codex_findings`, unique per source/provider/external_id).
+- Admin server fns in `src/lib/security-intake.functions.ts`; management UI at `/security/intake`.
 
 ## Cross-cutting technical details
 
