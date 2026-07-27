@@ -232,6 +232,9 @@ function ScanDetail({ jobId }: { jobId: string }) {
                         <span className="text-[10px] text-red-500">{rem.last_error}</span>
                       )}
                     </div>
+                    {rem && !["failed", "closed"].includes(rem.status) && (
+                      <RemediationReviewPanel remediation={rem} />
+                    )}
                   </div>
                 );
               })}
