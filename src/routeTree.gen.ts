@@ -108,6 +108,7 @@ import { Route as ApiPublicSeatsCommitRouteImport } from './routes/api.public.se
 import { Route as ApiPublicPricingCatalogRouteImport } from './routes/api.public.pricing.catalog'
 import { Route as ApiPublicLeadsCaptureRouteImport } from './routes/api.public.leads.capture'
 import { Route as ApiPublicHooksCodexSecurityRouteImport } from './routes/api.public.hooks.codex-security'
+import { Route as ApiPublicHooksCodexRemediationRouteImport } from './routes/api.public.hooks.codex-remediation'
 import { Route as ApiPublicHandoffsConsentRouteImport } from './routes/api.public.handoffs.consent'
 import { Route as ApiPublicHandoffBeaconRouteImport } from './routes/api.public.handoff.beacon'
 import { Route as ApiPublicHandoffAuditIngestRouteImport } from './routes/api.public.handoff.audit-ingest'
@@ -631,6 +632,12 @@ const ApiPublicHooksCodexSecurityRoute =
     path: '/api/public/hooks/codex-security',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksCodexRemediationRoute =
+  ApiPublicHooksCodexRemediationRouteImport.update({
+    id: '/api/public/hooks/codex-remediation',
+    path: '/api/public/hooks/codex-remediation',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandoffsConsentRoute =
   ApiPublicHandoffsConsentRouteImport.update({
     id: '/api/public/handoffs/consent',
@@ -794,6 +801,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handoff/audit-ingest': typeof ApiPublicHandoffAuditIngestRoute
   '/api/public/handoff/beacon': typeof ApiPublicHandoffBeaconRoute
   '/api/public/handoffs/consent': typeof ApiPublicHandoffsConsentRoute
+  '/api/public/hooks/codex-remediation': typeof ApiPublicHooksCodexRemediationRoute
   '/api/public/hooks/codex-security': typeof ApiPublicHooksCodexSecurityRoute
   '/api/public/leads/capture': typeof ApiPublicLeadsCaptureRoute
   '/api/public/pricing/catalog': typeof ApiPublicPricingCatalogRoute
@@ -907,6 +915,7 @@ export interface FileRoutesByTo {
   '/api/public/handoff/audit-ingest': typeof ApiPublicHandoffAuditIngestRoute
   '/api/public/handoff/beacon': typeof ApiPublicHandoffBeaconRoute
   '/api/public/handoffs/consent': typeof ApiPublicHandoffsConsentRoute
+  '/api/public/hooks/codex-remediation': typeof ApiPublicHooksCodexRemediationRoute
   '/api/public/hooks/codex-security': typeof ApiPublicHooksCodexSecurityRoute
   '/api/public/leads/capture': typeof ApiPublicLeadsCaptureRoute
   '/api/public/pricing/catalog': typeof ApiPublicPricingCatalogRoute
@@ -1022,6 +1031,7 @@ export interface FileRoutesById {
   '/api/public/handoff/audit-ingest': typeof ApiPublicHandoffAuditIngestRoute
   '/api/public/handoff/beacon': typeof ApiPublicHandoffBeaconRoute
   '/api/public/handoffs/consent': typeof ApiPublicHandoffsConsentRoute
+  '/api/public/hooks/codex-remediation': typeof ApiPublicHooksCodexRemediationRoute
   '/api/public/hooks/codex-security': typeof ApiPublicHooksCodexSecurityRoute
   '/api/public/leads/capture': typeof ApiPublicLeadsCaptureRoute
   '/api/public/pricing/catalog': typeof ApiPublicPricingCatalogRoute
@@ -1138,6 +1148,7 @@ export interface FileRouteTypes {
     | '/api/public/handoff/audit-ingest'
     | '/api/public/handoff/beacon'
     | '/api/public/handoffs/consent'
+    | '/api/public/hooks/codex-remediation'
     | '/api/public/hooks/codex-security'
     | '/api/public/leads/capture'
     | '/api/public/pricing/catalog'
@@ -1251,6 +1262,7 @@ export interface FileRouteTypes {
     | '/api/public/handoff/audit-ingest'
     | '/api/public/handoff/beacon'
     | '/api/public/handoffs/consent'
+    | '/api/public/hooks/codex-remediation'
     | '/api/public/hooks/codex-security'
     | '/api/public/leads/capture'
     | '/api/public/pricing/catalog'
@@ -1365,6 +1377,7 @@ export interface FileRouteTypes {
     | '/api/public/handoff/audit-ingest'
     | '/api/public/handoff/beacon'
     | '/api/public/handoffs/consent'
+    | '/api/public/hooks/codex-remediation'
     | '/api/public/hooks/codex-security'
     | '/api/public/leads/capture'
     | '/api/public/pricing/catalog'
@@ -1459,6 +1472,7 @@ export interface RootRouteChildren {
   ApiPublicHandoffAuditIngestRoute: typeof ApiPublicHandoffAuditIngestRoute
   ApiPublicHandoffBeaconRoute: typeof ApiPublicHandoffBeaconRoute
   ApiPublicHandoffsConsentRoute: typeof ApiPublicHandoffsConsentRoute
+  ApiPublicHooksCodexRemediationRoute: typeof ApiPublicHooksCodexRemediationRoute
   ApiPublicHooksCodexSecurityRoute: typeof ApiPublicHooksCodexSecurityRoute
   ApiPublicLeadsCaptureRoute: typeof ApiPublicLeadsCaptureRoute
   ApiPublicPricingCatalogRoute: typeof ApiPublicPricingCatalogRoute
@@ -2181,6 +2195,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCodexSecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/codex-remediation': {
+      id: '/api/public/hooks/codex-remediation'
+      path: '/api/public/hooks/codex-remediation'
+      fullPath: '/api/public/hooks/codex-remediation'
+      preLoaderRoute: typeof ApiPublicHooksCodexRemediationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handoffs/consent': {
       id: '/api/public/handoffs/consent'
       path: '/api/public/handoffs/consent'
@@ -2446,6 +2467,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandoffAuditIngestRoute: ApiPublicHandoffAuditIngestRoute,
   ApiPublicHandoffBeaconRoute: ApiPublicHandoffBeaconRoute,
   ApiPublicHandoffsConsentRoute: ApiPublicHandoffsConsentRoute,
+  ApiPublicHooksCodexRemediationRoute: ApiPublicHooksCodexRemediationRoute,
   ApiPublicHooksCodexSecurityRoute: ApiPublicHooksCodexSecurityRoute,
   ApiPublicLeadsCaptureRoute: ApiPublicLeadsCaptureRoute,
   ApiPublicPricingCatalogRoute: ApiPublicPricingCatalogRoute,
