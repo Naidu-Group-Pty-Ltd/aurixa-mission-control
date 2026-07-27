@@ -187,3 +187,124 @@ export const getScanDetail = createServerFn({ method: "GET" })
     if (job.error) throw job.error;
     return { job: job.data, findings: findings.data ?? [], events: events.data ?? [] };
   });
+
+// -------- Phase 5: fleet views + per-clone controls --------
+
+export const listCloneCodexOverview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const [clonesRes, jobsRes, findingsRes] = await Promise.all([
+      supabase
+        .from("clones")
+        .select("id, name, slug, repo_full_name, github_owner, github_repo, codex_nightly_enabled, status")
+        .order("name", { ascending: true }),
+      supabase
+        .from("codex_scan_jobs")
+        .select("id, clone_id, target_kind, status, kind, started_at, completed_at, created_at, result_summary")
+        .eq("target_kind", "clone")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      supabase
+        .from("codex_findings")
+        .select("clone_id, severity, state")
+        .eq("state", "open"),
+    ]);
+    if (clonesRes.error) throw clonesRes.error;
+
+    const lastByClone = new Map();
+    for (const j of jobsRes.data ?? []) {
+      if (j.clone_id && !lastByClone.has(j.clone_id)) lastByClone.set(j.clone_id, j);
+    }
+    const countsByClone = new Map();
+    for (const f of findingsRes.data ?? []) {
+      if (!f.clone_id) continue;
+      const bucket = countsByClone.get(f.clone_id) ?? { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+      bucket[f.severity] = (bucket[f.severity] ?? 0) + 1;
+      countsByClone.set(f.clone_id, bucket);
+    }
+
+    const rows = (clonesRes.data ?? []).map((c) => ({
+      ...c,
+      lastScan: lastByClone.get(c.id) ?? null,
+      openFindings: countsByClone.get(c.id) ?? { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+    }));
+
+    return { clones: rows };
+  });
+
+const CloneNightlyInput = z.object({
+  cloneId: z.string().uuid(),
+  enabled: z.boolean(),
+});
+
+export const setCloneNightly = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => CloneNightlyInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
+    if (!isAdmin) throw new Error("Forbidden: admin only");
+    const { error } = await context.supabase
+      .from("clones")
+      .update({ codex_nightly_enabled: data.enabled })
+      .eq("id", data.cloneId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+const ScanCloneInput = z.object({ cloneId: z.string().uuid() });
+
+export const runCloneScanNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => ScanCloneInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
+    if (!isAdmin) throw new Error("Forbidden: admin only");
+    const { enqueueScanNoAuth } = await import("@/server/codex-scheduling.server");
+    const { data: clone } = await context.supabase
+      .from("clones")
+      .select("repo_full_name, github_owner, github_repo")
+      .eq("id", data.cloneId)
+      .maybeSingle();
+    if (!clone) throw new Error("clone not found");
+    const repo = clone.repo_full_name || `${clone.github_owner}/${clone.github_repo}`;
+    const r = await enqueueScanNoAuth({
+      kind: "manual",
+      targetKind: "clone",
+      cloneId: data.cloneId,
+      repoFullName: repo,
+      dedupWindowHours: 0,
+      requestPayload: { source: "manual_clone", requestedBy: context.userId },
+    });
+    return r;
+  });
+
+export const listCloneScanJobs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ cloneId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: jobs, error } = await context.supabase
+      .from("codex_scan_jobs")
+      .select("id, kind, status, started_at, completed_at, created_at, result_summary, last_error, ref")
+      .eq("clone_id", data.cloneId)
+      .order("created_at", { ascending: false })
+      .limit(25);
+    if (error) throw error;
+    return { jobs: jobs ?? [] };
+  });
+
+export const listCloneOpenFindings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ cloneId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: findings, error } = await context.supabase
+      .from("codex_findings")
+      .select("id, title, severity, state, category, file_path, created_at, scan_job_id")
+      .eq("clone_id", data.cloneId)
+      .eq("state", "open")
+      .order("severity", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return { findings: findings ?? [] };
+  });
