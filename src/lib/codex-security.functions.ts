@@ -3,6 +3,50 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+const SchedulingInput = z.object({
+  codex_nightly_enabled: z.boolean().optional(),
+  codex_nightly_cron: z.string().min(9).max(64).optional(),
+  codex_pr_scan_enabled: z.boolean().optional(),
+  codex_post_merge_revalidate: z.boolean().optional(),
+  codex_scan_dedup_hours: z.number().int().min(0).max(168).optional(),
+});
+
+export const getSchedulingConfig = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("prime_config")
+      .select("id, codex_nightly_enabled, codex_nightly_cron, codex_pr_scan_enabled, codex_post_merge_revalidate, codex_scan_dedup_hours")
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return { config: data };
+  });
+
+export const updateSchedulingConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => SchedulingInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: userId });
+    if (!isAdmin) throw new Error("Forbidden: admin only");
+    const { data: existing } = await supabase.from("prime_config").select("id").limit(1).maybeSingle();
+    if (!existing) throw new Error("prime_config not initialized");
+    const { error } = await supabase.from("prime_config").update(data).eq("id", existing.id);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const runNightlyNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
+    if (!isAdmin) throw new Error("Forbidden: admin only");
+    const { runNightlyScans } = await import("@/server/codex-scheduling.server");
+    return await runNightlyScans();
+  });
+
+
 const EnqueueInput = z.object({
   kind: z
     .enum(["manual", "nightly_full", "pr_open", "targeted_path", "post_merge_revalidate"])

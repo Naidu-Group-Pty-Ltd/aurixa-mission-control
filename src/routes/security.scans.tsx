@@ -12,7 +12,11 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
-import { enqueueScan, listScanJobs, getScanDetail } from "@/lib/codex-security.functions";
+import { enqueueScan, listScanJobs, getScanDetail, getSchedulingConfig, updateSchedulingConfig, runNightlyNow } from "@/lib/codex-security.functions";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 import { draftRemediationPR, listRemediations } from "@/lib/codex-remediation.functions";
 import {
   reviewRemediation,
@@ -76,7 +80,10 @@ function CodexScansPage() {
         </div>
       </div>
 
+      <SchedulingPanel />
+
       <Card>
+
         <CardHeader>
           <CardTitle>Recent scans</CardTitle>
           <CardDescription>Last 100 jobs across Prime and clone fleet.</CardDescription>
@@ -421,5 +428,133 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+function SchedulingPanel() {
+  const qc = useQueryClient();
+  const cfgQ = useQuery({
+    queryKey: ["codex-scheduling-config"],
+    queryFn: () => getSchedulingConfig(),
+  });
+  const updateFn = useServerFn(updateSchedulingConfig);
+  const runNowFn = useServerFn(runNightlyNow);
+  const [dedup, setDedup] = useState<number | null>(null);
+  const [cron, setCron] = useState<string | null>(null);
+
+  const cfg = cfgQ.data?.config;
+
+  const save = useMutation({
+    mutationFn: (patch: any) => updateFn({ data: patch }),
+    onSuccess: () => {
+      toast.success("Scheduling updated");
+      qc.invalidateQueries({ queryKey: ["codex-scheduling-config"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const runNow = useMutation({
+    mutationFn: () => runNowFn({}),
+    onSuccess: (r: any) => {
+      toast.success(`Nightly triggered — ${r.enqueued?.length ?? 0} queued, ${r.skipped?.length ?? 0} skipped`);
+      qc.invalidateQueries({ queryKey: ["codex-scan-jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (!cfg) return null;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between">
+        <div>
+          <CardTitle>Perpetual scheduling</CardTitle>
+          <CardDescription>
+            Nightly full scans, PR-driven scans, and post-merge revalidation.
+          </CardDescription>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => runNow.mutate()} disabled={runNow.isPending}>
+          <PlayCircle className="h-4 w-4 mr-1" />
+          {runNow.isPending ? "Running…" : "Run nightly now"}
+        </Button>
+      </CardHeader>
+      <CardContent className="grid gap-4 md:grid-cols-2">
+        <div className="flex items-center justify-between rounded-md border p-3">
+          <div>
+            <Label className="font-medium">Nightly full scans</Label>
+            <p className="text-xs text-muted-foreground">Prime + every clone with nightly enabled.</p>
+          </div>
+          <Switch
+            checked={!!cfg.codex_nightly_enabled}
+            onCheckedChange={(v) => save.mutate({ codex_nightly_enabled: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-md border p-3">
+          <div>
+            <Label className="font-medium">PR-open scans</Label>
+            <p className="text-xs text-muted-foreground">Scan every opened / updated PR head SHA.</p>
+          </div>
+          <Switch
+            checked={!!cfg.codex_pr_scan_enabled}
+            onCheckedChange={(v) => save.mutate({ codex_pr_scan_enabled: v })}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-md border p-3">
+          <div>
+            <Label className="font-medium">Post-merge revalidate</Label>
+            <p className="text-xs text-muted-foreground">Re-scan Prime after each merge to catch fix regressions.</p>
+          </div>
+          <Switch
+            checked={cfg.codex_post_merge_revalidate !== false}
+            onCheckedChange={(v) => save.mutate({ codex_post_merge_revalidate: v })}
+          />
+        </div>
+        <div className="rounded-md border p-3 space-y-2">
+          <Label className="font-medium">Dedup window (hours)</Label>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={168}
+              defaultValue={cfg.codex_scan_dedup_hours ?? 6}
+              onChange={(e) => setDedup(Number(e.target.value))}
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={dedup === null || dedup === cfg.codex_scan_dedup_hours}
+              onClick={() => save.mutate({ codex_scan_dedup_hours: dedup })}
+            >
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Suppress duplicate scans for the same target+kind within this window.
+          </p>
+        </div>
+        <div className="rounded-md border p-3 space-y-2 md:col-span-2">
+          <Label className="font-medium">Nightly cron schedule (UTC)</Label>
+          <div className="flex gap-2">
+            <Input
+              defaultValue={cfg.codex_nightly_cron ?? "0 7 * * *"}
+              placeholder="0 7 * * *"
+              onChange={(e) => setCron(e.target.value)}
+              className="font-mono"
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={cron === null || cron === cfg.codex_nightly_cron}
+              onClick={() => save.mutate({ codex_nightly_cron: cron })}
+            >
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Recorded for reference — the active schedule is set in pg_cron. Update the cron job SQL to change fire time.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
