@@ -12,7 +12,8 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
-import { enqueueScan, listScanJobs, getScanDetail, getSchedulingConfig, updateSchedulingConfig, runNightlyNow } from "@/lib/codex-security.functions";
+import { enqueueScan, listScanJobs, getScanDetail, getSchedulingConfig, updateSchedulingConfig, runNightlyNow, listCloneCodexOverview, runCloneScanNow, setCloneNightly } from "@/lib/codex-security.functions";
+import { Link } from "@tanstack/react-router";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,6 +82,8 @@ function CodexScansPage() {
       </div>
 
       <SchedulingPanel />
+
+      <FleetOverviewPanel />
 
       <Card>
 
@@ -554,6 +557,175 @@ function SchedulingPanel() {
             Recorded for reference — the active schedule is set in pg_cron. Update the cron job SQL to change fire time.
           </p>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const sevBadge: Record<string, string> = {
+  critical: "bg-red-600 text-white",
+  high: "bg-orange-500 text-white",
+  medium: "bg-amber-500 text-white",
+  low: "bg-blue-500 text-white",
+  info: "bg-slate-500 text-white",
+};
+
+function FleetOverviewPanel() {
+  const qc = useQueryClient();
+  const fleetQ = useQuery({
+    queryKey: ["codex-fleet-overview"],
+    queryFn: () => listCloneCodexOverview(),
+    refetchInterval: 30000,
+  });
+  const runFn = useServerFn(runCloneScanNow);
+  const nightlyFn = useServerFn(setCloneNightly);
+
+  const runOne = useMutation({
+    mutationFn: (cloneId: string) => runFn({ data: { cloneId } }),
+    onSuccess: (r: any) => {
+      if (r?.skipped) toast.info(`Skipped: ${r.reason}`);
+      else toast.success("Scan queued");
+      qc.invalidateQueries({ queryKey: ["codex-fleet-overview"] });
+      qc.invalidateQueries({ queryKey: ["codex-scan-jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const scanAll = useMutation({
+    mutationFn: async () => {
+      const rows = fleetQ.data?.clones ?? [];
+      let queued = 0;
+      let skipped = 0;
+      for (const c of rows) {
+        try {
+          const r: any = await runFn({ data: { cloneId: c.id } });
+          if (r?.skipped) skipped++;
+          else queued++;
+        } catch { skipped++; }
+      }
+      return { queued, skipped };
+    },
+    onSuccess: (r) => {
+      toast.success(`Fleet scan: ${r.queued} queued, ${r.skipped} skipped`);
+      qc.invalidateQueries({ queryKey: ["codex-fleet-overview"] });
+      qc.invalidateQueries({ queryKey: ["codex-scan-jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleNightly = useMutation({
+    mutationFn: ({ cloneId, enabled }: { cloneId: string; enabled: boolean }) =>
+      nightlyFn({ data: { cloneId, enabled } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["codex-fleet-overview"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rows = fleetQ.data?.clones ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between">
+        <div>
+          <CardTitle>Clone fleet</CardTitle>
+          <CardDescription>
+            Per-clone Codex status, open findings, and nightly enrollment.
+          </CardDescription>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => scanAll.mutate()}
+          disabled={scanAll.isPending || rows.length === 0}
+        >
+          <PlayCircle className="h-4 w-4 mr-1" />
+          {scanAll.isPending ? "Queuing…" : "Scan every clone"}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Clone</TableHead>
+              <TableHead>Last scan</TableHead>
+              <TableHead>Open findings</TableHead>
+              <TableHead>Nightly</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((c: any) => {
+              const last = c.lastScan;
+              const of = c.openFindings ?? {};
+              return (
+                <TableRow key={c.id}>
+                  <TableCell>
+                    <Link
+                      to="/clones/$cloneId"
+                      params={{ cloneId: c.id }}
+                      className="font-medium hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground font-mono">
+                      {c.repo_full_name || `${c.github_owner ?? ""}/${c.github_repo ?? ""}`}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {last ? (
+                      <div className="space-y-1">
+                        <Badge variant={last.status === "failed" ? "destructive" : "outline"}>
+                          {last.status}
+                        </Badge>
+                        <div className="text-muted-foreground">
+                          {(last.completed_at ?? last.started_at ?? last.created_at)?.slice(0, 19).replace("T", " ")}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Never</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {["critical", "high", "medium", "low"].map((s) =>
+                        (of[s] ?? 0) > 0 ? (
+                          <Badge key={s} className={sevBadge[s]}>
+                            {s[0].toUpperCase()}:{of[s]}
+                          </Badge>
+                        ) : null,
+                      )}
+                      {["critical", "high", "medium", "low"].every((s) => !(of[s] > 0)) && (
+                        <span className="text-xs text-muted-foreground">Clean</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={c.codex_nightly_enabled !== false}
+                      onCheckedChange={(v) => toggleNightly.mutate({ cloneId: c.id, enabled: v })}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => runOne.mutate(c.id)}
+                      disabled={runOne.isPending}
+                    >
+                      Scan
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {!fleetQ.isLoading && rows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  No clones yet.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
