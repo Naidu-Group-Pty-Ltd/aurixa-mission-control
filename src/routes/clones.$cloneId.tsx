@@ -344,6 +344,7 @@ function CloneDetail() {
       <ClonePurchasesCard cloneId={cloneId} />
       <GitHubSecretSyncCard target="clone" cloneId={cloneId} />
       <CloneSecurityAssessmentsCard cloneId={cloneId} />
+      <CloneCodexScansCard cloneId={cloneId} />
       <ModuleInjector
         installed={installed}
         available={available}
