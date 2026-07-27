@@ -332,6 +332,39 @@ function SecurityPartnersPage() {
     }
   };
 
+  const bridgeFn = useServerFn(bridgeCodexFindingsToAssessment);
+  const exportFn = useServerFn(exportPartnerSignoffBundle);
+
+  const syncCodex = async (assessmentId: string) => {
+    setBusy(`codex:${assessmentId}`);
+    try {
+      const res = await bridgeFn({ data: { assessmentId } });
+      toast.success(
+        `Codex sync: ${res.created} new, ${res.updated} updated (of ${res.considered} open Codex findings).`,
+      );
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Codex sync failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const exportBundle = async (assessmentId: string) => {
+    setBusy(`bundle:${assessmentId}`);
+    try {
+      const res = await exportFn({ data: { assessmentId } });
+      toast.success(
+        `Sign-off bundle uploaded (${res.totals.findings} findings, ${res.totals.codex_mirrored} from Codex).`,
+      );
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bundle export failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
