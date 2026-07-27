@@ -51,13 +51,79 @@ export const Route = createFileRoute("/hooks/github")({
           });
         }
 
+        // Phase 4 — PR-driven Codex Security scans. `pull_request` opens,
+        // synchronizes, or reopens trigger a scan against the PR head SHA;
+        // scans are deduped within prime_config.codex_scan_dedup_hours.
+        if (eventType === "pull_request") {
+          let prPayload: any;
+          try {
+            prPayload = JSON.parse(rawBody);
+          } catch {
+            return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          const action = prPayload?.action as string | undefined;
+          if (!action || !["opened", "reopened", "synchronize", "ready_for_review"].includes(action)) {
+            return new Response(
+              JSON.stringify({ skipped: true, reason: `pull_request action ${action ?? "?"} ignored` }),
+              { headers: { "Content-Type": "application/json" } },
+            );
+          }
+          const repoOwner = prPayload?.repository?.owner?.login ?? prPayload?.repository?.owner?.name ?? "";
+          const repoName = prPayload?.repository?.name ?? "";
+          const repoFullName = repoOwner && repoName ? `${repoOwner}/${repoName}` : "";
+          const headSha = prPayload?.pull_request?.head?.sha ?? null;
+          const prNumber = prPayload?.pull_request?.number ?? null;
+
+          const { data: primeCfg } = await supabaseAdmin
+            .from("prime_config")
+            .select("codex_pr_scan_enabled, codex_scan_dedup_hours")
+            .limit(1)
+            .maybeSingle();
+          if (!primeCfg?.codex_pr_scan_enabled) {
+            return new Response(
+              JSON.stringify({ skipped: true, reason: "codex_pr_scan_disabled" }),
+              { headers: { "Content-Type": "application/json" } },
+            );
+          }
+          const target = repoFullName ? await resolveScanTarget(repoFullName) : null;
+          if (!target) {
+            return new Response(
+              JSON.stringify({ skipped: true, reason: `unknown_repo:${repoFullName}` }),
+              { headers: { "Content-Type": "application/json" } },
+            );
+          }
+          try {
+            const r = await enqueueScanNoAuth({
+              kind: "pr_open",
+              targetKind: target.targetKind,
+              cloneId: target.cloneId ?? null,
+              repoFullName,
+              ref: headSha,
+              dedupWindowHours: primeCfg.codex_scan_dedup_hours ?? 6,
+              requestPayload: { source: "github_pr", delivery: deliveryId, action, pr: prNumber },
+            });
+            return new Response(JSON.stringify({ success: true, ...r }), {
+              headers: { "Content-Type": "application/json" },
+            });
+          } catch (err) {
+            return new Response(
+              JSON.stringify({ success: false, error: (err as Error).message }),
+              { status: 500, headers: { "Content-Type": "application/json" } },
+            );
+          }
+        }
+
         if (eventType !== "push") {
-          // Acknowledge but don't act on non-push events
+          // Acknowledge but don't act on other events
           return new Response(
             JSON.stringify({ skipped: true, reason: `Unhandled event: ${eventType}` }),
             { headers: { "Content-Type": "application/json" } },
           );
         }
+
 
         type PushPayload = {
           ref?: string;
