@@ -34,6 +34,10 @@ import {
   SECURITY_ASSESSMENT_STATUSES,
   SECURITY_REVIEW_STATUSES,
 } from "@/server/security-partner-portal.functions";
+import {
+  bridgeCodexFindingsToAssessment,
+  exportPartnerSignoffBundle,
+} from "@/server/security-partner-codex.functions";
 
 export const Route = createFileRoute("/security-partners")({
   component: () => (
@@ -323,6 +327,39 @@ function SecurityPartnersPage() {
       void load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Comment failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const bridgeFn = useServerFn(bridgeCodexFindingsToAssessment);
+  const exportFn = useServerFn(exportPartnerSignoffBundle);
+
+  const syncCodex = async (assessmentId: string) => {
+    setBusy(`codex:${assessmentId}`);
+    try {
+      const res = await bridgeFn({ data: { assessmentId } });
+      toast.success(
+        `Codex sync: ${res.created} new, ${res.updated} updated (of ${res.considered} open Codex findings).`,
+      );
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Codex sync failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const exportBundle = async (assessmentId: string) => {
+    setBusy(`bundle:${assessmentId}`);
+    try {
+      const res = await exportFn({ data: { assessmentId } });
+      toast.success(
+        `Sign-off bundle uploaded (${res.totals.findings} findings, ${res.totals.codex_mirrored} from Codex).`,
+      );
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bundle export failed");
     } finally {
       setBusy(null);
     }
@@ -687,6 +724,24 @@ function SecurityPartnersPage() {
                       disabled={busy === `comment:${assessment.id}`}
                     >
                       Send note
+                    </Button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => syncCodex(assessment.id)}
+                      disabled={busy === `codex:${assessment.id}`}
+                    >
+                      {busy === `codex:${assessment.id}` ? "Syncing Codex…" : "Mirror Codex findings"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => exportBundle(assessment.id)}
+                      disabled={busy === `bundle:${assessment.id}`}
+                    >
+                      {busy === `bundle:${assessment.id}` ? "Exporting…" : "Export sign-off bundle"}
                     </Button>
                   </div>
                 </div>
