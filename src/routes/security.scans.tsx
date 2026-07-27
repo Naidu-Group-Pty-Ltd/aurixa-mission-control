@@ -80,7 +80,10 @@ function CodexScansPage() {
         </div>
       </div>
 
+      <SchedulingPanel />
+
       <Card>
+
         <CardHeader>
           <CardTitle>Recent scans</CardTitle>
           <CardDescription>Last 100 jobs across Prime and clone fleet.</CardDescription>
