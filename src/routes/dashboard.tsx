@@ -234,7 +234,7 @@ function Dashboard() {
         <StatCard label="Behind" value={stats.behind} tone="warning" icon={<Waves className="h-4 w-4" />} />
         <StatCard label="Failed" value={stats.failed} tone="destructive" icon={<Shield className="h-4 w-4" />} />
         <StatCard label={`AI suggestions${stats.ai_clones ? ` · ${stats.ai_clones} clones` : ""}`} value={stats.ai_open} tone="primary" icon={<Sparkles className="h-4 w-4" />} />
-        <StatCard label="Security active" value={stats.security_active} tone={stats.security_critical ? "destructive" : "success"} icon={<ShieldCheck className="h-4 w-4" />} />
+        <Link to="/security" className="contents"><StatCard label={`Security${stats.security_critical ? ` · ${stats.security_critical} critical` : ""}`} value={stats.security_active} tone={stats.security_critical ? "destructive" : "success"} icon={<ShieldCheck className="h-4 w-4" />} /></Link>
       </section>
 
       <section className="flex flex-col gap-3 md:flex-row md:items-center">
