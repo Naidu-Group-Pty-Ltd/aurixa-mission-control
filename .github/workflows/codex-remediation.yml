@@ -20,18 +20,19 @@ name: Codex Security Remediation
 on:
   workflow_dispatch:
     inputs:
-      remediation_id:      { description: "Mission Control remediation id (UUID)", required: true }
-      finding_id:          { description: "Codex finding id", required: true }
-      finding_title:       { description: "Finding title", required: true }
-      finding_severity:    { description: "Finding severity", required: true }
-      finding_file:        { description: "Affected file path", required: false, default: "" }
-      finding_line:        { description: "Affected line", required: false, default: "" }
-      finding_cwe:         { description: "CWE identifier", required: false, default: "" }
-      finding_description: { description: "Finding description (<= 4000 chars)", required: false, default: "" }
-      base_ref:            { description: "Base ref / branch to fork from", required: true }
-      branch_name:         { description: "Branch name to push the fix to", required: true }
-      callback_url:        { description: "Mission Control callback URL", required: true }
-      callback_secret:     { description: "HMAC secret for the callback", required: true }
+      remediation_id:  { description: "Mission Control remediation id (UUID)", required: true }
+      # One JSON object rather than seven flat finding_* inputs. GitHub caps
+      # workflow_dispatch at 10 inputs and rejects the whole file past that,
+      # so the flat form could never be dispatched. Keeping the finding in a
+      # single field also means its text is only ever read from an
+      # environment variable and parsed by node — never interpolated into a
+      # shell command, where a crafted title could otherwise run code on the
+      # runner. Shape: { id, title, severity, file, line, cwe, description }.
+      finding:         { description: "Finding as JSON", required: true }
+      base_ref:        { description: "Base ref / branch to fork from", required: true }
+      branch_name:     { description: "Branch name to push the fix to", required: true }
+      callback_url:    { description: "Mission Control callback URL", required: true }
+      callback_secret: { description: "HMAC secret for the callback", required: true }
 
 permissions:
   contents: write
@@ -51,10 +52,100 @@ jobs:
       BASE_REF:        ${{ inputs.base_ref }}
       CALLBACK_URL:    ${{ inputs.callback_url }}
       CALLBACK_SECRET: ${{ inputs.callback_secret }}
-      HELPER_DIR:      ${{ runner.temp }}/codex-helpers
       OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY || secrets.CODEX_SECURITY_API_KEY }}
 
     steps:
+      # Resolved here, not in `jobs.<id>.env`: the `runner` context does not
+      # exist at job level, and referencing it there makes GitHub reject the
+      # whole file at dispatch time with "Unrecognized named-value: 'runner'".
+      # $RUNNER_TEMP is the always-present environment-variable equivalent.
+      - name: Resolve helper directory
+        run: |
+          set -euo pipefail
+          echo "HELPER_DIR=$RUNNER_TEMP/codex-helpers" >> "$GITHUB_ENV"
+
+      # Renders every piece of finding-derived text to a file, once, up front.
+      # The finding arrives as scanner output about repository content, so it
+      # is untrusted: it reaches this step only as an environment variable and
+      # is parsed by node, never spliced into a shell command. Later steps use
+      # the rendered files, so no step needs to interpolate it again.
+      #
+      # $RUNNER_TEMP survives actions/checkout, which wipes the workspace.
+      - name: Render the finding
+        env:
+          FINDING_JSON: ${{ inputs.finding }}
+        run: |
+          set -euo pipefail
+          node <<'RENDER'
+          const fs = require("fs");
+          const tmp = process.env.RUNNER_TEMP;
+
+          let raw;
+          try {
+            raw = JSON.parse(process.env.FINDING_JSON || "");
+          } catch {
+            console.error("::error::the `finding` input is not valid JSON");
+            process.exit(1);
+          }
+
+          // Clamp every field: these bound the prompt, the commit message and
+          // the PR body, all of which have their own limits upstream.
+          const str = (value, max) => String(value ?? "").slice(0, max);
+          const finding = {
+            id: str(raw.id, 200),
+            title: str(raw.title, 200),
+            severity: str(raw.severity, 40),
+            file: str(raw.file, 400),
+            line: str(raw.line, 20),
+            cwe: str(raw.cwe, 40),
+            description: str(raw.description, 4000),
+          };
+          if (!finding.id || !finding.title || !finding.severity) {
+            console.error("::error::finding requires at least id, title and severity");
+            process.exit(1);
+          }
+          // A title spanning lines would corrupt a commit subject and a PR title.
+          const oneLine = (value) => value.replace(/\s+/g, " ").trim();
+          const location = finding.file ? `${finding.file}:${finding.line}` : "(not reported)";
+
+          fs.writeFileSync(`${tmp}/finding.json`, JSON.stringify(finding));
+          fs.writeFileSync(
+            `${tmp}/finding-context.txt`,
+            [
+              "",
+              `Title:       ${oneLine(finding.title)}`,
+              `Severity:    ${finding.severity}`,
+              `Location:    ${location}`,
+              `CWE:         ${finding.cwe || "(none)"}`,
+              "",
+              "Details:",
+              finding.description || "(no description provided)",
+              "",
+            ].join("\n"),
+          );
+          fs.writeFileSync(
+            `${tmp}/commit-message.txt`,
+            `codex: draft fix for ${oneLine(finding.title)} (${finding.severity})\n\n` +
+              `Finding: ${finding.id}\n`,
+          );
+          fs.writeFileSync(
+            `${tmp}/pr-title.txt`,
+            `codex: ${finding.severity} — ${oneLine(finding.title)}`,
+          );
+          fs.writeFileSync(
+            `${tmp}/pr-header.md`,
+            [
+              "Autogenerated by Codex Security via Mission Control.",
+              "",
+              `- Finding: \`${finding.id}\``,
+              `- Severity: **${finding.severity}**`,
+              `- Location: \`${location}\``,
+              `- CWE: ${finding.cwe || "(none)"}`,
+              "",
+            ].join("\n"),
+          );
+          RENDER
+
       - name: Install callback helper
         run: |
           set -euo pipefail
@@ -142,16 +233,9 @@ jobs:
           cat > "$RUNNER_TEMP/prompt.txt" <<'PROMPT'
           Fix the following security finding in this repository.
           PROMPT
-          cat >> "$RUNNER_TEMP/prompt.txt" <<EOF
-
-          Title:       ${{ inputs.finding_title }}
-          Severity:    ${{ inputs.finding_severity }}
-          Location:    ${{ inputs.finding_file }}:${{ inputs.finding_line }}
-          CWE:         ${{ inputs.finding_cwe }}
-
-          Details:
-          ${{ inputs.finding_description }}
-          EOF
+          # Rendered by "Render the finding"; appended as data so nothing in
+          # the finding is ever evaluated by the shell.
+          cat "$RUNNER_TEMP/finding-context.txt" >> "$RUNNER_TEMP/prompt.txt"
           cat >> "$RUNNER_TEMP/prompt.txt" <<'PROMPT'
 
           Rules:
@@ -210,9 +294,7 @@ jobs:
         run: |
           set -euo pipefail
           git add -A
-          git commit \
-            -m "codex: draft fix for ${{ inputs.finding_title }} (${{ inputs.finding_severity }})" \
-            -m "Finding: ${{ inputs.finding_id }}"
+          git commit -F "$RUNNER_TEMP/commit-message.txt"
           git push origin "$BRANCH_NAME"
           node "$HELPER_DIR/notify.mjs" '{"event":"branch.pushed"}'
 
@@ -224,24 +306,20 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "Autogenerated by Codex Security via Mission Control."
-            echo
-            echo "- Finding: \`${{ inputs.finding_id }}\`"
-            echo "- Severity: **${{ inputs.finding_severity }}**"
-            echo "- Location: \`${{ inputs.finding_file }}:${{ inputs.finding_line }}\`"
-            echo "- CWE: ${{ inputs.finding_cwe }}"
-            echo
+            cat "$RUNNER_TEMP/pr-header.md"
             echo "## What changed"
             cat "$RUNNER_TEMP/summary.md"
             echo
             echo "> Opened as a **draft**. Human review is required before merge."
           } > "$RUNNER_TEMP/pr-body.md"
 
+          # "$(cat ...)" passes the title as one argv element; the shell never
+          # re-evaluates it.
           PR_URL=$(gh pr create \
             --draft \
             --base "$BASE_REF" \
             --head "$BRANCH_NAME" \
-            --title "codex: ${{ inputs.finding_severity }} — ${{ inputs.finding_title }}" \
+            --title "$(cat "$RUNNER_TEMP/pr-title.txt")" \
             --body-file "$RUNNER_TEMP/pr-body.md")
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
           echo "pr_number=$(basename "$PR_URL")" >> "$GITHUB_OUTPUT"

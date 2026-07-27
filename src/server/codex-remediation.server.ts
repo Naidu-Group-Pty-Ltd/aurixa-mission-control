@@ -35,6 +35,25 @@ export type DispatchRemediationResult = {
 };
 
 /**
+ * Serialise a finding into the workflow's single `finding` input.
+ *
+ * Field lengths are clamped here as well as in the workflow: this side keeps
+ * the dispatch request inside GitHub's payload limit, and the workflow side
+ * cannot trust that a repo received its inputs from this code path.
+ */
+export function buildFindingInput(finding: DispatchRemediationInput["finding"]): string {
+  return JSON.stringify({
+    id: finding.id,
+    title: (finding.title || "").slice(0, 200),
+    severity: finding.severity,
+    file: finding.file ?? "",
+    line: finding.line == null ? "" : String(finding.line),
+    cwe: finding.cwe ?? "",
+    description: (finding.description ?? "").slice(0, 4000),
+  });
+}
+
+/**
  * Trigger the codex-remediation workflow on the target repo. GitHub's
  * `workflow_dispatch` endpoint does NOT return the run id, so we fetch
  * the most recent run for the workflow immediately after and store its
@@ -48,13 +67,11 @@ export async function dispatchRemediationWorkflow(
 
   const inputs = {
     remediation_id: input.remediationId,
-    finding_id: input.finding.id,
-    finding_title: (input.finding.title || "").slice(0, 200),
-    finding_severity: input.finding.severity,
-    finding_file: input.finding.file ?? "",
-    finding_line: String(input.finding.line ?? ""),
-    finding_cwe: input.finding.cwe ?? "",
-    finding_description: (input.finding.description ?? "").slice(0, 4000),
+    // One JSON field rather than seven flat finding_* inputs: GitHub caps
+    // workflow_dispatch at 10 inputs and rejects the entire workflow file
+    // past that, so the flat form could never be dispatched at all. The
+    // workflow parses this with node and never lets the text reach a shell.
+    finding: buildFindingInput(input.finding),
     base_ref: input.baseRef,
     branch_name: input.branchName,
     callback_url: input.callbackUrl,
