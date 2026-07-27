@@ -2187,6 +2187,7 @@ export type Database = {
           approvals_required: number
           base_ref: string
           branch_name: string | null
+          cascade_event_id: string | null
           clone_id: string | null
           completed_at: string | null
           created_at: string
@@ -2217,6 +2218,7 @@ export type Database = {
           approvals_required?: number
           base_ref: string
           branch_name?: string | null
+          cascade_event_id?: string | null
           clone_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -2247,6 +2249,7 @@ export type Database = {
           approvals_required?: number
           base_ref?: string
           branch_name?: string | null
+          cascade_event_id?: string | null
           clone_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -2274,6 +2277,13 @@ export type Database = {
           workflow_run_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "codex_remediations_cascade_event_id_fkey"
+            columns: ["cascade_event_id"]
+            isOneToOne: false
+            referencedRelation: "cascade_events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "codex_remediations_clone_id_fkey"
             columns: ["clone_id"]
