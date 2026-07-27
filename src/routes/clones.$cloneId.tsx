@@ -32,6 +32,7 @@ import { CloneLibraryPinsCard } from "@/components/clone-library-pins";
 import { ClonePurchasesCard } from "@/components/clone-purchases-card";
 import { CloneSecurityAssessmentsCard } from "@/components/clone-security-assessments-card";
 import { CloneSyncStatusCard } from "@/components/clone-sync-status-card";
+import { GitHubSecretSyncCard } from "@/components/github-secret-sync-card";
 import { CopyButton } from "@/components/copy-button";
 import { ProtectedRoute } from "@/components/protected-route";
 import { RouteError } from "@/components/route-error";
@@ -340,6 +341,7 @@ function CloneDetail() {
       </Suspense>
       <CloneBackendCard cloneId={cloneId} />
       <ClonePurchasesCard cloneId={cloneId} />
+      <GitHubSecretSyncCard target="clone" cloneId={cloneId} />
       <CloneSecurityAssessmentsCard cloneId={cloneId} />
       <ModuleInjector
         installed={installed}

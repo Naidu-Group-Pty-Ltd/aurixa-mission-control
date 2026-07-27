@@ -2662,6 +2662,66 @@ export type Database = {
         }
         Relationships: []
       }
+      github_secret_syncs: {
+        Row: {
+          clone_id: string | null
+          created_at: string
+          failed: Json
+          id: string
+          ok: boolean
+          owner: string
+          repo: string
+          skipped: Json
+          target_kind: string
+          trigger_source: string
+          triggered_by: string | null
+          written: string[]
+        }
+        Insert: {
+          clone_id?: string | null
+          created_at?: string
+          failed?: Json
+          id?: string
+          ok: boolean
+          owner: string
+          repo: string
+          skipped?: Json
+          target_kind: string
+          trigger_source?: string
+          triggered_by?: string | null
+          written?: string[]
+        }
+        Update: {
+          clone_id?: string | null
+          created_at?: string
+          failed?: Json
+          id?: string
+          ok?: boolean
+          owner?: string
+          repo?: string
+          skipped?: Json
+          target_kind?: string
+          trigger_source?: string
+          triggered_by?: string | null
+          written?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "github_secret_syncs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "github_secret_syncs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+        ]
+      }
       handoff_audit_events: {
         Row: {
           action: string | null

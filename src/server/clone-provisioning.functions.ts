@@ -303,6 +303,38 @@ export const provisionClone = createServerFn({ method: "POST" })
       console.error("[provisionClone] api key auto-issue failed:", e);
     }
 
+    // ─── Auto-sync Codex Actions secrets to the new repo ──────────────
+    // The remediation workflow needs CODEX_SECURITY_API_KEY and the
+    // callback secret to run. Push them immediately so the clone is
+    // ready for autonomous remediation from minute one. Non-fatal.
+    if (data.method !== "clone" && githubUrl) {
+      try {
+        const { syncRepoSecrets, buildCodexRepoSecrets } = await import(
+          "@/server/github-secrets.server"
+        );
+        const secretResult = await syncRepoSecrets({
+          owner: githubOwner,
+          repo: githubRepo,
+          secrets: buildCodexRepoSecrets(),
+        });
+        await supabase.from("github_secret_syncs").insert({
+          target_kind: "clone",
+          clone_id: inserted.id,
+          owner: githubOwner,
+          repo: githubRepo,
+          written: secretResult.written,
+          skipped: secretResult.skipped,
+          failed: secretResult.failed,
+          ok: secretResult.ok,
+          trigger_source: "auto-provision",
+          triggered_by: userId,
+        });
+      } catch (e) {
+        console.error("[provisionClone] github secret sync failed:", e);
+      }
+    }
+
+
     await supabase.from("audit_log").insert({
       action: "clone.created",
       entity_type: "clone",
