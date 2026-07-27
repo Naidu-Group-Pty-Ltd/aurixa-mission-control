@@ -126,12 +126,32 @@ function CodexScansPage() {
 }
 
 function ScanDetail({ jobId }: { jobId: string }) {
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["codex-scan-detail", jobId],
     queryFn: () => getScanDetail({ data: { jobId } }),
     refetchInterval: 10000,
   });
+  const remQ = useQuery({
+    queryKey: ["codex-remediations", jobId],
+    queryFn: () => listRemediations({ data: { jobId } }),
+    refetchInterval: 10000,
+  });
+  const draftFn = useServerFn(draftRemediationPR);
+  const draft = useMutation({
+    mutationFn: (findingId: string) => draftFn({ data: { findingId } }),
+    onSuccess: (r: any) => {
+      toast.success(r?.reused ? "Existing remediation reused" : "Draft fix PR dispatched");
+      qc.invalidateQueries({ queryKey: ["codex-remediations", jobId] });
+      qc.invalidateQueries({ queryKey: ["codex-scan-detail", jobId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const d = q.data;
+  const remByFinding: Record<string, any> = {};
+  for (const r of remQ.data?.remediations ?? []) {
+    if (!remByFinding[r.finding_id]) remByFinding[r.finding_id] = r;
+  }
   return (
     <div className="space-y-4">
       <SheetHeader>
@@ -151,21 +171,62 @@ function ScanDetail({ jobId }: { jobId: string }) {
           <div>
             <h3 className="font-semibold mb-2">Findings ({d.findings.length})</h3>
             <div className="space-y-2">
-              {d.findings.map((f: any) => (
-                <div key={f.id} className="border rounded p-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${sevColor[f.severity]}`} />
-                    <span className="font-medium">{f.title}</span>
-                    <Badge variant="outline" className="ml-auto">{f.state}</Badge>
-                  </div>
-                  {f.affected_file && (
-                    <div className="text-xs font-mono text-muted-foreground">
-                      {f.affected_file}{f.affected_line ? `:${f.affected_line}` : ""}
+              {d.findings.map((f: any) => {
+                const rem = remByFinding[f.id];
+                const canDraft = !rem || ["failed", "closed"].includes(rem.status);
+                return (
+                  <div key={f.id} className="border rounded p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${sevColor[f.severity]}`} />
+                      <span className="font-medium">{f.title}</span>
+                      <Badge variant="outline" className="ml-auto">{f.state}</Badge>
                     </div>
-                  )}
-                  {f.description && <p className="text-xs">{f.description}</p>}
-                </div>
-              ))}
+                    {f.affected_file && (
+                      <div className="text-xs font-mono text-muted-foreground">
+                        {f.affected_file}{f.affected_line ? `:${f.affected_line}` : ""}
+                      </div>
+                    )}
+                    {f.description && <p className="text-xs">{f.description}</p>}
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <Button
+                        size="sm"
+                        variant={canDraft ? "default" : "outline"}
+                        onClick={() => draft.mutate(f.id)}
+                        disabled={draft.isPending || !canDraft}
+                      >
+                        <GitPullRequest className="h-3 w-3 mr-1" />
+                        {rem ? (canDraft ? "Retry Fix PR" : "Fix in flight") : "Draft Fix PR"}
+                      </Button>
+                      {rem && (
+                        <Badge variant="outline" className="text-[10px]">rem: {rem.status}</Badge>
+                      )}
+                      {rem?.pr_url && (
+                        <a
+                          href={rem.pr_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs inline-flex items-center gap-1 text-blue-500 hover:underline"
+                        >
+                          PR #{rem.pr_number} <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                      {rem?.workflow_run_url && (
+                        <a
+                          href={rem.workflow_run_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs inline-flex items-center gap-1 text-muted-foreground hover:underline"
+                        >
+                          run <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                      {rem?.last_error && (
+                        <span className="text-[10px] text-red-500">{rem.last_error}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
               {d.findings.length === 0 && (
                 <p className="text-xs text-muted-foreground">No findings recorded yet.</p>
               )}
