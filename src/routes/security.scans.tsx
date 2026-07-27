@@ -28,8 +28,18 @@ import { useAuth } from "@/lib/auth";
 import { Textarea } from "@/components/ui/textarea";
 import { ThumbsUp, ThumbsDown, GitMerge, MessageSquareWarning } from "lucide-react";
 
+import { ProtectedRoute } from "@/components/protected-route";
+import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
+
 export const Route = createFileRoute("/security/scans")({
-  component: () => <CodexScansPage />,
+  component: () => (
+    <ProtectedRoute>
+      <AppShell>
+        <CodexScansPage />
+      </AppShell>
+    </ProtectedRoute>
+  ),
   head: () => ({ meta: [{ title: "Codex Security Scans — Aurixa Systems" }] }),
 });
 
