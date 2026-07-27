@@ -260,6 +260,9 @@ function SettingsGeneralPage() {
 
       <WebhookDeliveriesPanel />
 
+      {isAdmin && <GitHubSecretSyncCard target="prime" />}
+      {isAdmin && <GitHubSecretSyncCard target="fleet" />}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
