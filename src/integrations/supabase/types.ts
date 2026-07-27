@@ -2147,8 +2147,44 @@ export type Database = {
           },
         ]
       }
+      codex_remediation_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          decision: string
+          id: string
+          remediation_id: string
+          reviewer_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          decision: string
+          id?: string
+          remediation_id: string
+          reviewer_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          decision?: string
+          id?: string
+          remediation_id?: string
+          reviewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "codex_remediation_reviews_remediation_id_fkey"
+            columns: ["remediation_id"]
+            isOneToOne: false
+            referencedRelation: "codex_remediations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       codex_remediations: {
         Row: {
+          approvals_required: number
           base_ref: string
           branch_name: string | null
           clone_id: string | null
@@ -2160,9 +2196,15 @@ export type Database = {
           id: string
           last_error: string | null
           last_event: Json
+          merge_commit_sha: string | null
+          merged_at: string | null
+          merged_by: string | null
           pr_number: number | null
           pr_state: string | null
           pr_url: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejected_reason: string | null
           repo_full_name: string
           requested_by: string | null
           scan_job_id: string
@@ -2172,6 +2214,7 @@ export type Database = {
           workflow_run_url: string | null
         }
         Insert: {
+          approvals_required?: number
           base_ref: string
           branch_name?: string | null
           clone_id?: string | null
@@ -2183,9 +2226,15 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_event?: Json
+          merge_commit_sha?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
           pr_number?: number | null
           pr_state?: string | null
           pr_url?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejected_reason?: string | null
           repo_full_name: string
           requested_by?: string | null
           scan_job_id: string
@@ -2195,6 +2244,7 @@ export type Database = {
           workflow_run_url?: string | null
         }
         Update: {
+          approvals_required?: number
           base_ref?: string
           branch_name?: string | null
           clone_id?: string | null
@@ -2206,9 +2256,15 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_event?: Json
+          merge_commit_sha?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
           pr_number?: number | null
           pr_state?: string | null
           pr_url?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejected_reason?: string | null
           repo_full_name?: string
           requested_by?: string | null
           scan_job_id?: string
@@ -6282,6 +6338,9 @@ export type Database = {
         | "closed"
         | "failed"
         | "canceled"
+        | "approved"
+        | "rejected"
+        | "changes_requested"
       codex_scan_kind:
         | "manual"
         | "nightly_full"
@@ -6547,6 +6606,9 @@ export const Constants = {
         "closed",
         "failed",
         "canceled",
+        "approved",
+        "rejected",
+        "changes_requested",
       ],
       codex_scan_kind: [
         "manual",
