@@ -139,10 +139,26 @@ export const getGitHubStatus = createServerFn({ method: "POST" })
       });
     }
 
+    // Clones may live under their own GitHub App installation. Probing them
+    // all with the default installation reported false "not installed"
+    // failures for any clone outside it.
+    const { loadCloneInstallationIds } = await import("@/server/clone-installation.server");
+    const cloneInstallations = await loadCloneInstallationIds(
+      supabase,
+      targets.filter((t) => t.role === "clone").map((t) => t.id),
+    );
+
     status.repos = await Promise.all(
       targets.map(async (t) => {
+        const installationId =
+          t.role === "prime"
+            ? (primeRes.data?.github_app_installation_id ?? null)
+            : (cloneInstallations.get(t.id) ?? null);
         try {
-          const { data: br } = await octokit.repos.getBranch({
+          // Inside the try: resolving a per-clone installation can itself
+          // throw, and one bad row must not reject the whole probe.
+          const client = installationId ? getAppOctokit(installationId) : octokit;
+          const { data: br } = await client.repos.getBranch({
             owner: t.owner,
             repo: t.repo,
             branch: t.branch,
@@ -152,7 +168,7 @@ export const getGitHubStatus = createServerFn({ method: "POST" })
           const err = e as { status?: number; message?: string };
           const msg =
             err.status === 404
-              ? `Not installed on ${t.owner}/${t.repo} (or branch missing)`
+              ? `Not installed on ${t.owner}/${t.repo} (or branch "${t.branch}" missing)`
               : err.message || "Unreachable";
           return { ...t, ok: false, error: msg };
         }

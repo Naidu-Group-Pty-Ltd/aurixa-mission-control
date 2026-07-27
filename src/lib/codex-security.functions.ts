@@ -174,11 +174,74 @@ export const getScanDetail = createServerFn({ method: "GET" })
  * them in JavaScript. `codex_fleet_overview()` does the DISTINCT ON and the
  * severity roll-up in one indexed query and returns one row per clone.
  */
+/**
+ * Pre-RPC aggregation, kept only as a rollout fallback for deployments that
+ * have not applied the migration yet. Slower by design — it groups in JS.
+ */
+async function legacyFleetOverview(supabase: any) {
+  const [clonesRes, jobsRes, findingsRes] = await Promise.all([
+    supabase
+      .from("clones")
+      .select("id, name, slug, github_owner, github_repo, codex_nightly_enabled, sync_status")
+      .order("name", { ascending: true }),
+    supabase
+      .from("codex_scan_jobs")
+      .select("id, clone_id, status, kind, started_at, completed_at, created_at, result_summary")
+      .eq("target_kind", "clone")
+      .order("created_at", { ascending: false })
+      .limit(500),
+    supabase.from("codex_findings").select("clone_id, severity").eq("state", "open"),
+  ]);
+  if (clonesRes.error) throw clonesRes.error;
+
+  const lastByClone = new Map();
+  for (const j of jobsRes.data ?? []) {
+    if (j.clone_id && !lastByClone.has(j.clone_id)) lastByClone.set(j.clone_id, j);
+  }
+  const countsByClone = new Map();
+  for (const f of findingsRes.data ?? []) {
+    if (!f.clone_id) continue;
+    const bucket = countsByClone.get(f.clone_id) ?? {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    };
+    bucket[f.severity] = (bucket[f.severity] ?? 0) + 1;
+    countsByClone.set(f.clone_id, bucket);
+  }
+
+  const clones = (clonesRes.data ?? []).map((c: any) => ({
+    ...c,
+    repo_full_name: `${c.github_owner}/${c.github_repo}`,
+    lastScan: lastByClone.get(c.id) ?? null,
+    openFindings: countsByClone.get(c.id) ?? {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    },
+  }));
+
+  return { clones };
+}
+
 export const listCloneCodexOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.rpc("codex_fleet_overview");
-    if (error) throw error;
+
+    // PGRST202 = the function does not exist, i.e. this deployment has not
+    // applied 20260727140000 yet. Fall back to the pre-RPC aggregation so the
+    // fleet panel keeps working instead of erroring out mid-rollout.
+    if (error) {
+      if (error.code === "PGRST202") {
+        return legacyFleetOverview(context.supabase);
+      }
+      throw error;
+    }
 
     const clones = (data ?? []).map((row: any) => ({
       id: row.id,

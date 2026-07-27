@@ -90,7 +90,6 @@ export const provisionClone = createServerFn({ method: "POST" })
       return { ok: false, error: "Prime not configured — set it up in Settings first" };
     }
 
-
     let githubOwner = data.targetOwner;
     let githubRepo = data.slug;
     let githubUrl: string | null = null;
@@ -176,7 +175,6 @@ export const provisionClone = createServerFn({ method: "POST" })
         notes: data.notes || null,
         isolated_tenant: data.isolatedTenant === true,
         idempotency_key: data.idempotencyKey ?? null,
-
       })
       .select()
       .single();
@@ -205,9 +203,7 @@ export const provisionClone = createServerFn({ method: "POST" })
             .from("modules")
             .select("id, name, file_globs")
             .in("id", data.moduleIds);
-          const globs = Array.from(
-            new Set((mods ?? []).flatMap((m) => m.file_globs ?? [])),
-          );
+          const globs = Array.from(new Set((mods ?? []).flatMap((m) => m.file_globs ?? [])));
           if (globs.length > 0) {
             const { data: ev } = await supabase
               .from("cascade_events")
@@ -246,7 +242,6 @@ export const provisionClone = createServerFn({ method: "POST" })
         }
       }
     }
-
 
     // ─── Auto-issue + cascade Aurixa API key ──────────────────────────
     // Every new clone gets a Mission Control API key generated immediately
@@ -309,15 +304,18 @@ export const provisionClone = createServerFn({ method: "POST" })
     // scanning and remediation from minute one. Non-fatal.
     if (data.method !== "clone" && githubUrl) {
       try {
-        const { syncRepoSecrets, buildCodexRepoSecrets } = await import(
-          "@/server/github-secrets.server"
-        );
+        const { syncRepoSecrets, buildCodexRepoSecrets } =
+          await import("@/server/github-secrets.server");
         const secretResult = await syncRepoSecrets({
           owner: githubOwner,
           repo: githubRepo,
           secrets: await buildCodexRepoSecrets(),
         });
-        await supabase.from("github_secret_syncs").insert({
+        // github_secret_syncs grants only SELECT to `authenticated`; writing
+        // through the request-scoped client was denied by RLS and the error
+        // discarded, so provisioning never left a history row.
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { error: historyErr } = await supabaseAdmin.from("github_secret_syncs").insert({
           target_kind: "clone",
           clone_id: inserted.id,
           owner: githubOwner,
@@ -329,11 +327,16 @@ export const provisionClone = createServerFn({ method: "POST" })
           trigger_source: "auto-provision",
           triggered_by: userId,
         });
+        if (historyErr) {
+          console.error(
+            "[provisionClone] failed to record secret sync history:",
+            historyErr.message,
+          );
+        }
       } catch (e) {
         console.error("[provisionClone] github secret sync failed:", e);
       }
     }
-
 
     await supabase.from("audit_log").insert({
       action: "clone.created",
