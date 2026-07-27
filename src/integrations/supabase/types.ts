@@ -2059,6 +2059,210 @@ export type Database = {
         }
         Relationships: []
       }
+      codex_findings: {
+        Row: {
+          affected_file: string | null
+          affected_line: number | null
+          auto_fix_confidence: number | null
+          clone_id: string | null
+          codex_finding_id: string
+          created_at: string
+          cvss: number | null
+          cwe: string | null
+          description: string | null
+          id: string
+          raw: Json
+          remediation_pr_state: string | null
+          remediation_pr_url: string | null
+          resolved_at: string | null
+          scan_job_id: string
+          severity: Database["public"]["Enums"]["codex_finding_severity"]
+          state: Database["public"]["Enums"]["codex_finding_state"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          affected_file?: string | null
+          affected_line?: number | null
+          auto_fix_confidence?: number | null
+          clone_id?: string | null
+          codex_finding_id: string
+          created_at?: string
+          cvss?: number | null
+          cwe?: string | null
+          description?: string | null
+          id?: string
+          raw?: Json
+          remediation_pr_state?: string | null
+          remediation_pr_url?: string | null
+          resolved_at?: string | null
+          scan_job_id: string
+          severity?: Database["public"]["Enums"]["codex_finding_severity"]
+          state?: Database["public"]["Enums"]["codex_finding_state"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          affected_file?: string | null
+          affected_line?: number | null
+          auto_fix_confidence?: number | null
+          clone_id?: string | null
+          codex_finding_id?: string
+          created_at?: string
+          cvss?: number | null
+          cwe?: string | null
+          description?: string | null
+          id?: string
+          raw?: Json
+          remediation_pr_state?: string | null
+          remediation_pr_url?: string | null
+          resolved_at?: string | null
+          scan_job_id?: string
+          severity?: Database["public"]["Enums"]["codex_finding_severity"]
+          state?: Database["public"]["Enums"]["codex_finding_state"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "codex_findings_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "codex_findings_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "codex_findings_scan_job_id_fkey"
+            columns: ["scan_job_id"]
+            isOneToOne: false
+            referencedRelation: "codex_scan_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      codex_scan_events: {
+        Row: {
+          actor: string | null
+          created_at: string
+          event_type: string
+          id: string
+          job_id: string
+          payload: Json
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          job_id: string
+          payload?: Json
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          job_id?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "codex_scan_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "codex_scan_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      codex_scan_jobs: {
+        Row: {
+          clone_id: string | null
+          completed_at: string | null
+          created_at: string
+          external_scan_id: string | null
+          failure_count: number
+          id: string
+          kind: Database["public"]["Enums"]["codex_scan_kind"]
+          last_error: string | null
+          next_attempt_at: string | null
+          path_globs: string[] | null
+          ref: string | null
+          repo_full_name: string
+          request_payload: Json
+          requested_by: string | null
+          result_summary: Json
+          started_at: string | null
+          status: Database["public"]["Enums"]["codex_scan_status"]
+          target_kind: string
+          updated_at: string
+        }
+        Insert: {
+          clone_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          external_scan_id?: string | null
+          failure_count?: number
+          id?: string
+          kind?: Database["public"]["Enums"]["codex_scan_kind"]
+          last_error?: string | null
+          next_attempt_at?: string | null
+          path_globs?: string[] | null
+          ref?: string | null
+          repo_full_name: string
+          request_payload?: Json
+          requested_by?: string | null
+          result_summary?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["codex_scan_status"]
+          target_kind?: string
+          updated_at?: string
+        }
+        Update: {
+          clone_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          external_scan_id?: string | null
+          failure_count?: number
+          id?: string
+          kind?: Database["public"]["Enums"]["codex_scan_kind"]
+          last_error?: string | null
+          next_attempt_at?: string | null
+          path_globs?: string[] | null
+          ref?: string | null
+          repo_full_name?: string
+          request_payload?: Json
+          requested_by?: string | null
+          result_summary?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["codex_scan_status"]
+          target_kind?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "codex_scan_jobs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "codex_scan_jobs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+        ]
+      }
       edge_audit: {
         Row: {
           action: string
@@ -5898,6 +6102,28 @@ export type Database = {
         | "suspended"
       clone_stripe_mode: "platform" | "own_account" | "connect"
       clone_stripe_status: "pending" | "active" | "rotated" | "revoked"
+      codex_finding_severity: "critical" | "high" | "medium" | "low" | "info"
+      codex_finding_state:
+        | "open"
+        | "triaging"
+        | "fix_drafted"
+        | "pr_open"
+        | "fix_merged"
+        | "resolved"
+        | "dismissed"
+        | "false_positive"
+      codex_scan_kind:
+        | "manual"
+        | "nightly_full"
+        | "pr_open"
+        | "targeted_path"
+        | "post_merge_revalidate"
+      codex_scan_status:
+        | "queued"
+        | "running"
+        | "completed"
+        | "failed"
+        | "canceled"
       drift_severity: "low" | "medium" | "high"
       handoff_path: "rebuild_twin" | "enterprise_transfer"
       handoff_state:
@@ -6131,6 +6357,31 @@ export const Constants = {
       ],
       clone_stripe_mode: ["platform", "own_account", "connect"],
       clone_stripe_status: ["pending", "active", "rotated", "revoked"],
+      codex_finding_severity: ["critical", "high", "medium", "low", "info"],
+      codex_finding_state: [
+        "open",
+        "triaging",
+        "fix_drafted",
+        "pr_open",
+        "fix_merged",
+        "resolved",
+        "dismissed",
+        "false_positive",
+      ],
+      codex_scan_kind: [
+        "manual",
+        "nightly_full",
+        "pr_open",
+        "targeted_path",
+        "post_merge_revalidate",
+      ],
+      codex_scan_status: [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "canceled",
+      ],
       drift_severity: ["low", "medium", "high"],
       handoff_path: ["rebuild_twin", "enterprise_transfer"],
       handoff_state: [
