@@ -159,6 +159,12 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ShieldCheck,
         keywords: "pentest",
       },
+      {
+        to: "/security/intake",
+        label: "Intake Sources",
+        icon: Shield,
+        keywords: "scanner webhook hmac codex snyk semgrep ticketing linear jira",
+      },
     ],
   },
   {
