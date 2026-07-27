@@ -329,6 +329,15 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
         {remediation.status === "merged" && (
           <Badge className="text-[10px] bg-blue-600">merged</Badge>
         )}
+        {remediation.cascade_event_id && (
+          <a
+            href={`/cascades/${remediation.cascade_event_id}`}
+            className="underline underline-offset-2 hover:text-foreground"
+            title="Fleet cascade of this patch"
+          >
+            cascade →
+          </a>
+        )}
       </div>
       {reviews.length > 0 && (
         <div className="text-[10px] space-y-0.5">
