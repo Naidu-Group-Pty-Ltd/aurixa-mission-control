@@ -5086,6 +5086,7 @@ export type Database = {
           affected_asset: string | null
           assessment_id: string
           clone_id: string
+          codex_finding_id: string | null
           created_at: string
           cvss: string | null
           cwe: string | null
@@ -5094,9 +5095,11 @@ export type Database = {
           id: string
           partner_id: string
           recommendation: string | null
+          remediation_pr_url: string | null
           resolved_at: string | null
           retest_status: string
           severity: string
+          source: string
           status: string
           submitted_by: string | null
           title: string
@@ -5106,6 +5109,7 @@ export type Database = {
           affected_asset?: string | null
           assessment_id: string
           clone_id: string
+          codex_finding_id?: string | null
           created_at?: string
           cvss?: string | null
           cwe?: string | null
@@ -5114,9 +5118,11 @@ export type Database = {
           id?: string
           partner_id: string
           recommendation?: string | null
+          remediation_pr_url?: string | null
           resolved_at?: string | null
           retest_status?: string
           severity?: string
+          source?: string
           status?: string
           submitted_by?: string | null
           title: string
@@ -5126,6 +5132,7 @@ export type Database = {
           affected_asset?: string | null
           assessment_id?: string
           clone_id?: string
+          codex_finding_id?: string | null
           created_at?: string
           cvss?: string | null
           cwe?: string | null
@@ -5134,9 +5141,11 @@ export type Database = {
           id?: string
           partner_id?: string
           recommendation?: string | null
+          remediation_pr_url?: string | null
           resolved_at?: string | null
           retest_status?: string
           severity?: string
+          source?: string
           status?: string
           submitted_by?: string | null
           title?: string
@@ -5163,6 +5172,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clones_missing_isolated_backend"
             referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "security_findings_codex_finding_id_fkey"
+            columns: ["codex_finding_id"]
+            isOneToOne: false
+            referencedRelation: "codex_findings"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "security_findings_partner_id_fkey"
