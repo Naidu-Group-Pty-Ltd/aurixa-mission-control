@@ -1,18 +1,16 @@
 // Server-only helper to write Actions repository secrets via the
-// Aurixa GitHub App installation. Uses libsodium sealed box with the
-// repo's Actions public key (required by GitHub REST API).
+// Aurixa GitHub App installation. Values are sealed against the repo's
+// Actions public key with crypto_box_seal (required by the GitHub REST API).
+//
+// The sealed box is computed by a pure-JavaScript implementation — see
+// github-sealed-box.server.ts for why libsodium-wrappers cannot be used on
+// the Cloudflare Workers runtime this app deploys to.
 //
 // Required GitHub App permission: `Repository → Secrets: Read & write`.
 // If the installation lacks this permission, the API returns 403 —
 // re-accept the App's updated permissions on the installation.
-import sodium from "libsodium-wrappers";
 import { getAppOctokit } from "@/server/github-app.server";
-
-let sodiumReady: Promise<void> | null = null;
-function ensureSodium(): Promise<void> {
-  if (!sodiumReady) sodiumReady = sodium.ready;
-  return sodiumReady;
-}
+import { isLocalEncryptionFailure, sealedBoxBase64 } from "@/server/github-sealed-box.server";
 
 /**
  * GitHub's own constraint on Actions secret names. Violating it returns a
@@ -34,12 +32,16 @@ export function validateSecretName(name: string): string | null {
  * Turn an Octokit error into something an operator can act on. GitHub's
  * messages for this endpoint are famously ambiguous — a bare "Not Found"
  * covers a missing repo, an uninstalled app, AND a missing permission.
+ *
+ * `fatal` marks a failure that is a property of the environment or the
+ * repository rather than of one particular secret, so the caller knows the
+ * remaining names cannot possibly succeed.
  */
 export function describeSecretError(
   err: unknown,
   owner: string,
   repo: string,
-): { status: number | null; message: string } {
+): { status: number | null; message: string; fatal: boolean } {
   const status =
     (err as { status?: number })?.status ??
     (err as { response?: { status?: number } })?.response?.status ??
@@ -49,9 +51,27 @@ export function describeSecretError(
     (err instanceof Error ? err.message : String(err));
   const target = `${owner}/${repo}`;
 
+  // Encryption runs before the first GitHub call, so a failure here is not a
+  // permission problem and no amount of re-accepting App permissions will fix
+  // it. Say so explicitly — this class of error previously surfaced as a raw
+  // `Aborted(CompileError: ...)` repeated once per secret name.
+  if (isLocalEncryptionFailure(err)) {
+    return {
+      status: null,
+      fatal: true,
+      message:
+        `Mission Control could not encrypt the secrets for ${target} — this failed locally, ` +
+        `before GitHub was contacted, so it is not a repository or App-permission problem. ` +
+        `Actions secrets are sealed by a pure-JavaScript crypto_box_seal ` +
+        `(src/server/github-sealed-box.server.ts); a Wasm-backed crypto library in this path ` +
+        `cannot run on the Workers runtime. Detail: ${raw}`,
+    };
+  }
+
   if (status === 404) {
     return {
       status,
+      fatal: true,
       message:
         `404: the Aurixa GitHub App cannot see ${target}. Either the App is not installed ` +
         `on ${owner}, ${target} is not in the installation's repository access list, or the ` +
@@ -61,6 +81,7 @@ export function describeSecretError(
   if (status === 403) {
     return {
       status,
+      fatal: true,
       message:
         `403: the installation is missing the "Secrets: Read & write" permission for ${target}. ` +
         `Update the App's permissions, then re-accept them on the installation ` +
@@ -70,6 +91,7 @@ export function describeSecretError(
   if (status === 401) {
     return {
       status,
+      fatal: true,
       message:
         `401: GitHub rejected the App credentials. GITHUB_APP_PRIVATE_KEY probably does not ` +
         `match GITHUB_APP_ID, or GITHUB_APP_INSTALLATION_ID belongs to a different app. ` +
@@ -77,9 +99,15 @@ export function describeSecretError(
     };
   }
   if (status === 422) {
-    return { status, message: `422: GitHub rejected the secret for ${target}: ${raw}` };
+    // Specific to the value or name being written — the other secrets may
+    // still be fine, so this one does not stop the run.
+    return {
+      status,
+      fatal: false,
+      message: `422: GitHub rejected the secret for ${target}: ${raw}`,
+    };
   }
-  return { status, message: status ? `${status}: ${raw}` : raw };
+  return { status, fatal: false, message: status ? `${status}: ${raw}` : raw };
 }
 
 export type PutRepoSecretInput = {
@@ -97,7 +125,6 @@ export async function putRepoSecret(input: PutRepoSecretInput): Promise<void> {
     throw new Error(`Invalid secret name "${input.name}": ${nameProblem}`);
   }
 
-  await ensureSodium();
   const octokit = getAppOctokit(input.installationId ?? undefined);
 
   const { data: pk } = await octokit.request(
@@ -105,10 +132,7 @@ export async function putRepoSecret(input: PutRepoSecretInput): Promise<void> {
     { owner: input.owner, repo: input.repo },
   );
 
-  const keyBytes = sodium.from_base64(pk.key, sodium.base64_variants.ORIGINAL);
-  const valueBytes = sodium.from_string(input.value);
-  const sealed = sodium.crypto_box_seal(valueBytes, keyBytes);
-  const encrypted_value = sodium.to_base64(sealed, sodium.base64_variants.ORIGINAL);
+  const encrypted_value = sealedBoxBase64(pk.key, input.value);
 
   await octokit.request("PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}", {
     owner: input.owner,
@@ -139,10 +163,11 @@ export type SyncSecretsResult = {
 /**
  * Best-effort push of multiple secrets; never throws.
  *
- * A repo-wide failure (app not installed, missing permission) hits every
- * secret identically, so it is detected once against the first configured
- * secret and short-circuits the rest instead of making N identical failing
- * round trips.
+ * A failure that belongs to the environment or the repository — the App is not
+ * installed, the installation lacks a permission, encryption cannot run here —
+ * hits every secret identically. It is detected once and short-circuits the
+ * rest, so an operator sees one explained cause plus a list of names that were
+ * never attempted, rather than N copies of the same sentence.
  */
 export async function syncRepoSecrets(input: SyncSecretsInput): Promise<SyncSecretsResult> {
   const written: string[] = [];
@@ -162,7 +187,13 @@ export async function syncRepoSecrets(input: SyncSecretsInput): Promise<SyncSecr
 
   for (const [name, value] of configured) {
     if (fatal) {
-      failed.push({ name, error: fatal });
+      // Repeating the full explanation here is what turned one broken
+      // dependency into a six-line wall of identical errors. Point at the
+      // cause instead; it is already attached to the secret that hit it.
+      failed.push({
+        name,
+        error: "not attempted — see the failure above, it affects every secret",
+      });
       continue;
     }
     try {
@@ -175,11 +206,11 @@ export async function syncRepoSecrets(input: SyncSecretsInput): Promise<SyncSecr
       });
       written.push(name);
     } catch (e) {
-      const { status, message } = describeSecretError(e, input.owner, input.repo);
+      const { message, fatal: isFatal } = describeSecretError(e, input.owner, input.repo);
       failed.push({ name, error: message });
-      // 401/403/404 are properties of the repo + installation, not of this
+      // Properties of the runtime or of the repo + installation, not of this
       // particular secret — retrying the remaining names cannot succeed.
-      if (status === 401 || status === 403 || status === 404) fatal = message;
+      if (isFatal) fatal = message;
     }
   }
 

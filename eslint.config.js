@@ -44,6 +44,38 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-expressions": "warn",
     },
   },
+  {
+    // Application code deploys to Cloudflare Workers, which forbids compiling
+    // WebAssembly from bytes at runtime. libsodium-wrappers does exactly that
+    // on first use, which silently broke every GitHub Actions secret sync
+    // with `Aborted(CompileError: ... disallowed by embedder)`. It is kept as
+    // a devDependency purely as the reference implementation that
+    // github-sealed-box.server.test.ts checks our pure-JS sealed box against,
+    // so importing it anywhere else is an error rather than a warning.
+    files: ["**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "libsodium-wrappers",
+              message:
+                "libsodium-wrappers instantiates WebAssembly at runtime, which the Workers " +
+                "runtime rejects. Use sealedBoxBase64 from @/server/github-sealed-box.server.",
+            },
+            {
+              name: "libsodium",
+              message:
+                "libsodium instantiates WebAssembly at runtime, which the Workers runtime " +
+                "rejects. Use sealedBoxBase64 from @/server/github-sealed-box.server.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   eslintPluginPrettier,
   {
     // Keep format drift visible without blocking feature verification. The repo
