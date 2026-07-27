@@ -286,7 +286,14 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
   const merge = useMutation({
     mutationFn: () => mergeFn({ data: { remediationId: remediation.id } }),
     onSuccess: (r: any) => {
-      toast.success(`Merged ${r.sha?.slice(0, 7) ?? ""}`);
+      const sha = r?.sha ? ` ${r.sha.slice(0, 7)}` : "";
+      if (r?.cascadeEventId) {
+        toast.success(`Merged${sha} — cascade queued`);
+      } else if (r?.cascadeError) {
+        toast.warning(`Merged${sha}, cascade skipped: ${r.cascadeError}`);
+      } else {
+        toast.success(`Merged${sha}`);
+      }
       qc.invalidateQueries({ queryKey: ["codex-remediations"] });
       qc.invalidateQueries({ queryKey: ["codex-rem-reviews", remediation.id] });
     },
@@ -321,6 +328,15 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
         )}
         {remediation.status === "merged" && (
           <Badge className="text-[10px] bg-blue-600">merged</Badge>
+        )}
+        {remediation.cascade_event_id && (
+          <a
+            href={`/cascades/${remediation.cascade_event_id}`}
+            className="underline underline-offset-2 hover:text-foreground"
+            title="Fleet cascade of this patch"
+          >
+            cascade →
+          </a>
         )}
       </div>
       {reviews.length > 0 && (
