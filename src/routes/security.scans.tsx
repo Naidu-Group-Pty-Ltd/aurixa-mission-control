@@ -259,3 +259,151 @@ function ScanDetail({ jobId }: { jobId: string }) {
     </div>
   );
 }
+
+function RemediationReviewPanel({ remediation }: { remediation: any }) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const uid = user?.id;
+  const [comment, setComment] = useState("");
+  const reviewsQ = useQuery({
+    queryKey: ["codex-rem-reviews", remediation.id],
+    queryFn: () => listRemediationReviews({ data: { remediationId: remediation.id } }),
+    refetchInterval: 10000,
+  });
+  const reviewFn = useServerFn(reviewRemediation);
+  const mergeFn = useServerFn(mergeRemediationPR);
+  const review = useMutation({
+    mutationFn: (decision: "approve" | "reject" | "changes_requested") =>
+      reviewFn({ data: { remediationId: remediation.id, decision, comment: comment || undefined } }),
+    onSuccess: () => {
+      toast.success("Review recorded");
+      setComment("");
+      qc.invalidateQueries({ queryKey: ["codex-rem-reviews", remediation.id] });
+      qc.invalidateQueries({ queryKey: ["codex-remediations"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const merge = useMutation({
+    mutationFn: () => mergeFn({ data: { remediationId: remediation.id } }),
+    onSuccess: (r: any) => {
+      toast.success(`Merged ${r.sha?.slice(0, 7) ?? ""}`);
+      qc.invalidateQueries({ queryKey: ["codex-remediations"] });
+      qc.invalidateQueries({ queryKey: ["codex-rem-reviews", remediation.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const reviews = reviewsQ.data?.reviews ?? [];
+  const approvers = new Set(
+    reviews
+      .filter((r: any) => r.decision === "approve" && r.reviewer_id !== remediation.requested_by)
+      .map((r: any) => r.reviewer_id),
+  );
+  const rejected = reviews.some((r: any) => r.decision === "reject");
+  const required = remediation.approvals_required ?? 2;
+  const isRequester = uid && uid === remediation.requested_by;
+  const alreadyReviewed = reviews.some((r: any) => r.reviewer_id === uid);
+  const canMerge =
+    !!remediation.pr_number &&
+    approvers.size >= required &&
+    !rejected &&
+    !["merged", "rejected"].includes(remediation.status);
+
+  return (
+    <div className="mt-2 border-t pt-2 space-y-2">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <span>
+          Approvals: <b className={approvers.size >= required ? "text-emerald-500" : ""}>{approvers.size}</b>/{required}
+        </span>
+        {rejected && <Badge variant="destructive" className="text-[10px]">rejected</Badge>}
+        {remediation.status === "approved" && (
+          <Badge className="text-[10px] bg-emerald-600">approved</Badge>
+        )}
+        {remediation.status === "merged" && (
+          <Badge className="text-[10px] bg-blue-600">merged</Badge>
+        )}
+      </div>
+      {reviews.length > 0 && (
+        <div className="text-[10px] space-y-0.5">
+          {reviews.map((r: any) => (
+            <div key={r.id} className="flex gap-2">
+              <span className="font-mono">{r.reviewer_id.slice(0, 8)}</span>
+              <Badge
+                variant="outline"
+                className={
+                  r.decision === "approve"
+                    ? "text-emerald-500 border-emerald-500/40"
+                    : r.decision === "reject"
+                      ? "text-red-500 border-red-500/40"
+                      : "text-amber-500 border-amber-500/40"
+                }
+              >
+                {r.decision}
+              </Badge>
+              {r.comment && <span className="italic text-muted-foreground truncate">{r.comment}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {!isRequester && !["merged", "rejected"].includes(remediation.status) && (
+        <div className="space-y-1">
+          <Textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder={alreadyReviewed ? "Update comment (optional)" : "Review comment (optional)"}
+            className="text-xs min-h-[48px]"
+          />
+          <div className="flex gap-1 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => review.mutate("approve")}
+              disabled={review.isPending}
+            >
+              <ThumbsUp className="h-3 w-3 mr-1" /> Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => review.mutate("changes_requested")}
+              disabled={review.isPending}
+            >
+              <MessageSquareWarning className="h-3 w-3 mr-1" /> Request changes
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs text-red-500 border-red-500/40 hover:bg-red-500/10"
+              onClick={() => review.mutate("reject")}
+              disabled={review.isPending}
+            >
+              <ThumbsDown className="h-3 w-3 mr-1" /> Reject
+            </Button>
+          </div>
+        </div>
+      )}
+      {isRequester && (
+        <p className="text-[10px] text-muted-foreground">
+          You requested this remediation — you can't approve your own.
+        </p>
+      )}
+      <div>
+        <Button
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => merge.mutate()}
+          disabled={!canMerge || merge.isPending}
+        >
+          <GitMerge className="h-3 w-3 mr-1" />
+          {merge.isPending
+            ? "Merging…"
+            : canMerge
+              ? "Merge PR"
+              : `Needs ${Math.max(0, required - approvers.size)} more approval${required - approvers.size === 1 ? "" : "s"}`}
+        </Button>
+      </div>
+    </div>
+  );
+}
