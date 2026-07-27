@@ -1840,6 +1840,7 @@ export type Database = {
           default_branch: string
           deploy_url: string | null
           drift_suggestions: Json
+          github_app_installation_id: string | null
           github_owner: string
           github_repo: string
           github_url: string | null
@@ -1855,6 +1856,7 @@ export type Database = {
           notes: string | null
           owner_user_id: string | null
           provisioning_method: Database["public"]["Enums"]["provisioning_method"]
+          repo_full_name: string | null
           slug: string
           subdomain: string | null
           subdomain_fqdn: string | null
@@ -1874,6 +1876,7 @@ export type Database = {
           default_branch?: string
           deploy_url?: string | null
           drift_suggestions?: Json
+          github_app_installation_id?: string | null
           github_owner: string
           github_repo: string
           github_url?: string | null
@@ -1889,6 +1892,7 @@ export type Database = {
           notes?: string | null
           owner_user_id?: string | null
           provisioning_method: Database["public"]["Enums"]["provisioning_method"]
+          repo_full_name?: string | null
           slug: string
           subdomain?: string | null
           subdomain_fqdn?: string | null
@@ -1908,6 +1912,7 @@ export type Database = {
           default_branch?: string
           deploy_url?: string | null
           drift_suggestions?: Json
+          github_app_installation_id?: string | null
           github_owner?: string
           github_repo?: string
           github_url?: string | null
@@ -1923,6 +1928,7 @@ export type Database = {
           notes?: string | null
           owner_user_id?: string | null
           provisioning_method?: Database["public"]["Enums"]["provisioning_method"]
+          repo_full_name?: string | null
           slug?: string
           subdomain?: string | null
           subdomain_fqdn?: string | null
@@ -2074,13 +2080,19 @@ export type Database = {
           cwe: string | null
           description: string | null
           external_ticket_url: string | null
+          fingerprint: string | null
+          first_seen_at: string
           id: string
+          last_seen_at: string
           raw: Json
           remediation_pr_state: string | null
           remediation_pr_url: string | null
           resolved_at: string | null
-          scan_job_id: string
+          rule_id: string | null
+          scan_job_id: string | null
+          scanner: string | null
           severity: Database["public"]["Enums"]["codex_finding_severity"]
+          snippet: string | null
           source_slug: string | null
           state: Database["public"]["Enums"]["codex_finding_state"]
           title: string
@@ -2097,13 +2109,19 @@ export type Database = {
           cwe?: string | null
           description?: string | null
           external_ticket_url?: string | null
+          fingerprint?: string | null
+          first_seen_at?: string
           id?: string
+          last_seen_at?: string
           raw?: Json
           remediation_pr_state?: string | null
           remediation_pr_url?: string | null
           resolved_at?: string | null
-          scan_job_id: string
+          rule_id?: string | null
+          scan_job_id?: string | null
+          scanner?: string | null
           severity?: Database["public"]["Enums"]["codex_finding_severity"]
+          snippet?: string | null
           source_slug?: string | null
           state?: Database["public"]["Enums"]["codex_finding_state"]
           title: string
@@ -2120,13 +2138,19 @@ export type Database = {
           cwe?: string | null
           description?: string | null
           external_ticket_url?: string | null
+          fingerprint?: string | null
+          first_seen_at?: string
           id?: string
+          last_seen_at?: string
           raw?: Json
           remediation_pr_state?: string | null
           remediation_pr_url?: string | null
           resolved_at?: string | null
-          scan_job_id?: string
+          rule_id?: string | null
+          scan_job_id?: string | null
+          scanner?: string | null
           severity?: Database["public"]["Enums"]["codex_finding_severity"]
+          snippet?: string | null
           source_slug?: string | null
           state?: Database["public"]["Enums"]["codex_finding_state"]
           title?: string
@@ -2363,6 +2387,7 @@ export type Database = {
           clone_id: string | null
           completed_at: string | null
           created_at: string
+          engine: string
           external_scan_id: string | null
           failure_count: number
           id: string
@@ -2379,11 +2404,14 @@ export type Database = {
           status: Database["public"]["Enums"]["codex_scan_status"]
           target_kind: string
           updated_at: string
+          workflow_run_id: number | null
+          workflow_run_url: string | null
         }
         Insert: {
           clone_id?: string | null
           completed_at?: string | null
           created_at?: string
+          engine?: string
           external_scan_id?: string | null
           failure_count?: number
           id?: string
@@ -2400,11 +2428,14 @@ export type Database = {
           status?: Database["public"]["Enums"]["codex_scan_status"]
           target_kind?: string
           updated_at?: string
+          workflow_run_id?: number | null
+          workflow_run_url?: string | null
         }
         Update: {
           clone_id?: string | null
           completed_at?: string | null
           created_at?: string
+          engine?: string
           external_scan_id?: string | null
           failure_count?: number
           id?: string
@@ -2421,6 +2452,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["codex_scan_status"]
           target_kind?: string
           updated_at?: string
+          workflow_run_id?: number | null
+          workflow_run_url?: string | null
         }
         Relationships: [
           {
@@ -6310,6 +6343,21 @@ export type Database = {
         Returns: boolean
       }
       clone_requires_backend: { Args: { _clone_id: string }; Returns: boolean }
+      codex_fleet_overview: {
+        Args: never
+        Returns: {
+          codex_nightly_enabled: boolean
+          github_owner: string
+          github_repo: string
+          id: string
+          last_scan: Json
+          name: string
+          open_findings: Json
+          repo_full_name: string
+          slug: string
+          sync_status: string
+        }[]
+      }
       commit_seat: { Args: { _seat_id: string }; Returns: Json }
       commit_tokens: {
         Args: { _actual_tokens: number; _job_id: string; _result_meta?: Json }
