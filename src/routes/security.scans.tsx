@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { ShieldAlert, PlayCircle, RefreshCw } from "lucide-react";
+import { ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
 import { enqueueScan, listScanJobs, getScanDetail } from "@/lib/codex-security.functions";
+import { draftRemediationPR, listRemediations } from "@/lib/codex-remediation.functions";
 
 export const Route = createFileRoute("/security/scans")({
   component: () => <CodexScansPage />,
