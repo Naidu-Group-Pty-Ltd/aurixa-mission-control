@@ -31,6 +31,7 @@ import { CloneHealthCard } from "@/components/clone-health-card";
 import { CloneLibraryPinsCard } from "@/components/clone-library-pins";
 import { ClonePurchasesCard } from "@/components/clone-purchases-card";
 import { CloneSecurityAssessmentsCard } from "@/components/clone-security-assessments-card";
+import { CloneCodexScansCard } from "@/components/clone-codex-scans-card";
 import { CloneSyncStatusCard } from "@/components/clone-sync-status-card";
 import { GitHubSecretSyncCard } from "@/components/github-secret-sync-card";
 import { CopyButton } from "@/components/copy-button";
