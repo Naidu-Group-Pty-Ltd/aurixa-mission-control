@@ -71,25 +71,23 @@ function CodexScansPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6" /> Codex Security Scans
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Autonomous repository scans powered by OpenAI Codex Security.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => jobsQ.refetch()}>
-            <RefreshCw className="h-4 w-4 mr-1" /> Refresh
-          </Button>
-          <Button onClick={() => runScan.mutate()} disabled={runScan.isPending}>
-            <PlayCircle className="h-4 w-4 mr-1" />
-            {runScan.isPending ? "Queuing…" : "Scan Prime Now"}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="security"
+        icon={<ShieldAlert className="h-6 w-6 text-primary" />}
+        title="Scans & Findings"
+        description="Autonomous repository scans powered by OpenAI Codex Security."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => jobsQ.refetch()}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            </Button>
+            <Button onClick={() => runScan.mutate()} disabled={runScan.isPending}>
+              <PlayCircle className="h-4 w-4 mr-1" />
+              {runScan.isPending ? "Queuing…" : "Scan Prime Now"}
+            </Button>
+          </>
+        }
+      />
 
       <SchedulingPanel />
 
