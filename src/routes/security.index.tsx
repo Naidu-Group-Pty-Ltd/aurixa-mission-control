@@ -195,6 +195,7 @@ function SecurityOverviewPage() {
           <div className="text-xs text-muted-foreground">security patches in flight</div>
         </Tile>
       </div>
+      )}
 
       {/* Hotspots + PRs awaiting */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -205,8 +206,7 @@ function SecurityOverviewPage() {
                 <Users className="h-4 w-4" /> Clone hotspots
               </CardTitle>
               <CardDescription>Clones with open critical or high findings.</CardDescription>
-      </div>
-      )}
+            </div>
             <Button asChild variant="ghost" size="sm">
               <Link to="/security/scans">
                 All clones <ArrowRight className="h-3 w-3 ml-1" />
