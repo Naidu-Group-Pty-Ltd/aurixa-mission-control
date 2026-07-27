@@ -138,3 +138,33 @@ export async function verifyRemediationSignature(
     diff |= hex.charCodeAt(i) ^ provided.charCodeAt(i);
   return diff === 0;
 }
+
+/**
+ * Merge a Codex remediation PR via the GitHub App installation. Uses a
+ * squash-merge by default so the branch history stays clean. Returns the
+ * merge commit SHA on success.
+ */
+export async function mergeRemediationPRViaGitHub(input: {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  installationId?: string | null;
+  commitTitle?: string;
+  commitMessage?: string;
+  method?: "squash" | "merge" | "rebase";
+}): Promise<{ sha: string; merged: boolean }> {
+  const octokit = getAppOctokit(input.installationId ?? undefined);
+  const res = await octokit.request(
+    "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge",
+    {
+      owner: input.owner,
+      repo: input.repo,
+      pull_number: input.prNumber,
+      merge_method: input.method || "squash",
+      commit_title: input.commitTitle,
+      commit_message: input.commitMessage,
+    },
+  );
+  return { sha: (res.data as any).sha, merged: (res.data as any).merged };
+}
+

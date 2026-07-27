@@ -205,7 +205,7 @@ export const listRemediations = createServerFn({ method: "GET" })
     let q = context.supabase
       .from("codex_remediations")
       .select(
-        "id, finding_id, scan_job_id, repo_full_name, base_ref, branch_name, workflow_run_id, workflow_run_url, pr_number, pr_url, pr_state, status, last_error, dispatched_at, completed_at, created_at",
+        "id, finding_id, scan_job_id, repo_full_name, base_ref, branch_name, workflow_run_id, workflow_run_url, pr_number, pr_url, pr_state, status, last_error, dispatched_at, completed_at, created_at, requested_by, approvals_required, merged_at, merged_by, merge_commit_sha",
       )
       .order("created_at", { ascending: false })
       .limit(100);
