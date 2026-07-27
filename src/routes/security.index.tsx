@@ -75,6 +75,7 @@ function SecurityOverviewPage() {
   const jobs = jobsQ.data?.jobs ?? [];
   const clones = fleetQ.data?.clones ?? [];
   const remediations = remQ.data?.remediations ?? [];
+  const anyLoading = jobsQ.isLoading || fleetQ.isLoading || remQ.isLoading;
 
   // Aggregate severity across fleet + prime finding_id
   const fleetOpen = clones.reduce(
@@ -136,6 +137,16 @@ function SecurityOverviewPage() {
       />
 
       {/* Top-line tiles */}
+      {anyLoading && clones.length === 0 && jobs.length === 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[120px] animate-pulse rounded-lg border border-border/60 bg-card/40"
+            />
+          ))}
+        </div>
+      ) : (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Tile
           icon={<ShieldAlert className="h-4 w-4" />}
@@ -184,6 +195,7 @@ function SecurityOverviewPage() {
           <div className="text-xs text-muted-foreground">security patches in flight</div>
         </Tile>
       </div>
+      )}
 
       {/* Hotspots + PRs awaiting */}
       <div className="grid gap-4 lg:grid-cols-2">

@@ -6,6 +6,7 @@ import { LogOut, Radio, Menu, Search } from "lucide-react";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { NavSecurityBadge } from "@/components/nav-security-badge";
 import { CommandPalette } from "@/components/command-palette";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
@@ -57,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Icon className={cn("h-4 w-4", active && "text-primary")} />
             <span>{item.label}</span>
+            {to === "/security" && <NavSecurityBadge />}
             {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />}
           </Link>
         );
