@@ -124,7 +124,7 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
     const { data: rem } = await supabase
       .from("codex_remediations")
       .select(
-        "id, status, approvals_required, requested_by, repo_full_name, pr_number, scan_job_id, finding_id, clone_id",
+        "id, status, approvals_required, requested_by, repo_full_name, pr_number, scan_job_id, finding_id, clone_id, base_ref, branch_name",
       )
       .eq("id", data.remediationId)
       .maybeSingle();
@@ -151,8 +151,6 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
       throw new Error("A reviewer rejected this remediation");
     }
     if (uniqueApprovers.has(userId) === false && rem.requested_by === userId) {
-      // Requester cannot self-merge without approvals (they can't approve themselves).
-      // This is redundant with the count check but explicit.
       throw new Error("Requester cannot merge without independent approvals");
     }
 
@@ -191,6 +189,52 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
     });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Load finding title for cascade summary + audit payload.
+    const { data: finding } = await supabaseAdmin
+      .from("codex_findings")
+      .select("title, severity, cwe")
+      .eq("id", rem.finding_id)
+      .maybeSingle();
+
+    // Phase 3: cascade the merged security patch to the clone fleet.
+    // Only fan out when the remediation lives in Prime — clone-scoped
+    // fixes stay in that clone. Choose cascade mode from prime_config,
+    // falling back to `pr` for safety.
+    let cascadeEventId: string | null = null;
+    let cascadeError: string | null = null;
+    if (!rem.clone_id) {
+      try {
+        const { data: prime } = await supabaseAdmin
+          .from("prime_config")
+          .select("default_cascade_mode, default_branch")
+          .limit(1)
+          .maybeSingle();
+        const mode = (prime?.default_cascade_mode as any) || "pr";
+        const sourceBranch = prime?.default_branch || rem.base_ref || "main";
+        const title = (finding?.title || "security patch").slice(0, 140);
+        const severity = (finding?.severity || "").toUpperCase();
+        const { createCascadeForAllClones } = await import(
+          "@/server/cascade-trigger.server"
+        );
+        const cascade = await createCascadeForAllClones({
+          supabase: supabaseAdmin as any,
+          mode,
+          trigger: "commit",
+          sourceBranch,
+          sourceSha: merge.sha,
+          initiatedBy: userId,
+          summary: `Codex security patch${severity ? ` [${severity}]` : ""}: ${title} (PR #${rem.pr_number})`,
+        });
+        cascadeEventId = cascade.eventId;
+        if (cascade.error && !cascade.eventId) {
+          cascadeError = cascade.error;
+        }
+      } catch (err) {
+        cascadeError = (err as Error).message;
+      }
+    }
+
     await (supabaseAdmin as any)
       .from("codex_remediations")
       .update({
@@ -200,6 +244,7 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
         merge_commit_sha: merge.sha,
         pr_state: "merged",
         completed_at: new Date().toISOString(),
+        cascade_event_id: cascadeEventId,
       })
       .eq("id", rem.id);
     await (supabaseAdmin as any)
@@ -210,8 +255,38 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
       job_id: rem.scan_job_id,
       event_type: "remediation.merged",
       actor: userId,
-      payload: { remediation_id: rem.id, sha: merge.sha, pr_number: rem.pr_number },
+      payload: {
+        remediation_id: rem.id,
+        sha: merge.sha,
+        pr_number: rem.pr_number,
+        cascade_event_id: cascadeEventId,
+        cascade_error: cascadeError,
+      },
     });
+    if (cascadeEventId) {
+      await (supabaseAdmin as any).from("codex_scan_events").insert({
+        job_id: rem.scan_job_id,
+        event_type: "remediation.cascade_triggered",
+        actor: userId,
+        payload: {
+          remediation_id: rem.id,
+          cascade_event_id: cascadeEventId,
+          source_sha: merge.sha,
+        },
+      });
+    } else if (cascadeError) {
+      await (supabaseAdmin as any).from("codex_scan_events").insert({
+        job_id: rem.scan_job_id,
+        event_type: "remediation.cascade_skipped",
+        actor: userId,
+        payload: { remediation_id: rem.id, reason: cascadeError },
+      });
+    }
 
-    return { ok: true, sha: merge.sha };
+    return {
+      ok: true,
+      sha: merge.sha,
+      cascadeEventId,
+      cascadeError,
+    };
   });
