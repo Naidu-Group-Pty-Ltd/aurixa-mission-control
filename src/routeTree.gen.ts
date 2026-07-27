@@ -52,6 +52,7 @@ import { Route as SettingsCloneStripeRouteImport } from './routes/settings.clone
 import { Route as SettingsClientAccountsRouteImport } from './routes/settings.client-accounts'
 import { Route as SettingsBillingRouteImport } from './routes/settings.billing'
 import { Route as SecurityScansRouteImport } from './routes/security.scans'
+import { Route as SecurityIntakeRouteImport } from './routes/security.intake'
 import { Route as ModulesBuilderRouteImport } from './routes/modules.builder'
 import { Route as ModulesSlugRouteImport } from './routes/modules.$slug'
 import { Route as JoinTokenRouteImport } from './routes/join.$token'
@@ -340,6 +341,11 @@ const SettingsBillingRoute = SettingsBillingRouteImport.update({
 const SecurityScansRoute = SecurityScansRouteImport.update({
   id: '/security/scans',
   path: '/security/scans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityIntakeRoute = SecurityIntakeRouteImport.update({
+  id: '/security/intake',
+  path: '/security/intake',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ModulesBuilderRoute = ModulesBuilderRouteImport.update({
@@ -787,6 +793,7 @@ export interface FileRoutesByFullPath {
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
   '/modules/builder': typeof ModulesBuilderRoute
+  '/security/intake': typeof SecurityIntakeRoute
   '/security/scans': typeof SecurityScansRoute
   '/settings/billing': typeof SettingsBillingRoute
   '/settings/client-accounts': typeof SettingsClientAccountsRoute
@@ -903,6 +910,7 @@ export interface FileRoutesByTo {
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
   '/modules/builder': typeof ModulesBuilderRoute
+  '/security/intake': typeof SecurityIntakeRoute
   '/security/scans': typeof SecurityScansRoute
   '/settings/billing': typeof SettingsBillingRoute
   '/settings/client-accounts': typeof SettingsClientAccountsRoute
@@ -1021,6 +1029,7 @@ export interface FileRoutesById {
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
   '/modules/builder': typeof ModulesBuilderRoute
+  '/security/intake': typeof SecurityIntakeRoute
   '/security/scans': typeof SecurityScansRoute
   '/settings/billing': typeof SettingsBillingRoute
   '/settings/client-accounts': typeof SettingsClientAccountsRoute
@@ -1140,6 +1149,7 @@ export interface FileRouteTypes {
     | '/join/$token'
     | '/modules/$slug'
     | '/modules/builder'
+    | '/security/intake'
     | '/security/scans'
     | '/settings/billing'
     | '/settings/client-accounts'
@@ -1256,6 +1266,7 @@ export interface FileRouteTypes {
     | '/join/$token'
     | '/modules/$slug'
     | '/modules/builder'
+    | '/security/intake'
     | '/security/scans'
     | '/settings/billing'
     | '/settings/client-accounts'
@@ -1373,6 +1384,7 @@ export interface FileRouteTypes {
     | '/join/$token'
     | '/modules/$slug'
     | '/modules/builder'
+    | '/security/intake'
     | '/security/scans'
     | '/settings/billing'
     | '/settings/client-accounts'
@@ -1486,6 +1498,7 @@ export interface RootRouteChildren {
   HooksTokenAlertsRoute: typeof HooksTokenAlertsRoute
   HooksWarmHealthRoute: typeof HooksWarmHealthRoute
   JoinTokenRoute: typeof JoinTokenRoute
+  SecurityIntakeRoute: typeof SecurityIntakeRoute
   SecurityScansRoute: typeof SecurityScansRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
   ClientsHandoffTokenRoute: typeof ClientsHandoffTokenRoute
@@ -1827,6 +1840,13 @@ declare module '@tanstack/react-router' {
       path: '/security/scans'
       fullPath: '/security/scans'
       preLoaderRoute: typeof SecurityScansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security/intake': {
+      id: '/security/intake'
+      path: '/security/intake'
+      fullPath: '/security/intake'
+      preLoaderRoute: typeof SecurityIntakeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/modules/builder': {
@@ -2497,6 +2517,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksTokenAlertsRoute: HooksTokenAlertsRoute,
   HooksWarmHealthRoute: HooksWarmHealthRoute,
   JoinTokenRoute: JoinTokenRoute,
+  SecurityIntakeRoute: SecurityIntakeRoute,
   SecurityScansRoute: SecurityScansRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
   ClientsHandoffTokenRoute: ClientsHandoffTokenRoute,
