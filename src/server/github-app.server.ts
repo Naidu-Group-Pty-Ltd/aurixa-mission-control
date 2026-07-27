@@ -20,9 +20,26 @@ function readEnv(name: string): string {
  * accepts PKCS#8 (`BEGIN PRIVATE KEY`). Keys downloaded from GitHub App
  * settings are PKCS#1 (`BEGIN RSA PRIVATE KEY`), so we auto-convert.
  */
+function normalizePemWhitespace(pem: string): string {
+  let p = pem.replace(/\\n/g, "\n").trim();
+  // Some secret stores flatten newlines to spaces. If the PEM has no real
+  // newlines but does contain BEGIN/END markers, rebuild it: extract the
+  // base64 body between the markers and re-wrap at 64 chars per line.
+  if (!p.includes("\n")) {
+    const m = p.match(/-----BEGIN ([A-Z0-9 ]+?)-----([\s\S]+?)-----END \1-----/);
+    if (m) {
+      const label = m[1].trim();
+      const body = m[2].replace(/\s+/g, "");
+      const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+      p = `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----`;
+    }
+  }
+  return p;
+}
+
 function ensurePkcs8(pem: string): string {
-  // Normalize literal \n sequences to real newlines
-  const normalized = pem.replace(/\\n/g, "\n").trim();
+  const normalized = normalizePemWhitespace(pem);
+
 
   // Already PKCS#8 — nothing to do
   if (normalized.includes("-----BEGIN PRIVATE KEY-----")) {
