@@ -304,9 +304,9 @@ export const provisionClone = createServerFn({ method: "POST" })
     }
 
     // ─── Auto-sync Codex Actions secrets to the new repo ──────────────
-    // The remediation workflow needs CODEX_SECURITY_API_KEY and the
-    // callback secret to run. Push them immediately so the clone is
-    // ready for autonomous remediation from minute one. Non-fatal.
+    // The scan and remediation workflows need the model API key to run.
+    // Push the secrets immediately so the clone is ready for autonomous
+    // scanning and remediation from minute one. Non-fatal.
     if (data.method !== "clone" && githubUrl) {
       try {
         const { syncRepoSecrets, buildCodexRepoSecrets } = await import(
@@ -315,7 +315,7 @@ export const provisionClone = createServerFn({ method: "POST" })
         const secretResult = await syncRepoSecrets({
           owner: githubOwner,
           repo: githubRepo,
-          secrets: buildCodexRepoSecrets(),
+          secrets: await buildCodexRepoSecrets(),
         });
         await supabase.from("github_secret_syncs").insert({
           target_kind: "clone",

@@ -59,7 +59,7 @@ export const syncPrimeActionsSecrets = createServerFn({ method: "POST" })
       owner: prime.github_owner,
       repo: prime.github_repo,
       installationId: prime.github_app_installation_id ?? null,
-      secrets: buildCodexRepoSecrets(),
+      secrets: await buildCodexRepoSecrets(),
     });
 
     await recordSync(supabase, {
@@ -101,7 +101,7 @@ export const syncCloneActionsSecrets = createServerFn({ method: "POST" })
       owner: clone.github_owner,
       repo: clone.github_repo,
       installationId: clone.github_app_installation_id ?? null,
-      secrets: buildCodexRepoSecrets(),
+      secrets: await buildCodexRepoSecrets(),
     });
 
     await recordSync(supabase, {
@@ -133,7 +133,7 @@ export const syncAllCloneActionsSecrets = createServerFn({ method: "POST" })
     const { syncRepoSecrets, buildCodexRepoSecrets } = await import(
       "@/server/github-secrets.server"
     );
-    const secrets = buildCodexRepoSecrets();
+    const secrets = await buildCodexRepoSecrets();
 
     const summary = { attempted: 0, ok: 0, failed: 0 as number };
     for (const c of clones ?? []) {

@@ -11,7 +11,11 @@ import {
 } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
+import {
+  ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink,
+  CheckCircle2, AlertTriangle, XCircle, Activity,
+} from "lucide-react";
+import { getCodexEngineHealth } from "@/lib/codex-engine-health.functions";
 import { enqueueScan, listScanJobs, getScanDetail, getSchedulingConfig, updateSchedulingConfig, runNightlyNow, listCloneCodexOverview, runCloneScanNow, setCloneNightly } from "@/lib/codex-security.functions";
 import { Link } from "@tanstack/react-router";
 import { Switch } from "@/components/ui/switch";
@@ -62,9 +66,16 @@ function CodexScansPage() {
   const enqueue = useServerFn(enqueueScan);
   const runScan = useMutation({
     mutationFn: () => enqueue({ data: { kind: "manual", targetKind: "prime" } }),
-    onSuccess: () => {
-      toast.success("Scan queued");
+    onSuccess: (r: any) => {
+      if (r?.dispatchError) {
+        // The job exists and the sweeper will retry, but the operator needs
+        // to see why the first attempt bounced.
+        toast.warning(`Scan queued, but dispatch failed: ${r.dispatchError}`);
+      } else {
+        toast.success("Scan queued");
+      }
       qc.invalidateQueries({ queryKey: ["codex-scan-jobs"] });
+      qc.invalidateQueries({ queryKey: ["codex-engine-health"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -75,7 +86,7 @@ function CodexScansPage() {
         eyebrow="security"
         icon={<ShieldAlert className="h-6 w-6 text-primary" />}
         title="Scans & Findings"
-        description="Autonomous repository scans powered by OpenAI Codex Security."
+        description="Autonomous repository scans — gitleaks, semgrep, osv-scanner and a Codex reasoning pass, run in GitHub Actions against Prime and every clone."
         actions={
           <>
             <Button variant="outline" onClick={() => jobsQ.refetch()}>
@@ -88,6 +99,8 @@ function CodexScansPage() {
           </>
         }
       />
+
+      <EngineHealthPanel />
 
       <SchedulingPanel />
 
@@ -439,6 +452,110 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+const healthIcon: Record<string, JSX.Element> = {
+  ok: <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />,
+  warn: <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />,
+  fail: <XCircle className="h-4 w-4 text-red-500 shrink-0" />,
+};
+
+/**
+ * Engine health. Every reason the pipeline can silently stop running —
+ * missing secret, missing GitHub App permission, workflow file never copied
+ * into the target repo — surfaces here with the exact fix, instead of the
+ * operator staring at an empty job table.
+ */
+function EngineHealthPanel() {
+  const healthQ = useQuery({
+    queryKey: ["codex-engine-health"],
+    queryFn: () => getCodexEngineHealth(),
+    refetchInterval: 60000,
+  });
+
+  const checks = healthQ.data?.checks ?? [];
+  const summary = healthQ.data?.summary;
+  const problems = checks.filter((c: any) => c.status !== "ok");
+
+  if (healthQ.isLoading) return null;
+  if (healthQ.isError) {
+    return (
+      <Card className="border-red-500/40">
+        <CardHeader>
+          <CardTitle className="text-base">Engine health unavailable</CardTitle>
+          <CardDescription>{(healthQ.error as Error)?.message}</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const healthy = summary?.healthy && problems.length === 0;
+
+  return (
+    <Card className={healthy ? undefined : "border-amber-500/40"}>
+      <CardHeader className="flex flex-row items-start justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Activity className="h-4 w-4" />
+            Engine health
+            {healthy ? (
+              <Badge className="bg-emerald-600">operational</Badge>
+            ) : summary?.failing ? (
+              <Badge variant="destructive">{summary.failing} blocking</Badge>
+            ) : (
+              <Badge variant="outline" className="text-amber-500 border-amber-500/40">
+                {summary?.warnings ?? problems.length} warning
+                {(summary?.warnings ?? problems.length) === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Engine: <span className="font-mono">{summary?.engine}</span>
+            {summary?.last24h && Object.keys(summary.last24h).length > 0 && (
+              <>
+                {" · "}last 24h:{" "}
+                {Object.entries(summary.last24h)
+                  .map(([k, v]) => `${v} ${k}`)
+                  .join(", ")}
+              </>
+            )}
+          </CardDescription>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => healthQ.refetch()}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Re-check
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {/* Healthy checks collapse to a single line; problems stay expanded. */}
+        {problems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            All {checks.length} checks passing — scans dispatch, authenticate, and report back.
+          </p>
+        ) : (
+          problems.map((c: any) => (
+            <div key={c.key} className="flex gap-2 rounded-md border p-3">
+              {healthIcon[c.status]}
+              <div className="space-y-1 min-w-0">
+                <div className="text-sm font-medium">{c.label}</div>
+                <div className="text-xs text-muted-foreground break-words">{c.detail}</div>
+                {c.fix && <div className="text-xs break-words">{c.fix}</div>}
+              </div>
+            </div>
+          ))
+        )}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs text-muted-foreground">
+          {checks
+            .filter((c: any) => c.status === "ok")
+            .map((c: any) => (
+              <span key={c.key} className="inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                {c.label}
+              </span>
+            ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

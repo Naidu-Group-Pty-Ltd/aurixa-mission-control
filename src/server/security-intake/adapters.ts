@@ -50,10 +50,18 @@ const admin = supabaseAdmin as any;
 // Shared upsert used by codex/manual/generic adapters. Ticketing adapter does
 // not create findings (it only links to existing ones).
 async function upsertFinding(finding: NormalizedFinding, source: IntakeSource) {
+  const externalKey = `${source.slug}:${finding.external_id}`;
   const row = {
+    // Intake findings have no scan job; the column is nullable and a partial
+    // unique index on codex_finding_id keeps this path idempotent.
     scan_job_id: null,
     clone_id: finding.clone_id ?? null,
-    codex_finding_id: `${source.slug}:${finding.external_id}`,
+    codex_finding_id: externalKey,
+    // Same identity the scan pipeline uses, so intake findings take part in
+    // cross-run carry-forward and regression detection too.
+    fingerprint: externalKey,
+    scanner: source.slug,
+    last_seen_at: new Date().toISOString(),
     title: finding.title,
     severity: finding.severity,
     description: finding.description ?? null,

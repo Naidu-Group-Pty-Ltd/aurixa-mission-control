@@ -90,12 +90,7 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
       return { remediationId: existing.id, reused: true };
     }
 
-    const repoInfo = await resolveRepo(
-      supabase,
-      job.target_kind,
-      job.clone_id,
-      job.repo_full_name,
-    );
+    const repoInfo = await resolveRepo(supabase, job.target_kind, job.clone_id, job.repo_full_name);
     const baseRef = data.baseRef || job.ref || repoInfo.baseRef;
     const branchName = `codex/fix-${slugify(finding.severity + "-" + finding.title)}-${finding.codex_finding_id.slice(0, 8)}`;
 
@@ -120,16 +115,23 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
       .single();
     if (insErr) throw insErr;
 
-    // Fire-and-forget dispatch to GitHub Actions.
-    (async () => {
+    // Awaited, not fire-and-forget: a floating promise here was routinely
+    // killed with the serverless isolate, leaving remediations stuck at
+    // `queued` with no error recorded anywhere.
+    const dispatch = async () => {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       try {
-        const { dispatchRemediationWorkflow } = await import(
-          "@/server/codex-remediation.server"
-        );
-        const origin =
-          process.env.APP_PUBLIC_URL || "https://mission-control.aurixasystems.com.au";
-        const callbackSecret = process.env.CODEX_REMEDIATION_WEBHOOK_SECRET || "";
+        const { dispatchRemediationWorkflow } = await import("@/server/codex-remediation.server");
+        const { remediationCallbackUrl } = await import("@/server/codex-security-client.server");
+        const { resolveRemediationWebhookSecret } =
+          await import("@/server/codex-scheduling.server");
+        const callbackSecret = await resolveRemediationWebhookSecret();
+        if (!callbackSecret) {
+          throw new Error(
+            "No remediation callback secret configured — the workflow would have no way " +
+              "to report the PR back. Set CODEX_REMEDIATION_WEBHOOK_SECRET.",
+          );
+        }
         const res = await dispatchRemediationWorkflow({
           remediationId: row.id,
           owner: repoInfo.owner,
@@ -146,7 +148,7 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
             line: finding.affected_line,
             cwe: finding.cwe,
           },
-          callbackUrl: `${origin}/api/public/hooks/codex-remediation`,
+          callbackUrl: remediationCallbackUrl(),
           callbackSecret,
         });
         await supabaseAdmin
@@ -162,33 +164,45 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
           .from("codex_findings")
           .update({ state: "fix_drafted" })
           .eq("id", finding.id);
-        await supabaseAdmin.from("codex_scan_events").insert({
-          job_id: finding.scan_job_id,
-          event_type: "remediation.dispatched",
-          actor: userId,
-          payload: {
-            remediation_id: row.id,
-            finding_id: finding.id,
-            workflow_run_id: res.workflowRunId,
-          },
-        });
+        // Intake-sourced findings carry no scan job; codex_scan_events.job_id
+        // is NOT NULL, so skip the audit row rather than throwing.
+        if (finding.scan_job_id) {
+          await supabaseAdmin.from("codex_scan_events").insert({
+            job_id: finding.scan_job_id,
+            event_type: "remediation.dispatched",
+            actor: userId,
+            payload: {
+              remediation_id: row.id,
+              finding_id: finding.id,
+              workflow_run_id: res.workflowRunId,
+            },
+          });
+        }
+        return { ok: true as const };
       } catch (err) {
+        const message = (err as Error).message;
         await supabaseAdmin
           .from("codex_remediations")
           .update({
             status: "failed",
-            last_error: (err as Error).message,
+            last_error: message,
             completed_at: new Date().toISOString(),
           })
           .eq("id", row.id);
-        await supabaseAdmin.from("codex_scan_events").insert({
-          job_id: finding.scan_job_id,
-          event_type: "remediation.dispatch_failed",
-          actor: userId,
-          payload: { remediation_id: row.id, error: (err as Error).message },
-        });
+        if (finding.scan_job_id) {
+          await supabaseAdmin.from("codex_scan_events").insert({
+            job_id: finding.scan_job_id,
+            event_type: "remediation.dispatch_failed",
+            actor: userId,
+            payload: { remediation_id: row.id, error: message },
+          });
+        }
+        return { ok: false as const, error: message };
       }
-    })();
+    };
+
+    const outcome = await dispatch();
+    if (!outcome.ok) throw new Error(outcome.error);
 
     return { remediationId: row.id, reused: false };
   });

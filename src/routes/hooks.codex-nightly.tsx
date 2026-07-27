@@ -5,7 +5,7 @@
 // overlapping cron runs (or manual re-runs) don't stack duplicates.
 import { createFileRoute } from "@tanstack/react-router";
 import { verifyCronAuth } from "@/server/cron-auth.server";
-import { runNightlyScans } from "@/server/codex-scheduling.server";
+import { runNightlyScans, sweepStalledScans } from "@/server/codex-scheduling.server";
 
 export const Route = createFileRoute("/hooks/codex-nightly")({
   server: {
@@ -14,11 +14,16 @@ export const Route = createFileRoute("/hooks/codex-nightly")({
         const auth = verifyCronAuth(request);
         if (!auth.ok) return auth.response;
         try {
+          // Clear stranded jobs first: a target stuck in `queued` would
+          // otherwise trip the dedup window and skip tonight's scan too.
+          const swept = await sweepStalledScans().catch((err) => {
+            console.error("codex-nightly sweep failed:", err);
+            return null;
+          });
           const result = await runNightlyScans();
-          return new Response(
-            JSON.stringify({ success: true, ...result }),
-            { headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ success: true, ...result, swept }), {
+            headers: { "Content-Type": "application/json" },
+          });
         } catch (err) {
           const msg = err instanceof Error ? err.message : "nightly_failed";
           console.error("codex-nightly failed:", msg);

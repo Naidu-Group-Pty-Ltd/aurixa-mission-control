@@ -58,13 +58,29 @@ export const bridgeCodexFindingsToAssessment = createServerFn({ method: "POST" }
       .in("state", ["open", "triaging", "fix_drafted", "pr_open", "fix_merged"]);
     if (cErr) throw new Error(cErr.message);
 
-    let created = 0;
-    let updated = 0;
     const rows = codex ?? [];
+
+    // Previously this ran a SELECT plus an INSERT/UPDATE per finding — three
+    // round trips per row, so a clone with 200 findings meant ~400 queries
+    // and routinely timed out. One lookup + two batched writes instead.
+    const { data: mirrored, error: mErr } = await admin
+      .from("security_findings")
+      .select("id, codex_finding_id")
+      .eq("assessment_id", assessment.id)
+      .not("codex_finding_id", "is", null);
+    if (mErr) throw new Error(mErr.message);
+
+    const existingByCodexId = new Map<string, string>(
+      (mirrored ?? []).map((m: any) => [m.codex_finding_id, m.id]),
+    );
+
+    const nowIso = new Date().toISOString();
+    const toInsert: any[] = [];
+    const toUpdate: any[] = [];
 
     for (const f of rows) {
       const affectedAsset = [f.affected_file, f.affected_line].filter(Boolean).join(":") || null;
-      const payload = {
+      const base = {
         assessment_id: assessment.id,
         partner_id: assessment.partner_id,
         clone_id: assessment.clone_id,
@@ -76,37 +92,34 @@ export const bridgeCodexFindingsToAssessment = createServerFn({ method: "POST" }
         affected_asset: affectedAsset,
         cvss: f.cvss != null ? String(f.cvss) : null,
         cwe: f.cwe ?? null,
-        recommendation: null,
         remediation_pr_url: f.remediation_pr_url ?? null,
-        submitted_by: context.userId,
       };
 
-      const existing = await admin
-        .from("security_findings")
-        .select("id")
-        .eq("assessment_id", assessment.id)
-        .eq("codex_finding_id", f.id)
-        .maybeSingle();
-
-      if (existing.data?.id) {
-        await admin
-          .from("security_findings")
-          .update({
-            severity: payload.severity,
-            title: payload.title,
-            description: payload.description,
-            affected_asset: payload.affected_asset,
-            cvss: payload.cvss,
-            cwe: payload.cwe,
-            remediation_pr_url: payload.remediation_pr_url,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.data.id);
-        updated += 1;
+      const existingId = existingByCodexId.get(f.id);
+      if (existingId) {
+        toUpdate.push({ ...base, id: existingId, updated_at: nowIso });
       } else {
-        const ins = await admin.from("security_findings").insert(payload).select("id").single();
-        if (!ins.error) created += 1;
+        toInsert.push({ ...base, recommendation: null, submitted_by: context.userId });
       }
+    }
+
+    let created = 0;
+    let updated = 0;
+
+    if (toInsert.length) {
+      const ins = await admin.from("security_findings").insert(toInsert).select("id");
+      if (ins.error) throw new Error(ins.error.message);
+      created = ins.data?.length ?? 0;
+    }
+
+    if (toUpdate.length) {
+      // Upsert on the primary key updates the whole batch in one statement.
+      const upd = await admin
+        .from("security_findings")
+        .upsert(toUpdate, { onConflict: "id" })
+        .select("id");
+      if (upd.error) throw new Error(upd.error.message);
+      updated = upd.data?.length ?? 0;
     }
 
     await writeSecurityEvent({
@@ -152,7 +165,8 @@ export const exportPartnerSignoffBundle = createServerFn({ method: "POST" })
     const now = new Date();
     const stamp = now.toISOString().replace(/[:.]/g, "-");
     const filePath = `bundles/${assessment.id}/signoff-${stamp}.json`;
-    const label = data.label?.trim() || `Partner sign-off bundle — ${now.toISOString().slice(0, 10)}`;
+    const label =
+      data.label?.trim() || `Partner sign-off bundle — ${now.toISOString().slice(0, 10)}`;
 
     const bundle = {
       generated_at: now.toISOString(),
@@ -184,8 +198,11 @@ export const exportPartnerSignoffBundle = createServerFn({ method: "POST" })
       totals: {
         findings: (assessment.security_findings ?? []).length,
         open: (assessment.security_findings ?? []).filter((f: any) => f.status === "open").length,
-        critical: (assessment.security_findings ?? []).filter((f: any) => f.severity === "critical").length,
-        codex_mirrored: (assessment.security_findings ?? []).filter((f: any) => f.source === "codex").length,
+        critical: (assessment.security_findings ?? []).filter((f: any) => f.severity === "critical")
+          .length,
+        codex_mirrored: (assessment.security_findings ?? []).filter(
+          (f: any) => f.source === "codex",
+        ).length,
       },
     };
 

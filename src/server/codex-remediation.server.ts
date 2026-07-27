@@ -63,16 +63,13 @@ export async function dispatchRemediationWorkflow(
 
   const dispatchedAt = new Date();
 
-  await octokit.request(
-    "POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",
-    {
-      owner: input.owner,
-      repo: input.repo,
-      workflow_id: workflowFile,
-      ref: input.baseRef,
-      inputs,
-    },
-  );
+  await octokit.request("POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", {
+    owner: input.owner,
+    repo: input.repo,
+    workflow_id: workflowFile,
+    ref: input.baseRef,
+    inputs,
+  });
 
   // Best-effort: find the run we just triggered.
   let workflowRunId: number | null = null;
@@ -114,29 +111,16 @@ export async function dispatchRemediationWorkflow(
 export async function verifyRemediationSignature(
   rawBody: string,
   signatureHeader: string | null,
+  extraSecrets: (string | null | undefined)[] = [],
 ): Promise<boolean> {
-  const secret = process.env.CODEX_REMEDIATION_WEBHOOK_SECRET;
-  if (!secret || !signatureHeader) return false;
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
-  const hex = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  const provided = signatureHeader.startsWith("sha256=")
-    ? signatureHeader.slice(7)
-    : signatureHeader;
-  if (provided.length !== hex.length) return false;
-  let diff = 0;
-  for (let i = 0; i < hex.length; i++)
-    diff |= hex.charCodeAt(i) ^ provided.charCodeAt(i);
-  return diff === 0;
+  // Delegates to the shared constant-time verifier, but with the
+  // remediation key set only — the scan webhook's secret must not be able
+  // to forge remediation callbacks.
+  const { verifyHmacSignature } = await import("@/server/codex-security-client.server");
+  return verifyHmacSignature(rawBody, signatureHeader, [
+    process.env.CODEX_REMEDIATION_WEBHOOK_SECRET,
+    ...extraSecrets,
+  ]);
 }
 
 /**
@@ -154,17 +138,13 @@ export async function mergeRemediationPRViaGitHub(input: {
   method?: "squash" | "merge" | "rebase";
 }): Promise<{ sha: string; merged: boolean }> {
   const octokit = getAppOctokit(input.installationId ?? undefined);
-  const res = await octokit.request(
-    "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge",
-    {
-      owner: input.owner,
-      repo: input.repo,
-      pull_number: input.prNumber,
-      merge_method: input.method || "squash",
-      commit_title: input.commitTitle,
-      commit_message: input.commitMessage,
-    },
-  );
+  const res = await octokit.request("PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge", {
+    owner: input.owner,
+    repo: input.repo,
+    pull_number: input.prNumber,
+    merge_method: input.method || "squash",
+    commit_title: input.commitTitle,
+    commit_message: input.commitMessage,
+  });
   return { sha: (res.data as any).sha, merged: (res.data as any).merged };
 }
-

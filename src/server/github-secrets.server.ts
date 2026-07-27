@@ -35,21 +35,15 @@ export async function putRepoSecret(input: PutRepoSecretInput): Promise<void> {
   const keyBytes = sodium.from_base64(pk.key, sodium.base64_variants.ORIGINAL);
   const valueBytes = sodium.from_string(input.value);
   const sealed = sodium.crypto_box_seal(valueBytes, keyBytes);
-  const encrypted_value = sodium.to_base64(
-    sealed,
-    sodium.base64_variants.ORIGINAL,
-  );
+  const encrypted_value = sodium.to_base64(sealed, sodium.base64_variants.ORIGINAL);
 
-  await octokit.request(
-    "PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}",
-    {
-      owner: input.owner,
-      repo: input.repo,
-      secret_name: input.name,
-      encrypted_value,
-      key_id: pk.key_id,
-    },
-  );
+  await octokit.request("PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}", {
+    owner: input.owner,
+    repo: input.repo,
+    secret_name: input.name,
+    encrypted_value,
+    key_id: pk.key_id,
+  });
 }
 
 export type SyncSecretsInput = {
@@ -68,9 +62,7 @@ export type SyncSecretsResult = {
 };
 
 /** Best-effort push of multiple secrets; never throws. */
-export async function syncRepoSecrets(
-  input: SyncSecretsInput,
-): Promise<SyncSecretsResult> {
+export async function syncRepoSecrets(input: SyncSecretsInput): Promise<SyncSecretsResult> {
   const written: string[] = [];
   const skipped: { name: string; reason: string }[] = [];
   const failed: { name: string; error: string }[] = [];
@@ -91,9 +83,7 @@ export async function syncRepoSecrets(
       written.push(name);
     } catch (e: any) {
       const status = e?.status ?? e?.response?.status;
-      const msg =
-        e?.response?.data?.message ??
-        (e instanceof Error ? e.message : String(e));
+      const msg = e?.response?.data?.message ?? (e instanceof Error ? e.message : String(e));
       failed.push({ name, error: status ? `${status}: ${msg}` : msg });
     }
   }
@@ -103,15 +93,24 @@ export async function syncRepoSecrets(
 
 /**
  * The canonical set of Actions secrets that every Aurixa-managed repo
- * (Prime and each clone) needs for Codex Security remediation workflows.
+ * (Prime and each clone) needs for the Codex Security workflows.
+ *
+ * The scan and remediation workflows receive their callback URL and HMAC
+ * secret as workflow_dispatch inputs, so the only secret they genuinely
+ * require in the repo is the model API key. The rest are written for
+ * operator convenience and for workflows that run outside a dispatch.
  */
-export function buildCodexRepoSecrets(): Record<string, string | undefined> {
-  const appBase =
-    process.env.APP_PUBLIC_URL ?? "https://mission-control.aurixasystems.com.au";
+export async function buildCodexRepoSecrets(): Promise<Record<string, string | undefined>> {
+  const { remediationCallbackUrl, scanCallbackUrl } =
+    await import("@/server/codex-security-client.server");
   return {
+    // Authenticates the Codex CLI in both the scan reasoning pass and the
+    // remediation patch author. CODEX_SECURITY_API_KEY is the legacy alias.
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? process.env.CODEX_SECURITY_API_KEY,
     CODEX_SECURITY_API_KEY: process.env.CODEX_SECURITY_API_KEY,
-    CODEX_REMEDIATION_WEBHOOK_SECRET:
-      process.env.CODEX_REMEDIATION_WEBHOOK_SECRET,
-    CODEX_CALLBACK_URL: `${appBase.replace(/\/$/, "")}/api/public/hooks/codex-remediation`,
+    CODEX_REMEDIATION_WEBHOOK_SECRET: process.env.CODEX_REMEDIATION_WEBHOOK_SECRET,
+    CODEX_SECURITY_WEBHOOK_SECRET: process.env.CODEX_SECURITY_WEBHOOK_SECRET,
+    CODEX_CALLBACK_URL: remediationCallbackUrl(),
+    CODEX_SCAN_CALLBACK_URL: scanCallbackUrl(),
   };
 }
