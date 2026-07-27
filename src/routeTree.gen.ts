@@ -37,6 +37,7 @@ import { Route as AuditLogRouteImport } from './routes/audit-log'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SecurityIndexRouteImport } from './routes/security.index'
 import { Route as SettingsRolesRouteImport } from './routes/settings.roles'
 import { Route as SettingsRoleAuditRouteImport } from './routes/settings.role-audit'
 import { Route as SettingsProvisioningPreviewRouteImport } from './routes/settings.provisioning-preview'
@@ -265,6 +266,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => SettingsRoute,
+} as any)
+const SecurityIndexRoute = SecurityIndexRouteImport.update({
+  id: '/security/',
+  path: '/security/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRolesRoute = SettingsRolesRouteImport.update({
   id: '/roles',
@@ -809,6 +815,7 @@ export interface FileRoutesByFullPath {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
@@ -926,6 +933,7 @@ export interface FileRoutesByTo {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/security': typeof SecurityIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
@@ -1045,6 +1053,7 @@ export interface FileRoutesById {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
@@ -1165,6 +1174,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/security/'
     | '/settings/'
     | '/api/public/purchases'
     | '/clients/handoff/$token'
@@ -1282,6 +1292,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/security'
     | '/settings'
     | '/api/public/purchases'
     | '/clients/handoff/$token'
@@ -1400,6 +1411,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/security/'
     | '/settings/'
     | '/api/public/purchases'
     | '/clients/handoff/$token'
@@ -1500,6 +1512,7 @@ export interface RootRouteChildren {
   JoinTokenRoute: typeof JoinTokenRoute
   SecurityIntakeRoute: typeof SecurityIntakeRoute
   SecurityScansRoute: typeof SecurityScansRoute
+  SecurityIndexRoute: typeof SecurityIndexRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
   ClientsHandoffTokenRoute: typeof ClientsHandoffTokenRoute
   ApiPublicBillingHandoffRoute: typeof ApiPublicBillingHandoffRoute
@@ -1736,6 +1749,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/security/': {
+      id: '/security/'
+      path: '/security'
+      fullPath: '/security/'
+      preLoaderRoute: typeof SecurityIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/settings/roles': {
       id: '/settings/roles'
@@ -2519,6 +2539,7 @@ const rootRouteChildren: RootRouteChildren = {
   JoinTokenRoute: JoinTokenRoute,
   SecurityIntakeRoute: SecurityIntakeRoute,
   SecurityScansRoute: SecurityScansRoute,
+  SecurityIndexRoute: SecurityIndexRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
   ClientsHandoffTokenRoute: ClientsHandoffTokenRoute,
   ApiPublicBillingHandoffRoute: ApiPublicBillingHandoffRoute,
