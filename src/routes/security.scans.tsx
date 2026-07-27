@@ -14,6 +14,14 @@ import { toast } from "sonner";
 import { ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink } from "lucide-react";
 import { enqueueScan, listScanJobs, getScanDetail } from "@/lib/codex-security.functions";
 import { draftRemediationPR, listRemediations } from "@/lib/codex-remediation.functions";
+import {
+  reviewRemediation,
+  listRemediationReviews,
+  mergeRemediationPR,
+} from "@/lib/codex-remediation-reviews.functions";
+import { useAuth } from "@/lib/auth";
+import { Textarea } from "@/components/ui/textarea";
+import { ThumbsUp, ThumbsDown, GitMerge, MessageSquareWarning } from "lucide-react";
 
 export const Route = createFileRoute("/security/scans")({
   component: () => <CodexScansPage />,
