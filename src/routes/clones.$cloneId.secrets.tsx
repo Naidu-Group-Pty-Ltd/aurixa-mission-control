@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   listCloneBackendSecrets,
   setCloneBackendSecret,
-} from "@/server/backend-provisioning.functions";
+} from "@/lib/backend-provisioning.functions";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

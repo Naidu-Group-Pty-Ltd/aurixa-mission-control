@@ -17,7 +17,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 import { decryptSecret } from "@/server/crypto.server";
-import { runQueuedBackendProvisioning } from "@/server/backend-provisioning.functions";
+import { runQueuedBackendProvisioning } from "@/lib/backend-provisioning.functions";
 
 const admin = supabaseAdmin as any;
 const STALL_MINUTES = 15;

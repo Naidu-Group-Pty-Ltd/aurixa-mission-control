@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { getCloneBackendStatus } from "@/server/backend-provisioning.functions";
+import { getCloneBackendStatus } from "@/lib/backend-provisioning.functions";
 import { getCloneMigrationStatus, syncCloneMigrations } from "@/server/migration-sync.functions";
 import { cn } from "@/lib/utils";
 
