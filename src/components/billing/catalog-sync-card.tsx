@@ -33,6 +33,8 @@ type Plan = {
     interval: string;
     unitAmount: number;
     gstComponent: number;
+    baseAmount: number;
+    includesAml: boolean;
   }>;
   untouched?: string[];
   warnings?: string[];
@@ -84,10 +86,12 @@ export function CatalogSyncCard() {
           <Tag className="h-4 w-4" /> Seat plan price list
         </CardTitle>
         <CardDescription>
-          Moves the tiers onto the signed-off prices. Every figure is tax-inclusive — GST is
-          contained in the amount, not added to it — and Stripe prices are created with
-          <code className="mx-1">tax_behavior: inclusive</code> so enabling Stripe Tax later cannot
-          inflate a total. Annual bills twelve months less 10%.
+          Moves the tiers onto the signed-off prices. Each tier is titled in the price list by its
+          <strong className="mx-1">with AML/CTF Compliance</strong> figure, so that is what Stripe
+          charges and what the pricing page leads with; the without-AML figure is shown beside it.
+          Every figure is tax-inclusive — GST is contained in the amount, not added to it — and
+          Stripe prices are created with <code className="mx-1">tax_behavior: inclusive</code> so
+          enabling Stripe Tax later cannot inflate a total. Annual bills twelve months less 10%.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -145,6 +149,7 @@ export function CatalogSyncCard() {
                   <TableHead>Billing</TableHead>
                   <TableHead className="text-right">Price (incl GST)</TableHead>
                   <TableHead className="text-right">of which GST</TableHead>
+                  <TableHead className="text-right">Without AML/CTF</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -159,6 +164,9 @@ export function CatalogSyncCard() {
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
                       {aud(p.gstComponent)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      {aud(p.baseAmount)}
                     </TableCell>
                   </TableRow>
                 ))}

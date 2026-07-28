@@ -13,7 +13,15 @@
 import Stripe from "stripe";
 import { getStripe } from "@/server/stripe.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { TIERS, annualCents, gstComponentCents, type Tier } from "@/lib/pricing/aurixa-catalog";
+import {
+  TIERS,
+  TIER_INCLUDES_AML,
+  annualCents,
+  gstComponentCents,
+  tierBaseCents,
+  tierHeadlineCents,
+  type Tier,
+} from "@/lib/pricing/aurixa-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
@@ -26,9 +34,13 @@ export type PriceOp = {
   tierSlug: string;
   productName: string;
   interval: "month" | "year";
-  /** Tax-INCLUSIVE, in cents. */
+  /** Tax-INCLUSIVE, in cents — the sheet's headline figure for this tier. */
   unitAmount: number;
   gstComponent: number;
+  /** Same tier without the AML/CTF module, for display alongside. */
+  baseAmount: number;
+  /** Whether unitAmount includes the AML/CTF module. */
+  includesAml: boolean;
 };
 
 export type SyncPlan = {
@@ -105,22 +117,19 @@ export function planCatalogSync(rows: readonly PlanRow[]): SyncPlan {
 
   const prices: PriceOp[] = [];
   for (const tier of TIERS) {
-    const monthly = tier.monthlyInclGstCents;
-    prices.push({
-      tierSlug: tier.slug,
-      productName: `Aurixa ${tier.name}`,
-      interval: "month",
-      unitAmount: monthly,
-      gstComponent: gstComponentCents(monthly),
-    });
-    const annual = annualCents(monthly);
-    prices.push({
-      tierSlug: tier.slug,
-      productName: `Aurixa ${tier.name}`,
-      interval: "year",
-      unitAmount: annual,
-      gstComponent: gstComponentCents(annual),
-    });
+    for (const interval of ["month", "year"] as const) {
+      const period = interval === "year" ? "annual" : "monthly";
+      const amount = tierHeadlineCents(tier, period);
+      prices.push({
+        tierSlug: tier.slug,
+        productName: `Aurixa ${tier.name}`,
+        interval,
+        unitAmount: amount,
+        gstComponent: gstComponentCents(amount),
+        baseAmount: tierBaseCents(tier, period),
+        includesAml: TIER_INCLUDES_AML,
+      });
+    }
   }
 
   const touched = new Set([...ordered.map((o) => o.from), ...TIERS.map((t) => t.slug)]);
@@ -209,7 +218,7 @@ export async function applyCatalogSync(plan: SyncPlan): Promise<ApplyResult> {
           slug: tier.slug,
           name: tier.name,
           description: tier.blurb,
-          price_cents: tier.monthlyInclGstCents,
+          price_cents: tierHeadlineCents(tier, "monthly"),
           currency: "AUD",
           seat_limit: tier.seatMax,
           stripe_price_id: ids.month ?? null,
@@ -219,7 +228,10 @@ export async function applyCatalogSync(plan: SyncPlan): Promise<ApplyResult> {
             gst_included: true,
             seat_min: tier.seatMin,
             seat_max: tier.seatMax,
-            annual_price_cents: annualCents(tier.monthlyInclGstCents),
+            annual_price_cents: tierHeadlineCents(tier, "annual"),
+            includes_aml_ctf: TIER_INCLUDES_AML,
+            base_price_cents: tierBaseCents(tier, "monthly"),
+            base_annual_price_cents: tierBaseCents(tier, "annual"),
             annual_stripe_price_id: ids.year ?? null,
           },
         })
