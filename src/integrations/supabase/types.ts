@@ -4445,6 +4445,42 @@ export type Database = {
           },
         ]
       }
+      plan_module_entitlements: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          entitlement_key: string
+          id: string
+          module_name: string
+          note: string | null
+          plan_slug: string
+          sub_module_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          entitlement_key: string
+          id?: string
+          module_name: string
+          note?: string | null
+          plan_slug: string
+          sub_module_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          entitlement_key?: string
+          id?: string
+          module_name?: string
+          note?: string | null
+          plan_slug?: string
+          sub_module_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       platform_hosting_config: {
         Row: {
           auto_provision: boolean
