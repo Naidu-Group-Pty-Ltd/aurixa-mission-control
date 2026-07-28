@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadValidHandoff } from "@/server/purchases.server";
 import { storefrontJson, storefrontPreflight } from "@/server/storefront-cors.server";
+import { planForTenant } from "@/server/current-plan.server";
 
 /**
  * GET /api/public/storefront/handoff?h=<uuid>
@@ -48,8 +49,12 @@ export const Route = createFileRoute("/api/public/storefront/handoff")({
           cloneName = tenant?.display_name ?? tenant?.external_ref ?? null;
         }
 
+        const plan = await planForTenant(handoff.tenant_id).catch(() => null);
+
         return storefrontJson({
           ok: true,
+          current_plan_slug: plan?.slug ?? null,
+          current_plan_name: plan?.name ?? null,
           handoff_id: handoff.id,
           clone_name: cloneName,
           origin_username: handoff.origin_username,

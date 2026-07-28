@@ -26,6 +26,10 @@ const Schema = z
     mode: z.enum(["topup", "seat_plan", "setup_package"]),
     item_id: z.string().uuid(),
     quantity: z.number().int().min(1).max(10).default(1),
+    // Which price to charge. Annual is a separate Stripe price, so the
+    // storefront has to say which one the buyer chose — otherwise the toggle
+    // is cosmetic and every purchase bills monthly.
+    period: z.enum(["monthly", "annual"]).default("monthly"),
     // Self-declared buyer details from the pricing page. Only ever used to
     // seed BLANK Stripe Customer fields (see billing-contact.server.ts), so a
     // public `uid` link cannot repoint an established billing email.
@@ -99,6 +103,7 @@ export const Route = createFileRoute("/api/public/storefront/checkout")({
                 mode: data.mode,
                 itemId: data.item_id,
                 quantity: data.quantity,
+                period: data.period,
                 successUrl,
                 cancelUrl,
               })
@@ -107,6 +112,7 @@ export const Route = createFileRoute("/api/public/storefront/checkout")({
                 mode: data.mode,
                 itemId: data.item_id,
                 quantity: data.quantity,
+                period: data.period,
                 successUrl,
                 cancelUrl,
                 // A handoff carries its own contact server-side; only the
