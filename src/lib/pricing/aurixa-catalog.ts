@@ -6,12 +6,17 @@
 // FROM them (÷11), never added to them. Getting that backwards overcharges
 // every customer by 10%, so the direction is asserted in the tests.
 //
-// Tiers are priced WITHOUT the AML/CTF module, because the sheet's own numbers
-// say that is what they are: 699−504, 1055−860 and 2210−2015 all equal exactly
-// 195, which is the listed price of the AML/CTF module. So a tier is
-// `base + optional $195 module` rather than two separate products, and the
-// "with AML/CTF" headline prices fall out of the arithmetic instead of being
-// a second set of figures to keep in step.
+// A tier is modelled as `base + the AML/CTF module`, because the sheet's own
+// numbers say that is what it is: 699−504, 1055−860 and 2210−2015 all equal
+// exactly 195, the listed price of that module. Storing one number per tier
+// and deriving the other means the two can never drift apart.
+//
+// Which of the two is the HEADLINE is a commercial decision, and the sheet
+// makes it: every tier is titled with its with-AML figure ("Launch / Tier 1
+// (1 To 4 Seats) with AML/CTF Compliance Module - $699.00 Incl GST & $504.00
+// Incl GST without AML/CTF"). So `tierHeadlineCents` is what Stripe charges
+// and what both surfaces lead with; `tierBaseCents` is the documented
+// alternative, shown alongside rather than hidden. See TIER_INCLUDES_AML.
 
 /** Australian GST is 10%, so a tax-inclusive total is 11/10 of its base. */
 export const GST_DIVISOR = 11;
@@ -51,7 +56,10 @@ export type Tier = {
   replacesSlug: string | null;
   seatMin: number;
   seatMax: number;
-  /** Monthly, tax-inclusive, WITHOUT the AML/CTF module. */
+  /**
+   * Monthly, tax-inclusive, WITHOUT the AML/CTF module. The headline price
+   * customers see is derived from this — see tierHeadlineCents.
+   */
   monthlyInclGstCents: number;
   blurb: string;
 };
@@ -311,6 +319,31 @@ export const MODULES: readonly PricedModule[] = [
 
 /** The module whose price is the gap between a tier's two headline figures. */
 export const AML_MODULE_SLUG = "aml-ctf";
+
+/**
+ * Whether a tier is SOLD with the AML/CTF module included.
+ *
+ * The pricing sheet titles every tier with its with-AML figure — "Launch /
+ * Tier 1 (1 To 4 Seats) with AML/CTF Compliance Module - $699.00 Incl GST &
+ * $504.00 Incl GST without AML/CTF" — so that is the headline product and the
+ * amount Stripe charges. The without-AML figure is the documented alternative,
+ * shown alongside it rather than hidden.
+ *
+ * Kept as one constant because it is a commercial decision, not an
+ * implementation detail: flipping it moves the headline, the Stripe price and
+ * both surfaces together, so display can never drift from what is charged.
+ */
+export const TIER_INCLUDES_AML = true;
+
+/** The headline price for a tier — what the sheet titles it with, and what Stripe charges. */
+export function tierHeadlineCents(tier: Tier, period: BillingPeriod = "monthly"): number {
+  return tierPriceCents(tier, { period, withAml: TIER_INCLUDES_AML });
+}
+
+/** The same tier without the AML/CTF module — the sheet's stated alternative. */
+export function tierBaseCents(tier: Tier, period: BillingPeriod = "monthly"): number {
+  return tierPriceCents(tier, { period, withAml: !TIER_INCLUDES_AML });
+}
 
 export const moduleBySlug = (slug: string): PricedModule | undefined =>
   MODULES.find((m) => m.slug === slug);

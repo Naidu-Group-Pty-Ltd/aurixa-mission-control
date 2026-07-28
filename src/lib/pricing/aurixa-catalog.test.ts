@@ -12,6 +12,8 @@ import {
   tierBySlug,
   tierIncludesModule,
   tierPriceCents,
+  tierBaseCents,
+  tierHeadlineCents,
   upgradesFor,
 } from "./aurixa-catalog";
 import { SUB_MODULE_MATRIX, enabledSubModules, tierEnablesSubModule } from "./sub-module-matrix";
@@ -189,5 +191,50 @@ describe("sub-module entitlement matrix", () => {
     expect(enabledSubModules("launch").length).toBe(20);
     expect(enabledSubModules("growth").length).toBe(23);
     expect(enabledSubModules("scale").length).toBe(32);
+  });
+});
+
+describe("the headline price is the one the sheet titles each tier with", () => {
+  // The sheet names every tier by its with-AML figure, so that is the number
+  // customers see and the number Stripe charges. The without-AML figure is the
+  // documented alternative, not the headline.
+  const headline = [
+    { slug: "launch", monthly: $(699), annual: $(7549.2) },
+    { slug: "growth", monthly: $(1055), annual: $(11394) },
+    { slug: "scale", monthly: $(2210), annual: $(23868) },
+  ];
+
+  for (const h of headline) {
+    it(`${h.slug} headlines at $${h.monthly / 100} / month`, () => {
+      const tier = tierBySlug(h.slug)!;
+      expect(tierHeadlineCents(tier)).toBe(h.monthly);
+      expect(tierHeadlineCents(tier, "annual")).toBe(h.annual);
+    });
+  }
+
+  it("still exposes the without-AML figure the sheet also publishes", () => {
+    expect(tierBaseCents(tierBySlug("launch")!)).toBe($(504));
+    expect(tierBaseCents(tierBySlug("growth")!)).toBe($(860));
+    expect(tierBaseCents(tierBySlug("scale")!)).toBe($(2015));
+  });
+
+  it("keeps headline and base exactly one AML module apart", () => {
+    const aml = moduleBySlug(AML_MODULE_SLUG)!.monthlyInclGstCents;
+    for (const tier of TIERS) {
+      expect(tierHeadlineCents(tier) - tierBaseCents(tier)).toBe(aml);
+    }
+  });
+
+  it("discounts the headline annual by 10% of twelve months", () => {
+    for (const tier of TIERS) {
+      const twelve = tierHeadlineCents(tier) * 12;
+      expect(tierHeadlineCents(tier, "annual")).toBe(Math.round(twelve * 0.9));
+    }
+  });
+
+  it("headline GST still divides out cleanly", () => {
+    expect(gstComponentCents($(699))).toBe($(63.55));
+    expect(gstComponentCents($(1055))).toBe($(95.91));
+    expect(gstComponentCents($(2210))).toBe($(200.91));
   });
 });

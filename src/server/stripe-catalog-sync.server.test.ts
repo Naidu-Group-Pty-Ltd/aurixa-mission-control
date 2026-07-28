@@ -79,20 +79,30 @@ describe("planCatalogSync", () => {
     }
   });
 
-  it("prices the tiers at the sheet's without-AML figures", () => {
+  it("prices the tiers at the sheet's headline (with AML/CTF) figures", () => {
     const monthly = (slug: string) =>
       plan.prices.find((p) => p.tierSlug === slug && p.interval === "month")!.unitAmount;
-    expect(monthly("launch")).toBe(50400);
-    expect(monthly("growth")).toBe(86000);
-    expect(monthly("scale")).toBe(201500);
+    expect(monthly("launch")).toBe(69900);
+    expect(monthly("growth")).toBe(105500);
+    expect(monthly("scale")).toBe(221000);
+  });
+
+  it("carries the without-AML figure alongside, so both can be shown", () => {
+    const base = (slug: string) =>
+      plan.prices.find((p) => p.tierSlug === slug && p.interval === "month")!.baseAmount;
+    expect(base("launch")).toBe(50400);
+    expect(base("growth")).toBe(86000);
+    expect(base("scale")).toBe(201500);
+    expect(plan.prices.every((p) => p.includesAml)).toBe(true);
   });
 
   it("discounts the annual price by 10% of twelve months", () => {
     const yearly = (slug: string) =>
       plan.prices.find((p) => p.tierSlug === slug && p.interval === "year")!.unitAmount;
-    expect(yearly("launch")).toBe(annualCents(50400));
-    expect(yearly("launch")).toBe(544320);
-    expect(yearly("scale")).toBe(2176200);
+    expect(yearly("launch")).toBe(annualCents(69900));
+    expect(yearly("launch")).toBe(754920);
+    expect(yearly("growth")).toBe(1139400);
+    expect(yearly("scale")).toBe(2386800);
   });
 
   it("carries the GST contained in each amount, never added to it", () => {
