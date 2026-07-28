@@ -21,6 +21,7 @@ import { listPricingCatalog } from "@/lib/pricing-catalog.functions";
 import { createStripeCheckout } from "@/lib/stripe.functions";
 import { EmptyState } from "@/components/empty-state";
 import { ReportCostIndexCard } from "@/components/billing/report-cost-index-card";
+import { CatalogSyncCard } from "@/components/billing/catalog-sync-card";
 
 const SearchSchema = z.object({ tenant: z.string().uuid().optional() });
 
@@ -288,6 +289,7 @@ function CatalogPage() {
               Credits deducted per generated report. Clones meter these via the token reservation
               API.
             </p>
+            <CatalogSyncCard />
             <ReportCostIndexCard />
           </section>
         </>
