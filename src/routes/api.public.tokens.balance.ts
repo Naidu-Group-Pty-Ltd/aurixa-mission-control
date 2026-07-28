@@ -22,6 +22,20 @@ export const Route = createFileRoute("/api/public/tokens/balance")({
         const tenant = await ensureTenant(key.clone_id, tenantRef, displayName);
         if (!tenant.ok) return jsonResponse(tenant, 500);
 
+        // `token_balances` is a cache refreshed by ledger writes. A reservation
+        // orphaned by an abandoned generation run stops counting once its TTL
+        // passes, but nothing rewrites the cache — so without this the tenant
+        // keeps seeing credits that are already free again as "reserved". The
+        // RPC no-ops unless the cached row is actually stale.
+        await supabaseAdmin
+          .rpc("refresh_token_balance", { _tenant_id: tenant.tenantId, _max_age_seconds: 60 })
+          .then(
+            ({ error }) => {
+              if (error) console.warn("[tokens/balance] refresh failed", error.message);
+            },
+            () => {},
+          );
+
         const [bal, ten] = await Promise.all([
           supabaseAdmin
             .from("token_balances")

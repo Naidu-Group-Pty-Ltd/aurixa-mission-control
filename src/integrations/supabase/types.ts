@@ -6448,7 +6448,15 @@ export type Database = {
         Args: { _tenant_id: string }
         Returns: undefined
       }
+      refresh_token_balance: {
+        Args: { _max_age_seconds?: number; _tenant_id: string }
+        Returns: Json
+      }
       refund_job: { Args: { _job_id: string; _reason?: string }; Returns: Json }
+      release_token_job: {
+        Args: { _job_id: string; _reason?: string }
+        Returns: Json
+      }
       register_device: {
         Args: {
           _clone_id: string
