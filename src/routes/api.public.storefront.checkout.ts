@@ -37,6 +37,10 @@ const Schema = z
         full_name: z.string().max(200).optional().nullable(),
         phone: z.string().max(40).optional().nullable(),
         company: z.string().max(200).optional().nullable(),
+        // Business tax ID (ABN). Validated server-side; an invalid value is
+        // dropped so Stripe Checkout asks the buyer for one instead.
+        tax_id: z.string().max(50).optional().nullable(),
+        tax_id_type: z.string().max(32).optional().nullable(),
       })
       .optional()
       .nullable(),

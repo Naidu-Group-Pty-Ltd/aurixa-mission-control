@@ -82,7 +82,10 @@ export async function ensureStripeCustomer(
   if (!tenant) throw new Error("tenant_not_found");
 
   const orgName =
-    tenant.display_name ?? contact.company ?? tenant.external_ref ?? `tenant_${tenantId.slice(0, 8)}`;
+    tenant.display_name ??
+    contact.company ??
+    tenant.external_ref ??
+    `tenant_${tenantId.slice(0, 8)}`;
 
   if (tenant.stripe_customer_id) {
     await syncStripeCustomerContact(tenant.stripe_customer_id, contact, { orgName });
@@ -214,13 +217,25 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     // prefill instead of asking again.
     billing_address_collection: "required",
     metadata: sharedMeta,
-    // Write back what the buyer confirms on Stripe's page. Without this the
-    // address is captured on the session and then thrown away: the Customer
-    // stays blank, automatic_tax keeps failing its address check, and every
-    // future purchase re-asks for details we have already been given.
+    // Write back the address the buyer confirms on Stripe's page. Without this
+    // it is captured on the session and then thrown away: the Customer stays
+    // blank, automatic_tax keeps failing its address check, and every future
+    // purchase re-asks for details we have already been given.
     // `customer_update` requires a real `customer`, which is always set here
     // for tenant-scoped modes.
-    ...(customerId ? { customer_update: { name: "auto", address: "auto" } } : {}),
+    //
+    // `name` is deliberately NOT 'auto'. Outside the tax-ID form Checkout would
+    // write the CARDHOLDER's personal name onto the Customer, and this Customer
+    // is the organisation's billing account — its name is the workspace name
+    // and belongs on every tax invoice. ensureStripeCustomer owns that field.
+    ...(customerId ? { customer_update: { address: "auto" } } : {}),
+    // ABN capture (and the equivalent business tax ID elsewhere). Checkout
+    // shows the field only where the buyer's country supports it AND the
+    // Customer has none saved — so once an ABN is on file, whether typed here
+    // or pre-attached from the workspace's settings, the form stops appearing.
+    // Optional rather than `required: 'if_supported'`: a buyer without an ABN
+    // must still be able to pay.
+    tax_id_collection: { enabled: true },
     // Propagate metadata onto the Subscription so that subsequent
     // subscription.* / invoice.* webhook events carry tenant/clone context.
     // One-time payments additionally get a real Stripe invoice (hosted page +
@@ -241,7 +256,11 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   // sale. Each entry names a parameter that some accounts reject, how to spot
   // that rejection, and the degraded value to retry with; a checkout only
   // fails once nothing is left to drop.
-  const degradations: Array<{ label: string; matches: RegExp; apply: (p: typeof sessionParams) => typeof sessionParams }> = [
+  const degradations: Array<{
+    label: string;
+    matches: RegExp;
+    apply: (p: typeof sessionParams) => typeof sessionParams;
+  }> = [
     {
       label: "automatic_tax",
       matches: /automatic.?tax|tax settings|origin address|head office/i,
@@ -256,6 +275,13 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
         const { customer_update: _drop, ...rest } = p as Record<string, unknown>;
         return rest as typeof sessionParams;
       },
+    },
+    {
+      // Tax ID collection needs Stripe Tax reachable on the account. If it is
+      // not, we lose ABN capture for that session — never the sale.
+      label: "tax_id_collection",
+      matches: /tax_id_collection|tax id/i,
+      apply: (p) => ({ ...p, tax_id_collection: { enabled: false } }),
     },
   ];
 

@@ -15,6 +15,7 @@ import {
   savePaymentMethodFromSetupSession,
 } from "@/server/payment-methods.server";
 import { upsertInvoiceRecord } from "@/server/invoices.server";
+import { recordTenantTaxIdFromSession } from "@/server/billing-contact.server";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -160,6 +161,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Idempotent upsert keyed on the session id — safe on webhook replays and
   // covers sessions whose initiated-insert never landed.
   await finalizePurchaseFromSession(session, "completed");
+
+  // Mirror any ABN / business tax ID the buyer entered on Stripe's page, so it
+  // is visible in Mission Control and the next checkout knows they have one.
+  // Best-effort: never fail a fulfilled purchase over a bookkeeping copy.
+  const tenantIdForTax = (session.metadata ?? {}).tenant_id;
+  if (tenantIdForTax) {
+    try {
+      await recordTenantTaxIdFromSession(tenantIdForTax, session.customer_details);
+    } catch (err) {
+      console.error("recordTenantTaxIdFromSession failed", err);
+    }
+  }
+
   await notifyPurchaseCompleted(session);
 }
 

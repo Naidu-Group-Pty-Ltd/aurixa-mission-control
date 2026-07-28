@@ -130,6 +130,8 @@ export type HandoffRow = {
   contact_last_name: string | null;
   contact_phone: string | null;
   contact_company: string | null;
+  contact_tax_id: string | null;
+  contact_tax_id_type: string | null;
 };
 
 /**
@@ -143,7 +145,8 @@ export async function loadHandoffById(handoffId: string): Promise<HandoffRow | n
     .from("billing_handoffs")
     .select(
       "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at, " +
-        "contact_email, contact_first_name, contact_last_name, contact_phone, contact_company",
+        "contact_email, contact_first_name, contact_last_name, contact_phone, contact_company, " +
+        "contact_tax_id, contact_tax_id_type",
     )
     .eq("id", handoffId)
     .maybeSingle();
@@ -172,6 +175,8 @@ export async function createHandoff(
       contact_last_name: input.contact?.lastName ?? null,
       contact_phone: input.contact?.phone ?? null,
       contact_company: input.contact?.company ?? null,
+      contact_tax_id: input.contact?.taxIdValue ?? null,
+      contact_tax_id_type: input.contact?.taxIdType ?? null,
       expires_at: expiresAt,
     })
     .select("id, expires_at")
