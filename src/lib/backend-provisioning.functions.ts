@@ -41,10 +41,10 @@ async function runBackendProvisioning(
 
   try {
     const { resolvePrimeSource, fetchPrimeBackendSnapshot } =
-      await import("./prime-backend.server");
-    const { getAppOctokit } = await import("./github-app.server");
-    const { provisionCloneBackend } = await import("./backend-provisioning.server");
-    const { encryptSecret } = await import("./crypto.server");
+      await import("@/server/prime-backend.server");
+    const { getAppOctokit } = await import("@/server/github-app.server");
+    const { provisionCloneBackend } = await import("@/server/backend-provisioning.server");
+    const { encryptSecret } = await import("@/server/crypto.server");
     // ── Snapshot the prime's backend architecture from GitHub ──
     const source = await resolvePrimeSource(supabase);
     if (!source) {
@@ -176,7 +176,7 @@ async function runBackendProvisioning(
       error?: string;
     }> = [];
     if (moduleIds.length > 0) {
-      const { applyModuleMigrations } = await import("./backend-provisioning.server");
+      const { applyModuleMigrations } = await import("@/server/backend-provisioning.server");
       const { data: mods } = await supabase
         .from("modules")
         .select("id, name, clone_migration_sql, apply_on_install, dependencies")
@@ -312,7 +312,7 @@ export const provisionBackend = createServerFn({ method: "POST" })
       context,
     }): Promise<{ ok: true; queued: true } | { ok: false; error: string }> => {
       const { supabase, userId } = context;
-      const { encryptSecret } = await import("./crypto.server");
+      const { encryptSecret } = await import("@/server/crypto.server");
 
       const { data: clone } = await supabase
         .from("clones")
@@ -426,7 +426,7 @@ export const retryBackendProvisioning = createServerFn({ method: "POST" })
       context,
     }): Promise<{ ok: true; queued: true } | { ok: false; error: string }> => {
       const { supabase, userId } = context;
-      const { encryptSecret } = await import("./crypto.server");
+      const { encryptSecret } = await import("@/server/crypto.server");
 
       const { data: backend } = await supabase
         .from("clone_backends")
@@ -508,7 +508,7 @@ export const setCloneBackendSecret = createServerFn({ method: "POST" })
     if (!backend?.supabase_project_ref) {
       return { ok: false as const, error: "Clone backend not provisioned yet" };
     }
-    const { setCloneSecretValue } = await import("./backend-provisioning.server");
+    const { setCloneSecretValue } = await import("@/server/backend-provisioning.server");
     const res = await setCloneSecretValue(backend.supabase_project_ref, data.name, data.value);
     const now = new Date().toISOString();
     await supabase.from("clone_backend_secrets").upsert(
@@ -639,7 +639,7 @@ export const addModulesToBackend = createServerFn({ method: "POST" })
       applyOnInstall: m.apply_on_install !== false,
     }));
 
-    const { applyModuleMigrations } = await import("./backend-provisioning.server");
+    const { applyModuleMigrations } = await import("@/server/backend-provisioning.server");
     // Reflect progress on the clone_backends row while migrations run.
     await supabase
       .from("clone_backends")
