@@ -16,6 +16,13 @@ import {
 } from "@/server/purchases.server";
 import { intentAllows } from "@/server/billing-handoffs.server";
 import { countActivePaymentMethods, MAX_PAYMENT_METHODS } from "@/server/payment-methods.server";
+import {
+  contactFromHandoffRow,
+  contactMetadata,
+  EMPTY_CONTACT,
+  syncStripeCustomerContact,
+  type BillingContact,
+} from "@/server/billing-contact.server";
 import type { OriginAttribution } from "@/server/purchases.server";
 
 export type CheckoutMode = "topup" | "seat_plan" | "setup_package";
@@ -52,18 +59,47 @@ export async function resolveItem(mode: CheckoutMode, itemId: string): Promise<C
   return (data as CatalogItem | null) ?? null;
 }
 
-export async function ensureStripeCustomer(tenantId: string): Promise<string> {
+/**
+ * Resolve (or create) the tenant's Stripe Customer, populated with whatever we
+ * know about the buyer.
+ *
+ * The contact block is what makes Checkout prefill: Stripe reads the email off
+ * the attached Customer (`customer_email` cannot be combined with `customer`),
+ * so a Customer created with a name and nothing else guarantees every buyer
+ * retypes their email. On an existing Customer the sync only fills blanks —
+ * see billing-contact.server.ts for why an org's billing email is not a
+ * per-purchase field.
+ */
+export async function ensureStripeCustomer(
+  tenantId: string,
+  contact: BillingContact = EMPTY_CONTACT,
+): Promise<string> {
   const { data: tenant } = await supabaseAdmin
     .from("tenants")
     .select("id, display_name, external_ref, stripe_customer_id")
     .eq("id", tenantId)
     .maybeSingle();
   if (!tenant) throw new Error("tenant_not_found");
-  if (tenant.stripe_customer_id) return tenant.stripe_customer_id;
+
+  const orgName =
+    tenant.display_name ?? contact.company ?? tenant.external_ref ?? `tenant_${tenantId.slice(0, 8)}`;
+
+  if (tenant.stripe_customer_id) {
+    await syncStripeCustomerContact(tenant.stripe_customer_id, contact, { orgName });
+    return tenant.stripe_customer_id;
+  }
 
   const customer = await getStripe().customers.create({
-    name: tenant.display_name ?? tenant.external_ref ?? `tenant_${tenantId.slice(0, 8)}`,
-    metadata: { tenant_id: tenantId, external_ref: tenant.external_ref ?? "" },
+    name: orgName,
+    // Seeding these at creation time is the whole point — a first-time buyer
+    // then sees their own email already filled in on Stripe's page.
+    ...(contact.email ? { email: contact.email } : {}),
+    ...(contact.phone ? { phone: contact.phone } : {}),
+    metadata: {
+      tenant_id: tenantId,
+      external_ref: tenant.external_ref ?? "",
+      ...contactMetadata(contact),
+    },
   });
   await supabaseAdmin
     .from("tenants")
@@ -83,6 +119,8 @@ export type CheckoutCoreArgs = {
   /** Absolute URL. */
   cancelUrl: string;
   attribution: OriginAttribution;
+  /** Buyer details to seed the Stripe Customer and prefill Checkout. */
+  contact?: BillingContact;
   /** Single-use handoff to burn once a session exists. */
   handoffToConsume?: string | null;
 };
@@ -117,11 +155,13 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     tenantId = ensured.tenantId;
   }
 
+  const contact = args.contact ?? EMPTY_CONTACT;
+
   let customerId: string | undefined;
   let billingUserId = "";
   if (tenantId) {
     try {
-      customerId = await ensureStripeCustomer(tenantId);
+      customerId = await ensureStripeCustomer(tenantId, contact);
     } catch (err) {
       const msg = stripeErrorMessage(err);
       console.error("[checkout] ensureStripeCustomer failed:", msg);
@@ -150,7 +190,15 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     // Attribution contract fields — propagate to the webhook via Stripe so
     // the purchases ledger knows who initiated this checkout, from where.
     ...attributionMetadata(args.attribution),
+    // Buyer identity, so a purchase can be traced to a person even though the
+    // Stripe Customer represents the whole organisation.
+    ...contactMetadata(contact),
   };
+
+  // The buyer's own address for THIS purchase's receipt. The Customer's email
+  // is the organisation's billing inbox and may belong to someone else, so the
+  // person who actually paid would otherwise never receive their own receipt.
+  const receiptEmail = contact.email ?? undefined;
 
   const sessionParams = {
     mode: args.mode === "seat_plan" ? "subscription" : "payment",
@@ -160,7 +208,19 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     cancel_url: args.cancelUrl,
     allow_promotion_codes: true,
     automatic_tax: { enabled: true },
+    // Collect the full billing address rather than just country+postcode. It
+    // is what Stripe Tax needs to be accurate, what invoices need to be valid,
+    // and — combined with customer_update below — what makes the NEXT checkout
+    // prefill instead of asking again.
+    billing_address_collection: "required",
     metadata: sharedMeta,
+    // Write back what the buyer confirms on Stripe's page. Without this the
+    // address is captured on the session and then thrown away: the Customer
+    // stays blank, automatic_tax keeps failing its address check, and every
+    // future purchase re-asks for details we have already been given.
+    // `customer_update` requires a real `customer`, which is always set here
+    // for tenant-scoped modes.
+    ...(customerId ? { customer_update: { name: "auto", address: "auto" } } : {}),
     // Propagate metadata onto the Subscription so that subsequent
     // subscription.* / invoice.* webhook events carry tenant/clone context.
     // One-time payments additionally get a real Stripe invoice (hosted page +
@@ -169,36 +229,56 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
     ...(args.mode === "seat_plan"
       ? { subscription_data: { metadata: sharedMeta } }
       : {
-          payment_intent_data: { metadata: sharedMeta },
+          payment_intent_data: {
+            metadata: sharedMeta,
+            ...(receiptEmail ? { receipt_email: receiptEmail } : {}),
+          },
           invoice_creation: { enabled: true, invoice_data: { metadata: sharedMeta } },
         }),
   };
 
+  // Stripe account configuration we cannot see from here must never block a
+  // sale. Each entry names a parameter that some accounts reject, how to spot
+  // that rejection, and the degraded value to retry with; a checkout only
+  // fails once nothing is left to drop.
+  const degradations: Array<{ label: string; matches: RegExp; apply: (p: typeof sessionParams) => typeof sessionParams }> = [
+    {
+      label: "automatic_tax",
+      matches: /automatic.?tax|tax settings|origin address|head office/i,
+      apply: (p) => ({ ...p, automatic_tax: { enabled: false } }),
+    },
+    {
+      // Older API versions and some account shapes reject customer_update.
+      // Losing it costs the write-back, not the sale.
+      label: "customer_update",
+      matches: /customer_update/i,
+      apply: (p) => {
+        const { customer_update: _drop, ...rest } = p as Record<string, unknown>;
+        return rest as typeof sessionParams;
+      },
+    },
+  ];
+
   let session;
-  try {
-    session = await getStripe().checkout.sessions.create(sessionParams);
-  } catch (err) {
-    const msg = stripeErrorMessage(err);
-    // Stripe Tax not being configured on the account must never block a
-    // checkout — retry once without automatic tax and let it succeed.
-    if (/automatic.?tax|tax settings|origin address|head office/i.test(msg)) {
-      console.warn("[checkout] automatic_tax unavailable, retrying without it:", msg);
-      try {
-        session = await getStripe().checkout.sessions.create({
-          ...sessionParams,
-          automatic_tax: { enabled: false },
-        });
-      } catch (retryErr) {
-        const retryMsg = stripeErrorMessage(retryErr);
-        console.error("[checkout] session create failed after tax retry:", retryMsg);
-        return { ok: false as const, error: `stripe: ${retryMsg}` };
+  let params = sessionParams;
+  const dropped = new Set<string>();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      session = await getStripe().checkout.sessions.create(params);
+      break;
+    } catch (err) {
+      const msg = stripeErrorMessage(err);
+      const next = degradations.find((d) => !dropped.has(d.label) && d.matches.test(msg));
+      if (!next || attempt >= degradations.length) {
+        // Surface the sanitized Stripe reason ('No such price…', key/mode
+        // mismatches, …) instead of a blind checkout_failed 500 — these are
+        // config errors an operator must see to fix.
+        console.error("[checkout] session create failed:", msg);
+        return { ok: false as const, error: `stripe: ${msg}` };
       }
-    } else {
-      // Surface the sanitized Stripe reason ('No such price…', key/mode
-      // mismatches, …) instead of a blind checkout_failed 500 — these are
-      // config errors an operator must see to fix.
-      console.error("[checkout] session create failed:", msg);
-      return { ok: false as const, error: `stripe: ${msg}` };
+      console.warn(`[checkout] ${next.label} unavailable, retrying without it:`, msg);
+      dropped.add(next.label);
+      params = next.apply(params);
     }
   }
 
@@ -252,6 +332,9 @@ export async function startHandoffCheckout(input: HandoffCheckoutInput) {
     // purchase onto another clone or tenant.
     cloneId: handoff.clone_id,
     tenantId: handoff.tenant_id ?? undefined,
+    // Buyer details travelled server-to-server with the handoff; the browser
+    // never carried them, so they cannot have been tampered with in the URL.
+    contact: contactFromHandoffRow(handoff as unknown as Record<string, unknown>),
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
     attribution: {
@@ -271,6 +354,11 @@ export type UidCheckoutInput = {
   quantity: number;
   successUrl: string;
   cancelUrl: string;
+  /** Optional buyer details from the storefront. A `uid` is a stable, public
+   *  link with no user attached, so anything here is self-declared and used
+   *  only to seed blank Customer fields — never to change an established
+   *  billing email. */
+  contact?: BillingContact;
 };
 
 /**
@@ -320,6 +408,7 @@ export async function startUidCheckout(input: UidCheckoutInput) {
     tenantId,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
+    contact: input.contact ?? EMPTY_CONTACT,
     attribution: {
       originUserId: uid,
       originUsername: displayName,
@@ -342,6 +431,7 @@ export type CardSetupCoreArgs = {
   successUrl: string;
   cancelUrl: string;
   attribution: OriginAttribution;
+  contact?: BillingContact;
   handoffToConsume?: string | null;
 };
 
@@ -351,9 +441,15 @@ export async function startCardSetupCore(args: CardSetupCoreArgs) {
     return { ok: false as const, error: "card_limit_reached" };
   }
 
+  const contact = args.contact ?? EMPTY_CONTACT;
+
   let customerId: string;
   try {
-    customerId = await ensureStripeCustomer(args.tenantId);
+    // Seeds email/phone/name onto the Customer. Setup mode does not support
+    // Stripe's field-prefill features, but it DOES render the attached
+    // Customer's email — so populating the Customer is the only way the
+    // card-save page arrives with anything already filled in.
+    customerId = await ensureStripeCustomer(args.tenantId, contact);
   } catch (err) {
     const msg = stripeErrorMessage(err);
     console.error("[wallet] ensureStripeCustomer failed:", msg);
@@ -365,6 +461,7 @@ export async function startCardSetupCore(args: CardSetupCoreArgs) {
     tenant_id: args.tenantId,
     clone_id: args.cloneId ?? "",
     ...attributionMetadata(args.attribution),
+    ...contactMetadata(contact),
   };
 
   let session;
@@ -373,6 +470,11 @@ export async function startCardSetupCore(args: CardSetupCoreArgs) {
       mode: "setup",
       customer: customerId,
       payment_method_types: ["card"],
+      // Capture the cardholder's full billing address alongside the card. It
+      // is stored on the payment method at Stripe (never here beyond the
+      // display name), and it is what lets a later off-session charge and its
+      // invoice carry a complete, tax-valid billing record.
+      billing_address_collection: "required",
       success_url: args.successUrl,
       cancel_url: args.cancelUrl,
       metadata: meta,
@@ -420,6 +522,7 @@ export async function startHandoffCardSetup(input: {
     tenantId: handoff.tenant_id,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
+    contact: contactFromHandoffRow(handoff as unknown as Record<string, unknown>),
     attribution: {
       originUserId: handoff.origin_user_id,
       originUsername: handoff.origin_username,
@@ -434,6 +537,7 @@ export async function startUidCardSetup(input: {
   billingUserId: string;
   successUrl: string;
   cancelUrl: string;
+  contact?: BillingContact;
 }) {
   const uid = input.billingUserId.trim();
   if (!uid) return { ok: false as const, error: "uid_required" };
@@ -471,6 +575,7 @@ export async function startUidCardSetup(input: {
     tenantId: tenantId as string,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
+    contact: input.contact ?? EMPTY_CONTACT,
     attribution: {
       originUserId: uid,
       originUsername: displayName,

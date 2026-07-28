@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { startHandoffCardSetup, startUidCardSetup } from "@/server/checkout.server";
+import { normalizeBillingContact } from "@/server/billing-contact.server";
 import { storefrontPricingBase } from "@/server/billing-handoffs.server";
 import { storefrontJson, storefrontPreflight } from "@/server/storefront-cors.server";
 
@@ -21,6 +22,17 @@ const Schema = z
   .object({
     h: z.string().uuid().optional(),
     uid: z.string().min(1).max(200).optional(),
+    contact: z
+      .object({
+        email: z.string().max(320).optional().nullable(),
+        first_name: z.string().max(100).optional().nullable(),
+        last_name: z.string().max(100).optional().nullable(),
+        full_name: z.string().max(200).optional().nullable(),
+        phone: z.string().max(40).optional().nullable(),
+        company: z.string().max(200).optional().nullable(),
+      })
+      .optional()
+      .nullable(),
   })
   .refine((v) => !!v.h !== !!v.uid, {
     message: "exactly one of h or uid is required",
@@ -71,6 +83,7 @@ export const Route = createFileRoute("/api/public/storefront/setup")({
                 billingUserId: data.uid as string,
                 successUrl,
                 cancelUrl,
+                contact: normalizeBillingContact(data.contact),
               });
           if (!result.ok) return storefrontJson(result, 400);
           return storefrontJson({ ok: true, url: result.url, session_id: result.sessionId });

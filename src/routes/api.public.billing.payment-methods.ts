@@ -71,6 +71,10 @@ function serialize(rows: Awaited<ReturnType<typeof listActivePaymentMethods>>) {
     exp_month: r.exp_month,
     exp_year: r.exp_year,
     funding: r.funding,
+    // Cardholder as entered on Stripe's page — lets a clone label the card
+    // with a person instead of just a brand and last4.
+    billing_name: r.billing_name,
+    billing_email: r.billing_email,
     priority: r.priority,
     role: PRIORITY_ROLES[r.priority] ?? `slot_${r.priority}`,
     origin_username: r.origin_username,

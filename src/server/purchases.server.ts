@@ -190,7 +190,8 @@ export async function loadValidHandoff(handoffId: string): Promise<BillingHandof
   const { data, error } = await adminAny
     .from("billing_handoffs")
     .select(
-      "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at",
+      "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at, " +
+      "contact_email, contact_first_name, contact_last_name, contact_phone, contact_company",
     )
     .eq("id", handoffId)
     .maybeSingle();
