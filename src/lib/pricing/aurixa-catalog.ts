@@ -317,6 +317,137 @@ export const MODULES: readonly PricedModule[] = [
   },
 ];
 
+export type TopupPack = {
+  slug: string;
+  name: string;
+  /** Position in the ladder, 1 = smallest. Also the sheet's own "Stage". */
+  stage: number;
+  credits: number;
+  /** Tax-inclusive, in cents — the sheet's "Recommended price incl. GST". */
+  priceInclGstCents: number;
+  /** The sheet's "Positioning" column, shown on the card. */
+  positioning: string;
+  /** The sheet marks exactly one pack as the popular choice. */
+  popular?: boolean;
+  /** …and exactly one as the best value. */
+  bestValue?: boolean;
+};
+
+/**
+ * The top-up ladder, transcribed from the sheet's "Top-Up Pricing — GST
+ * Inclusive" table.
+ *
+ * Only credits and price are stored. Price-per-credit and discount-from-the-
+ * smallest-pack are the sheet's other two columns, but they are consequences
+ * of these two numbers, not independent facts — storing them would let a
+ * rounded copy drift away from what is actually charged. They are derived by
+ * packPerCreditCents/packDiscountFraction and pinned against the sheet's
+ * published figures in the tests.
+ *
+ * The ladder must stay sorted by credits: the discount column, the storefront
+ * ordering and the "smallest pack" baseline all read position 0 as the floor.
+ */
+export const TOPUP_PACKS: readonly TopupPack[] = [
+  {
+    slug: "topup-250",
+    name: "250 Credit Pack",
+    stage: 1,
+    credits: 250,
+    priceInclGstCents: 2090,
+    positioning: "Emergency top-up",
+  },
+  {
+    slug: "topup-500",
+    name: "500 Credit Pack",
+    stage: 2,
+    credits: 500,
+    priceInclGstCents: 3850,
+    positioning: "Small reporting boost",
+  },
+  {
+    slug: "topup-1000",
+    name: "1,000 Credit Pack",
+    stage: 3,
+    credits: 1000,
+    priceInclGstCents: 7150,
+    positioning: "Light additional usage",
+  },
+  {
+    slug: "topup-2500",
+    name: "2,500 Credit Pack",
+    stage: 4,
+    credits: 2500,
+    priceInclGstCents: 16390,
+    positioning: "Regular reporting top-up",
+  },
+  {
+    slug: "topup-5000",
+    name: "5,000 Credit Pack",
+    stage: 5,
+    credits: 5000,
+    priceInclGstCents: 30690,
+    positioning: "Most popular",
+    popular: true,
+  },
+  {
+    slug: "topup-7500",
+    name: "7,500 Credit Pack",
+    stage: 6,
+    credits: 7500,
+    priceInclGstCents: 43890,
+    positioning: "Team reporting capacity",
+  },
+  {
+    slug: "topup-10000",
+    name: "10,000 Credit Pack",
+    stage: 7,
+    credits: 10000,
+    priceInclGstCents: 54890,
+    positioning: "High-volume monthly overflow",
+  },
+  {
+    slug: "topup-15000",
+    name: "15,000 Credit Pack",
+    stage: 8,
+    credits: 15000,
+    priceInclGstCents: 71390,
+    positioning: "Best top-up value",
+    bestValue: true,
+  },
+];
+
+/** Packs the ladder replaces. Retired on cutover, never deleted — they have sales against them. */
+export const RETIRED_PACK_SLUGS: readonly string[] = [
+  "credits-50",
+  "credits-100",
+  "credits-250",
+  "credits-500",
+];
+
+export const packBySlug = (slug: string): TopupPack | undefined =>
+  TOPUP_PACKS.find((p) => p.slug === slug);
+
+/**
+ * What one credit costs in this pack, in cents — a fraction of a cent, so
+ * deliberately NOT rounded here. The sheet quotes it to two decimals ("8.36
+ * cents") and so should any display, but the discount column is computed from
+ * the unrounded figure and rounding first moves it (5,000 credits reads 26.6%
+ * from 6.138c and 26.6% from 6.14c only by luck).
+ */
+export function packPerCreditCents(pack: TopupPack): number {
+  return pack.priceInclGstCents / pack.credits;
+}
+
+/**
+ * How much cheaper a credit is here than in the smallest pack, as a fraction.
+ * Zero for the smallest pack itself, which is the baseline.
+ */
+export function packDiscountFraction(pack: TopupPack): number {
+  const baseline = packPerCreditCents(TOPUP_PACKS[0]);
+  if (!baseline) return 0;
+  return 1 - packPerCreditCents(pack) / baseline;
+}
+
 /** The module whose price is the gap between a tier's two headline figures. */
 export const AML_MODULE_SLUG = "aml-ctf";
 
