@@ -4445,6 +4445,56 @@ export type Database = {
           },
         ]
       }
+      plan_change_events: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string
+          credits_expire_at: string | null
+          credits_granted: number
+          from_plan_name: string | null
+          from_plan_slug: string | null
+          id: string
+          source_ref: string
+          tenant_id: string
+          to_plan_name: string
+          to_plan_slug: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string
+          credits_expire_at?: string | null
+          credits_granted?: number
+          from_plan_name?: string | null
+          from_plan_slug?: string | null
+          id?: string
+          source_ref: string
+          tenant_id: string
+          to_plan_name: string
+          to_plan_slug: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string
+          credits_expire_at?: string | null
+          credits_granted?: number
+          from_plan_name?: string | null
+          from_plan_slug?: string | null
+          id?: string
+          source_ref?: string
+          tenant_id?: string
+          to_plan_name?: string
+          to_plan_slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_change_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_module_entitlements: {
         Row: {
           created_at: string
@@ -6626,6 +6676,22 @@ export type Database = {
       }
     }
     Functions: {
+      acknowledge_plan_change: {
+        Args: { _event_id: string; _tenant_id: string }
+        Returns: Json
+      }
+      advance_tenant_billing_period: {
+        Args: {
+          _period_end?: string
+          _period_start: string
+          _tenant_id: string
+        }
+        Returns: Json
+      }
+      apply_seat_plan_change: {
+        Args: { _plan_slug: string; _source_ref: string; _tenant_id: string }
+        Returns: Json
+      }
       apply_topup: {
         Args: {
           _metadata?: Json
@@ -6825,6 +6891,28 @@ export type Database = {
           reason: string
           remaining: number
         }[]
+      }
+      unseen_plan_changes: {
+        Args: { _tenant_id: string }
+        Returns: {
+          acknowledged_at: string | null
+          created_at: string
+          credits_expire_at: string | null
+          credits_granted: number
+          from_plan_name: string | null
+          from_plan_slug: string | null
+          id: string
+          source_ref: string
+          tenant_id: string
+          to_plan_name: string
+          to_plan_slug: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "plan_change_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
     }
     Enums: {
