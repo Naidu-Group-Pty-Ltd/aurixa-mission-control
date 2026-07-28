@@ -83,6 +83,36 @@ export type BackfillReport = {
   }>;
 };
 
+/** A foreign key the row points at no longer exists. */
+export function isForeignKeyViolation(
+  error: { message?: string | null; code?: string | null } | null | undefined,
+): boolean {
+  if (!error) return false;
+  if (error.code === "23503") return true;
+  return /violates foreign key constraint/i.test(error.message ?? "");
+}
+
+/**
+ * Inserts a purchase row, surviving a handoff that is no longer there.
+ *
+ * `purchases.handoff_id` references `billing_handoffs`, and handoffs are
+ * single-use and short-lived — by the time a window is reconstructed, days
+ * later, the row it pointed at may well have been cleaned up. That link is a
+ * convenience: who initiated the purchase is already carried by
+ * `origin_user_id` and `origin_username`, which are plain text and always
+ * survive. So a dangling handoff costs the link, not the record.
+ */
+async function insertPurchaseRow(row: Record<string, unknown>) {
+  const first = await adminAny.from("purchases").insert(row);
+  if (!isForeignKeyViolation(first.error) || row.handoff_id == null) return first;
+
+  console.warn(
+    "[purchase-backfill] handoff no longer exists; inserting without the link",
+    row.stripe_checkout_session_id,
+  );
+  return await adminAny.from("purchases").insert({ ...row, handoff_id: null });
+}
+
 /** Which of these session ids already have a purchases row. */
 async function existingSessionIds(ids: string[]): Promise<Set<string>> {
   const found = new Set<string>();
@@ -184,7 +214,7 @@ export async function reconcilePurchasesFromStripe(input: {
 
     try {
       const { dropped } = await writeToleratingSchemaDrift(
-        (r) => adminAny.from("purchases").insert(r),
+        (r) => insertPurchaseRow(r),
         row,
         PURCHASE_IDENTITY_COLUMNS,
       );

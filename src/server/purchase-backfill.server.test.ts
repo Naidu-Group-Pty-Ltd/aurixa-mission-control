@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isPurchaseSession, purchaseStatusFromSession } from "./purchase-backfill.server";
+import {
+  isForeignKeyViolation,
+  isPurchaseSession,
+  purchaseStatusFromSession,
+} from "./purchase-backfill.server";
 
 describe("purchaseStatusFromSession", () => {
   it("records a paid, complete session as completed", () => {
@@ -53,5 +57,28 @@ describe("isPurchaseSession", () => {
     // never had a purchases row to restore.
     expect(isPurchaseSession({ mode: "setup" })).toBe(false);
     expect(isPurchaseSession({})).toBe(false);
+  });
+});
+
+describe("isForeignKeyViolation", () => {
+  it("spots the SQLSTATE and the message form", () => {
+    expect(isForeignKeyViolation({ code: "23503" })).toBe(true);
+    expect(
+      isForeignKeyViolation({
+        message:
+          'insert or update on table "purchases" violates foreign key constraint "purchases_handoff_id_fkey"',
+      }),
+    ).toBe(true);
+  });
+
+  it("is false for anything else, including no error at all", () => {
+    // Handoffs are single-use and short-lived, so a window reconstructed days
+    // later can point at one that has been cleaned up. That must cost the
+    // link, not the row — but only for a genuine FK failure.
+    expect(isForeignKeyViolation({ message: "column purchases.item_name does not exist" })).toBe(
+      false,
+    );
+    expect(isForeignKeyViolation(null)).toBe(false);
+    expect(isForeignKeyViolation(undefined)).toBe(false);
   });
 });

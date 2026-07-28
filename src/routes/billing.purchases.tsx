@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { listPurchases, listPurchaseSources, purchaseRollups } from "@/lib/purchases.functions";
+import { RestorePurchasesDialog } from "@/components/billing/restore-purchases-dialog";
 import { formatMoneyByCurrency } from "@/lib/purchase-rollups";
 import { useClones } from "@/lib/queries";
 import { toCSV, downloadCSV } from "@/lib/csv";
@@ -290,6 +291,7 @@ function PurchasesPage() {
             <Button variant="outline" size="sm" onClick={exportCsv} disabled={rows.length === 0}>
               <Download className="mr-1.5 h-3.5 w-3.5" /> CSV (page)
             </Button>
+            <RestorePurchasesDialog />
           </div>
         </CardContent>
       </Card>
