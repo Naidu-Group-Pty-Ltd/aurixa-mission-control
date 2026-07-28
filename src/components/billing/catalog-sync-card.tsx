@@ -40,6 +40,8 @@ type Plan = {
   warnings?: string[];
   createdPrices?: Array<{ tierSlug: string; interval: string; priceId: string }>;
   errors?: string[];
+  notes?: string[];
+  storefrontRefreshed?: boolean;
 };
 
 export function CatalogSyncCard() {
@@ -124,9 +126,7 @@ export function CatalogSyncCard() {
 
         {plan && !plan.ok && (
           <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3">
-            <p className="text-sm font-medium text-destructive">
-              {plan.error ?? "Sync failed."}
-            </p>
+            <p className="text-sm font-medium text-destructive">{plan.error ?? "Sync failed."}</p>
             {/* Per-tier detail. A failure here is usually Stripe or Postgres
                 saying something specific, and hiding it behind a generic
                 message leaves an operator with nothing to act on. */}
@@ -147,9 +147,8 @@ export function CatalogSyncCard() {
 
         {!!plan?.renames?.length && (
           <p className="text-xs text-muted-foreground">
-            Rows reused, in this order:{" "}
-            {plan.renames.map((r) => `${r.from} → ${r.to}`).join(", ")}. Existing Stripe products
-            and subscription history stay attached to the row.
+            Rows reused, in this order: {plan.renames.map((r) => `${r.from} → ${r.to}`).join(", ")}.
+            Existing Stripe products and subscription history stay attached to the row.
           </p>
         )}
 
@@ -189,9 +188,7 @@ export function CatalogSyncCard() {
         )}
 
         {!!plan?.untouched?.length && (
-          <p className="text-xs text-muted-foreground">
-            Left alone: {plan.untouched.join(", ")}.
-          </p>
+          <p className="text-xs text-muted-foreground">Left alone: {plan.untouched.join(", ")}.</p>
         )}
 
         {applied && !!plan?.createdPrices?.length && (
@@ -199,6 +196,23 @@ export function CatalogSyncCard() {
             Created {plan.createdPrices.length} Stripe price
             {plan.createdPrices.length === 1 ? "" : "s"} and repointed the catalog. Prices that
             already existed at the right amount were reused rather than duplicated.
+          </p>
+        )}
+
+        {plan?.notes?.map((n) => (
+          <p key={n} className="text-xs text-muted-foreground">
+            {n}
+          </p>
+        ))}
+
+        {/* Repricing here and the pricing page showing it are two different
+            things. Said plainly, so a stale page is not mistaken for a failed
+            cutover. */}
+        {plan?.storefrontRefreshed === false && (
+          <p className="flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            The new prices are live here, but the pricing page still shows the old ones until the
+            15-minute reconcile runs.
           </p>
         )}
       </CardContent>

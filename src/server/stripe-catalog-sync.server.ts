@@ -13,6 +13,7 @@
 import Stripe from "stripe";
 import { getStripe } from "@/server/stripe.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { describeRefresh, refreshStorefrontMirror } from "@/server/storefront-refresh.server";
 import {
   TIERS,
   TIER_INCLUDES_AML,
@@ -285,6 +286,9 @@ export type ApplyResult = {
   renamed: RenameOp[];
   createdPrices: Array<{ tierSlug: string; interval: string; priceId: string; amount: number }>;
   errors: string[];
+  notes: string[];
+  /** Whether the storefront's read mirror picked the change up straight away. */
+  storefrontRefreshed?: boolean;
 };
 
 /**
@@ -300,7 +304,13 @@ export type ApplyResult = {
  */
 export async function applyCatalogSync(plan: SyncPlan, rows: readonly PlanRow[] = []): Promise<ApplyResult> {
   const stripe = getStripe();
-  const result: ApplyResult = { applied: true, renamed: [], createdPrices: [], errors: [] };
+  const result: ApplyResult = {
+    applied: true,
+    renamed: [],
+    createdPrices: [],
+    errors: [],
+    notes: [],
+  };
   const bySlug = new Map(rows.map((r) => [r.slug, r]));
 
   for (const tier of tierApplyOrder(plan)) {
@@ -354,6 +364,14 @@ export async function applyCatalogSync(plan: SyncPlan, rows: readonly PlanRow[] 
       result.errors.push(`${tier.slug}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+
+  // The pricing page reads a mirror of this catalog, and the trigger meant to
+  // refresh it was silently doing nothing — so a tier reprice was invisible on
+  // the storefront for up to fifteen minutes. Ask directly, and say whether it
+  // worked. Never fatal: the prices here are already correct.
+  const refresh = await refreshStorefrontMirror();
+  result.storefrontRefreshed = refresh.ok;
+  result.notes.push(describeRefresh(refresh, "price list"));
 
   return result;
 }
