@@ -143,7 +143,7 @@ export function ReportCostIndexCard() {
               Report token cost index
             </CardTitle>
             <CardDescription className="max-w-2xl">
-              Credits reserved per generated report, keyed by the metering kind each clone sends.
+              Credits charged per generated report, keyed by the metering kind each clone sends.
               Publishing cascades to every clone and the prime repository.
             </CardDescription>
           </div>
