@@ -8,14 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Receipt,
   Puzzle,
   UserCog,
@@ -28,6 +20,7 @@ import {
 import { listPricingCatalog } from "@/lib/pricing-catalog.functions";
 import { createStripeCheckout } from "@/lib/stripe.functions";
 import { EmptyState } from "@/components/empty-state";
+import { ReportCostIndexCard } from "@/components/billing/report-cost-index-card";
 
 const SearchSchema = z.object({ tenant: z.string().uuid().optional() });
 
@@ -295,39 +288,7 @@ function CatalogPage() {
               Credits deducted per generated report. Clones meter these via the token reservation
               API.
             </p>
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Report</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Complexity</TableHead>
-                      <TableHead className="text-right">Credits</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.reports.map((r: any) => (
-                      <TableRow key={r.id}>
-                        <TableCell>
-                          <div className="font-medium">{r.name}</div>
-                          <div className="text-xs text-muted-foreground">{r.description}</div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {r.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="capitalize text-sm text-muted-foreground">
-                          {r.metadata?.complexity ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">{r.credit_cost}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <ReportCostIndexCard />
           </section>
         </>
       )}

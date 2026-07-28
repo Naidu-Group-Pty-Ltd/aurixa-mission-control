@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { jsonResponse, resolveCloneApiKey } from "@/server/clone-api-keys.server";
+import { indexVersion } from "@/server/report-cost-index.server";
 
 export const Route = createFileRoute("/api/public/pricing/catalog")({
   server: {
@@ -39,7 +40,9 @@ export const Route = createFileRoute("/api/public/pricing/catalog")({
             .order("sort_order"),
           supabaseAdmin
             .from("report_credit_costs" as never)
-            .select("slug,name,category,description,credit_cost,metadata,sort_order")
+            // `updated_at` feeds the index version below; `metadata.token_kind`
+            // is how a clone maps its own `kind` onto a row.
+            .select("slug,name,category,description,credit_cost,metadata,sort_order,updated_at")
             .eq("is_active", true)
             .order("sort_order"),
           supabaseAdmin
@@ -54,12 +57,18 @@ export const Route = createFileRoute("/api/public/pricing/catalog")({
             .order("price_cents"),
         ]);
 
+        // Version of the report cost index. Clones compare it against what
+        // they last saw to decide whether a refresh actually changed anything,
+        // and to log which revision a reservation was priced under.
+        const reportsVersion = indexVersion((reports.data ?? []) as Array<{ updated_at: string }>);
+
         return jsonResponse({
           ok: true,
           roles: roles.data ?? [],
           addons: addons.data ?? [],
           setups: setups.data ?? [],
           reports: reports.data ?? [],
+          reports_version: reportsVersion,
           plans: plans.data ?? [],
           packs: packs.data ?? [],
         });
