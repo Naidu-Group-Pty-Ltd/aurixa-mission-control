@@ -2226,13 +2226,20 @@ export type Database = {
           created_at: string
           dispatch_payload: Json
           dispatched_at: string | null
+          engine: string
+          files_changed: number | null
           finding_id: string
+          fix_confirmed_at: string | null
+          fix_confirmed_by_job_id: string | null
           id: string
           last_error: string | null
           last_event: Json
+          lines_added: number | null
+          lines_removed: number | null
           merge_commit_sha: string | null
           merged_at: string | null
           merged_by: string | null
+          model: string | null
           pr_number: number | null
           pr_state: string | null
           pr_url: string | null
@@ -2241,9 +2248,11 @@ export type Database = {
           rejected_reason: string | null
           repo_full_name: string
           requested_by: string | null
-          scan_job_id: string
+          scan_job_id: string | null
           status: Database["public"]["Enums"]["codex_remediation_status"]
           updated_at: string
+          verification: Json
+          verified: boolean | null
           workflow_run_id: number | null
           workflow_run_url: string | null
         }
@@ -2257,13 +2266,20 @@ export type Database = {
           created_at?: string
           dispatch_payload?: Json
           dispatched_at?: string | null
+          engine?: string
+          files_changed?: number | null
           finding_id: string
+          fix_confirmed_at?: string | null
+          fix_confirmed_by_job_id?: string | null
           id?: string
           last_error?: string | null
           last_event?: Json
+          lines_added?: number | null
+          lines_removed?: number | null
           merge_commit_sha?: string | null
           merged_at?: string | null
           merged_by?: string | null
+          model?: string | null
           pr_number?: number | null
           pr_state?: string | null
           pr_url?: string | null
@@ -2272,9 +2288,11 @@ export type Database = {
           rejected_reason?: string | null
           repo_full_name: string
           requested_by?: string | null
-          scan_job_id: string
+          scan_job_id?: string | null
           status?: Database["public"]["Enums"]["codex_remediation_status"]
           updated_at?: string
+          verification?: Json
+          verified?: boolean | null
           workflow_run_id?: number | null
           workflow_run_url?: string | null
         }
@@ -2288,13 +2306,20 @@ export type Database = {
           created_at?: string
           dispatch_payload?: Json
           dispatched_at?: string | null
+          engine?: string
+          files_changed?: number | null
           finding_id?: string
+          fix_confirmed_at?: string | null
+          fix_confirmed_by_job_id?: string | null
           id?: string
           last_error?: string | null
           last_event?: Json
+          lines_added?: number | null
+          lines_removed?: number | null
           merge_commit_sha?: string | null
           merged_at?: string | null
           merged_by?: string | null
+          model?: string | null
           pr_number?: number | null
           pr_state?: string | null
           pr_url?: string | null
@@ -2303,9 +2328,11 @@ export type Database = {
           rejected_reason?: string | null
           repo_full_name?: string
           requested_by?: string | null
-          scan_job_id?: string
+          scan_job_id?: string | null
           status?: Database["public"]["Enums"]["codex_remediation_status"]
           updated_at?: string
+          verification?: Json
+          verified?: boolean | null
           workflow_run_id?: number | null
           workflow_run_url?: string | null
         }
@@ -2336,6 +2363,13 @@ export type Database = {
             columns: ["finding_id"]
             isOneToOne: false
             referencedRelation: "codex_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "codex_remediations_fix_confirmed_by_job_id_fkey"
+            columns: ["fix_confirmed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "codex_scan_jobs"
             referencedColumns: ["id"]
           },
           {
