@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { storefrontJson, storefrontPreflight } from "@/server/storefront-cors.server";
+import { planForBillingUserId } from "@/server/current-plan.server";
 
 /**
  * GET /api/public/storefront/identity?uid=<billing_user_id>
@@ -41,11 +42,18 @@ export const Route = createFileRoute("/api/public/storefront/identity")({
           cloneName = tenant.display_name ?? tenant.external_ref ?? null;
         }
 
+        // Best-effort: the pricing page only uses this to label its buttons,
+        // and a workspace should never fail to load pricing because its plan
+        // lookup did.
+        const plan = await planForBillingUserId(uid).catch(() => null);
+
         return storefrontJson({
           ok: true,
           uid,
           clone_name: cloneName,
           origin_username: null,
+          current_plan_slug: plan?.slug ?? null,
+          current_plan_name: plan?.name ?? null,
         });
       },
     },

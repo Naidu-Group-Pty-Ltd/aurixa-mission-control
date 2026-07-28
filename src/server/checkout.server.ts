@@ -43,12 +43,14 @@ type CatalogItem = {
   slug: string;
   name: string;
   stripe_price_id: string | null;
+  /** Seat plans carry `annual_stripe_price_id` for the yearly price. */
+  metadata?: Record<string, unknown> | null;
   currency: string;
   is_active: boolean;
 };
 
 export async function resolveItem(mode: CheckoutMode, itemId: string): Promise<CatalogItem | null> {
-  const cols = "id, slug, name, stripe_price_id, currency, is_active";
+  const cols = "id, slug, name, stripe_price_id, currency, is_active, metadata";
   const query =
     mode === "topup"
       ? supabaseAdmin.from("topup_packs").select(cols).eq("id", itemId).maybeSingle()
@@ -115,6 +117,8 @@ export type CheckoutCoreArgs = {
   mode: CheckoutMode;
   itemId: string;
   quantity: number;
+  /** Which Stripe price to use. Defaults to monthly. */
+  period?: "monthly" | "annual";
   cloneId: string | null;
   tenantId?: string;
   /** Absolute URL; must contain the {CHECKOUT_SESSION_ID} placeholder. */
@@ -137,7 +141,22 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   const item = await resolveItem(args.mode, args.itemId);
   if (!item) return { ok: false as const, error: "item_not_found" };
   if (!item.is_active) return { ok: false as const, error: "item_inactive" };
-  if (!item.stripe_price_id) return { ok: false as const, error: "stripe_price_not_linked" };
+  // Annual is a different Stripe price, not a discount applied to the monthly
+  // one. Without this the toggle changed the figure on the pricing page and
+  // then billed the monthly amount anyway — the page would advertise
+  // $7,549.20 a year and charge $699 a month.
+  const annualPriceId =
+    typeof item.metadata?.annual_stripe_price_id === "string"
+      ? (item.metadata.annual_stripe_price_id as string)
+      : null;
+  const priceId = args.period === "annual" ? annualPriceId : item.stripe_price_id;
+  if (!priceId) {
+    return {
+      ok: false as const,
+      error:
+        args.period === "annual" ? "annual_price_not_linked" : "stripe_price_not_linked",
+    };
+  }
 
   // Topups + setup packages need a tenant. If a cloneId is supplied without
   // an explicit tenantId, auto-resolve (or provision) the clone's primary
@@ -215,7 +234,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   const sessionParams = {
     mode: args.mode === "seat_plan" ? "subscription" : "payment",
     customer: customerId,
-    line_items: [{ price: item.stripe_price_id, quantity: args.quantity }],
+    line_items: [{ price: priceId, quantity: args.quantity }],
     success_url: args.successUrl,
     cancel_url: args.cancelUrl,
     allow_promotion_codes: true,
@@ -340,6 +359,8 @@ export type HandoffCheckoutInput = {
   mode: CheckoutMode;
   itemId: string;
   quantity: number;
+  /** Which Stripe price to use. Defaults to monthly. */
+  period?: "monthly" | "annual";
   /** Absolute URLs for the post-checkout redirect (storefront pages). */
   successUrl: string;
   cancelUrl: string;
@@ -363,6 +384,7 @@ export async function startHandoffCheckout(input: HandoffCheckoutInput) {
     mode: input.mode,
     itemId: input.itemId,
     quantity: input.quantity,
+    period: input.period,
     // Scope comes strictly from the handoff — input cannot redirect the
     // purchase onto another clone or tenant.
     cloneId: handoff.clone_id,
@@ -387,6 +409,8 @@ export type UidCheckoutInput = {
   mode: CheckoutMode;
   itemId: string;
   quantity: number;
+  /** Which Stripe price to use. Defaults to monthly. */
+  period?: "monthly" | "annual";
   successUrl: string;
   cancelUrl: string;
   /** Optional buyer details from the storefront. A `uid` is a stable, public
@@ -445,6 +469,7 @@ export async function startUidCheckout(input: UidCheckoutInput) {
     mode: input.mode,
     itemId: input.itemId,
     quantity: input.quantity,
+    period: input.period,
     cloneId,
     tenantId,
     successUrl: input.successUrl,
