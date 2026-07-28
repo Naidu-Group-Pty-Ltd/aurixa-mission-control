@@ -5962,6 +5962,45 @@ export type Database = {
           },
         ]
       }
+      storefront_access_grants: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          label: string
+          last_used_at: string | null
+          note: string | null
+          revoked_at: string | null
+          updated_at: string
+          use_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label: string
+          last_used_at?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+          use_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string
+          last_used_at?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+          use_count?: number
+        }
+        Relationships: []
+      }
       stripe_events: {
         Row: {
           clone_id: string | null
