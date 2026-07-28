@@ -104,6 +104,7 @@ import { Route as ApiPublicStorefrontIdentityRouteImport } from './routes/api.pu
 import { Route as ApiPublicStorefrontHandoffRouteImport } from './routes/api.public.storefront.handoff'
 import { Route as ApiPublicStorefrontCheckoutRouteImport } from './routes/api.public.storefront.checkout'
 import { Route as ApiPublicStorefrontCatalogRouteImport } from './routes/api.public.storefront.catalog'
+import { Route as ApiPublicStorefrontAccessRouteImport } from './routes/api.public.storefront.access'
 import { Route as ApiPublicSecurityIntakeRouteImport } from './routes/api.public.security.intake'
 import { Route as ApiPublicSeatsReserveRouteImport } from './routes/api.public.seats.reserve'
 import { Route as ApiPublicSeatsReleaseRouteImport } from './routes/api.public.seats.release'
@@ -615,6 +616,12 @@ const ApiPublicStorefrontCatalogRoute =
     path: '/api/public/storefront/catalog',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicStorefrontAccessRoute =
+  ApiPublicStorefrontAccessRouteImport.update({
+    id: '/api/public/storefront/access',
+    path: '/api/public/storefront/access',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSecurityIntakeRoute = ApiPublicSecurityIntakeRouteImport.update({
   id: '/api/public/security/intake',
   path: '/api/public/security/intake',
@@ -845,6 +852,7 @@ export interface FileRoutesByFullPath {
   '/api/public/seats/release': typeof ApiPublicSeatsReleaseRoute
   '/api/public/seats/reserve': typeof ApiPublicSeatsReserveRoute
   '/api/public/security/intake': typeof ApiPublicSecurityIntakeRoute
+  '/api/public/storefront/access': typeof ApiPublicStorefrontAccessRoute
   '/api/public/storefront/catalog': typeof ApiPublicStorefrontCatalogRoute
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
@@ -964,6 +972,7 @@ export interface FileRoutesByTo {
   '/api/public/seats/release': typeof ApiPublicSeatsReleaseRoute
   '/api/public/seats/reserve': typeof ApiPublicSeatsReserveRoute
   '/api/public/security/intake': typeof ApiPublicSecurityIntakeRoute
+  '/api/public/storefront/access': typeof ApiPublicStorefrontAccessRoute
   '/api/public/storefront/catalog': typeof ApiPublicStorefrontCatalogRoute
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
@@ -1085,6 +1094,7 @@ export interface FileRoutesById {
   '/api/public/seats/release': typeof ApiPublicSeatsReleaseRoute
   '/api/public/seats/reserve': typeof ApiPublicSeatsReserveRoute
   '/api/public/security/intake': typeof ApiPublicSecurityIntakeRoute
+  '/api/public/storefront/access': typeof ApiPublicStorefrontAccessRoute
   '/api/public/storefront/catalog': typeof ApiPublicStorefrontCatalogRoute
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
@@ -1207,6 +1217,7 @@ export interface FileRouteTypes {
     | '/api/public/seats/release'
     | '/api/public/seats/reserve'
     | '/api/public/security/intake'
+    | '/api/public/storefront/access'
     | '/api/public/storefront/catalog'
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
@@ -1326,6 +1337,7 @@ export interface FileRouteTypes {
     | '/api/public/seats/release'
     | '/api/public/seats/reserve'
     | '/api/public/security/intake'
+    | '/api/public/storefront/access'
     | '/api/public/storefront/catalog'
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
@@ -1446,6 +1458,7 @@ export interface FileRouteTypes {
     | '/api/public/seats/release'
     | '/api/public/seats/reserve'
     | '/api/public/security/intake'
+    | '/api/public/storefront/access'
     | '/api/public/storefront/catalog'
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
@@ -1546,6 +1559,7 @@ export interface RootRouteChildren {
   ApiPublicSeatsReleaseRoute: typeof ApiPublicSeatsReleaseRoute
   ApiPublicSeatsReserveRoute: typeof ApiPublicSeatsReserveRoute
   ApiPublicSecurityIntakeRoute: typeof ApiPublicSecurityIntakeRoute
+  ApiPublicStorefrontAccessRoute: typeof ApiPublicStorefrontAccessRoute
   ApiPublicStorefrontCatalogRoute: typeof ApiPublicStorefrontCatalogRoute
   ApiPublicStorefrontCheckoutRoute: typeof ApiPublicStorefrontCheckoutRoute
   ApiPublicStorefrontHandoffRoute: typeof ApiPublicStorefrontHandoffRoute
@@ -2232,6 +2246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStorefrontCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/storefront/access': {
+      id: '/api/public/storefront/access'
+      path: '/api/public/storefront/access'
+      fullPath: '/api/public/storefront/access'
+      preLoaderRoute: typeof ApiPublicStorefrontAccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/security/intake': {
       id: '/api/public/security/intake'
       path: '/api/public/security/intake'
@@ -2581,6 +2602,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSeatsReleaseRoute: ApiPublicSeatsReleaseRoute,
   ApiPublicSeatsReserveRoute: ApiPublicSeatsReserveRoute,
   ApiPublicSecurityIntakeRoute: ApiPublicSecurityIntakeRoute,
+  ApiPublicStorefrontAccessRoute: ApiPublicStorefrontAccessRoute,
   ApiPublicStorefrontCatalogRoute: ApiPublicStorefrontCatalogRoute,
   ApiPublicStorefrontCheckoutRoute: ApiPublicStorefrontCheckoutRoute,
   ApiPublicStorefrontHandoffRoute: ApiPublicStorefrontHandoffRoute,
@@ -2602,3 +2624,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

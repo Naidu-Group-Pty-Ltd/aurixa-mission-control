@@ -22,6 +22,7 @@ import { createStripeCheckout } from "@/lib/stripe.functions";
 import { EmptyState } from "@/components/empty-state";
 import { ReportCostIndexCard } from "@/components/billing/report-cost-index-card";
 import { CatalogSyncCard } from "@/components/billing/catalog-sync-card";
+import { StorefrontAccessCard } from "@/components/billing/storefront-access-card";
 
 const SearchSchema = z.object({ tenant: z.string().uuid().optional() });
 
@@ -290,6 +291,7 @@ function CatalogPage() {
               API.
             </p>
             <CatalogSyncCard />
+            <StorefrontAccessCard />
             <ReportCostIndexCard />
           </section>
         </>
