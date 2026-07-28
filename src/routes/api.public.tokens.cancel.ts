@@ -56,7 +56,7 @@ export const Route = createFileRoute("/api/public/tokens/cancel")({
         // already-committed one; both branches are idempotent, so a clone that
         // retries a release never double-refunds.
         const { data: result, error } = parsed.data.refund_if_committed
-          ? await (supabaseAdmin.rpc as any)("release_token_job", {
+          ? await supabaseAdmin.rpc("release_token_job", {
               _job_id: parsed.data.job_id,
               _reason: parsed.data.reason ?? undefined,
             })
