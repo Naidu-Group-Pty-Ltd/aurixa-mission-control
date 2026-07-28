@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Operator-facing RPCs for the per-report token cost index.
 //
 // Reading is open to any operator (it is the platform price list). Publishing
@@ -20,6 +19,13 @@ import {
   diffCostEdits,
 } from "@/server/report-cost-index.server";
 
+// `requireSupabaseAuth` does not carry its context through to the handler's
+// inferred type, so `context` lands as `undefined`. Most siblings answer that
+// with a file-wide `@ts-nocheck`, which also buries every unrelated type error
+// in the file. Narrow it here instead: one named shape, applied at the two
+// places that read the context, leaving the rest of the file type-checked.
+type AuthContext = { supabase: unknown; user: { id?: string } | null };
+
 async function callerRoles(supabase: unknown, userId: string): Promise<string[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (supabase as any).from("user_roles").select("role").eq("user_id", userId);
@@ -30,7 +36,7 @@ async function callerRoles(supabase: unknown, userId: string): Promise<string[]>
 export const listReportCostIndex = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, user } = context;
+    const { supabase, user } = context as unknown as AuthContext;
     const rows = await listReportCosts();
     const roles = user?.id ? await callerRoles(supabase, user.id) : [];
 
@@ -61,7 +67,7 @@ export const publishReportCostIndex = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { edits: Array<{ slug: string; credit_cost: number }>; note?: string }) => d)
   .handler(async ({ data, context }) => {
-    const { supabase, user } = context;
+    const { supabase, user } = context as unknown as AuthContext;
     if (!user?.id) return { ok: false as const, error: "unauthenticated" };
 
     const roles = await callerRoles(supabase, user.id);
