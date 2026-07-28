@@ -72,10 +72,7 @@ const STATE_PRECEDENCE: Record<string, number> = {
  * Pick the state that should represent a fingerprint when history holds
  * more than one row for it (e.g. the same issue seen by several past scans).
  */
-export function mostDecisiveState(
-  a?: string | null,
-  b?: string | null,
-): string | null {
+export function mostDecisiveState(a?: string | null, b?: string | null): string | null {
   if (!a) return b ?? null;
   if (!b) return a;
   const rankA = STATE_PRECEDENCE[a] ?? 99;
@@ -87,10 +84,7 @@ export function mostDecisiveState(
  * Earliest of two ISO timestamps, tolerating nulls. Keeps `first_seen_at`
  * meaning "first ever seen" rather than "first seen by this scan".
  */
-export function earliestTimestamp(
-  a?: string | null,
-  b?: string | null,
-): string | null {
+export function earliestTimestamp(a?: string | null, b?: string | null): string | null {
   if (!a) return b ?? null;
   if (!b) return a;
   return a < b ? a : b;
@@ -110,6 +104,51 @@ export const FULL_TREE_KINDS: ReadonlySet<string> = new Set([
  */
 export function canAutoResolve(scanKind: string): boolean {
   return FULL_TREE_KINDS.has(scanKind);
+}
+
+/**
+ * States a finding may be sitting in purely because a remediation was
+ * dispatched for it. If that remediation fails, the finding must fall back
+ * to `open` — otherwise it stays "fix drafted" forever with no PR behind
+ * it, drops out of the open-findings count, and is never fixed.
+ */
+const SPECULATIVE_FINDING_STATES: ReadonlySet<string> = new Set(["fix_drafted", "pr_open"]);
+
+export function shouldReopenOnRemediationFailure(state?: string | null): boolean {
+  return !!state && SPECULATIVE_FINDING_STATES.has(state);
+}
+
+export type VerificationCheck = {
+  name: string;
+  ok: boolean;
+  skipped?: boolean;
+  detail?: string;
+};
+
+export type VerificationSummary = {
+  /** Checks that actually executed (skipped ones are not evidence). */
+  ran: number;
+  failed: VerificationCheck[];
+  /** null when nothing ran — "unknown" reads differently from "failed". */
+  ok: boolean | null;
+};
+
+/**
+ * Collapse the workflow's per-check results into a verdict. A run where
+ * every check was skipped is `null`, not a pass: a repo with no test script
+ * has not proved anything about the patch.
+ */
+export function summarizeVerification(
+  verification?: { checks?: VerificationCheck[] } | null,
+): VerificationSummary {
+  const checks = verification?.checks ?? [];
+  const ran = checks.filter((c) => !c.skipped);
+  const failed = ran.filter((c) => !c.ok);
+  return {
+    ran: ran.length,
+    failed,
+    ok: ran.length === 0 ? null : failed.length === 0,
+  };
 }
 
 export type SeverityCounts = {

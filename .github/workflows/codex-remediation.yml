@@ -3,10 +3,23 @@ name: Codex Security Remediation
 # in every repo (Prime and clones) that should accept Mission Control's
 # draft-fix dispatches.
 #
-# Mission Control triggers it via workflow_dispatch with the inputs below.
-# The job asks the Codex CLI to fix the finding in the working tree, commits
-# whatever it changed, opens a DRAFT pull request, and reports each lifecycle
-# event back to the callback URL (HMAC-SHA256 signed with callback_secret).
+# WHAT AUTHORS THE FIX
+#   The OpenAI Codex CLI (`@openai/codex`), running here on the runner with
+#   `--sandbox workspace-write`. It reads the repository, edits real files in
+#   a checkout of `base_ref`, and writes a summary of what it changed. There
+#   is no "patch API" — the model works directly in the working tree, which
+#   is why it can follow the surrounding code's conventions.
+#
+# WHAT HAPPENS TO THAT FIX BEFORE A HUMAN SEES IT
+#   1. Blast radius is measured (files touched, lines added/removed).
+#   2. gitleaks scans the patched tree. A fix that introduces a secret is
+#      NEVER pushed — that is the one hard stop in this workflow.
+#   3. The repo's own checks (typecheck / lint / test / build, whichever
+#      exist) run against the patched tree. Failures do not block the PR —
+#      a reviewer needs to see a broken fix — but they are reported on the
+#      PR and back to Mission Control.
+#   4. A DRAFT pull request is opened. Nothing is ever merged here; merging
+#      requires two independent admin approvals in Mission Control.
 #
 # Secrets consumed (synced by Mission Control — see
 # src/server/github-secrets.server.ts):
@@ -21,13 +34,14 @@ on:
   workflow_dispatch:
     inputs:
       remediation_id:  { description: "Mission Control remediation id (UUID)", required: true }
-      # One JSON object rather than seven flat finding_* inputs. GitHub caps
+      # One JSON object rather than flat finding_* inputs. GitHub caps
       # workflow_dispatch at 10 inputs and rejects the whole file past that,
       # so the flat form could never be dispatched. Keeping the finding in a
       # single field also means its text is only ever read from an
       # environment variable and parsed by node — never interpolated into a
       # shell command, where a crafted title could otherwise run code on the
-      # runner. Shape: { id, title, severity, file, line, cwe, description }.
+      # runner. Shape:
+      # { id, title, severity, file, line, cwe, description, scanner, ruleId, snippet }.
       finding:         { description: "Finding as JSON", required: true }
       base_ref:        { description: "Base ref / branch to fork from", required: true }
       branch_name:     { description: "Branch name to push the fix to", required: true }
@@ -45,7 +59,7 @@ concurrency:
 jobs:
   draft-fix:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     env:
       REMEDIATION_ID:  ${{ inputs.remediation_id }}
       BRANCH_NAME:     ${{ inputs.branch_name }}
@@ -53,6 +67,9 @@ jobs:
       CALLBACK_URL:    ${{ inputs.callback_url }}
       CALLBACK_SECRET: ${{ inputs.callback_secret }}
       OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY || secrets.CODEX_SECURITY_API_KEY }}
+      # A literal, so it is safe at job level. Anything reading the `runner`
+      # context must be resolved in a step instead — see below.
+      GITLEAKS_VERSION: "8.28.0"
 
     steps:
       # Resolved here, not in `jobs.<id>.env`: the `runner` context does not
@@ -99,6 +116,11 @@ jobs:
             line: str(raw.line, 20),
             cwe: str(raw.cwe, 40),
             description: str(raw.description, 4000),
+            // Provenance and the offending source: a title and a line number
+            // alone make for weak patches.
+            scanner: str(raw.scanner, 60),
+            ruleId: str(raw.ruleId, 200),
+            snippet: str(raw.snippet, 2000),
           };
           if (!finding.id || !finding.title || !finding.severity) {
             console.error("::error::finding requires at least id, title and severity");
@@ -107,6 +129,9 @@ jobs:
           // A title spanning lines would corrupt a commit subject and a PR title.
           const oneLine = (value) => value.replace(/\s+/g, " ").trim();
           const location = finding.file ? `${finding.file}:${finding.line}` : "(not reported)";
+          const reportedBy = finding.scanner
+            ? `${finding.scanner}${finding.ruleId ? ` (rule ${finding.ruleId})` : ""}`
+            : "(not reported)";
 
           fs.writeFileSync(`${tmp}/finding.json`, JSON.stringify(finding));
           fs.writeFileSync(
@@ -117,9 +142,11 @@ jobs:
               `Severity:    ${finding.severity}`,
               `Location:    ${location}`,
               `CWE:         ${finding.cwe || "(none)"}`,
+              `Reported by: ${reportedBy}`,
               "",
               "Details:",
               finding.description || "(no description provided)",
+              ...(finding.snippet ? ["", "Offending code:", finding.snippet] : []),
               "",
             ].join("\n"),
           );
@@ -135,12 +162,14 @@ jobs:
           fs.writeFileSync(
             `${tmp}/pr-header.md`,
             [
-              "Autogenerated by Codex Security via Mission Control.",
+              "Autogenerated by **Codex Security** via Aurixa Mission Control.",
               "",
               `- Finding: \`${finding.id}\``,
               `- Severity: **${finding.severity}**`,
               `- Location: \`${location}\``,
               `- CWE: ${finding.cwe || "(none)"}`,
+              `- Reported by: ${reportedBy}`,
+              "- Patch author: OpenAI Codex CLI (`codex exec`)",
               "",
             ].join("\n"),
           );
@@ -193,11 +222,12 @@ jobs:
           const payload = {
             remediation_id: process.env.REMEDIATION_ID,
             branch_name: process.env.BRANCH_NAME,
+            engine: "codex_cli",
             workflow_run_id: Number(process.env.GITHUB_RUN_ID),
             workflow_run_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
             ...extra,
           };
-          const file = path.join(process.env.HELPER_DIR, `payload-${Date.now()}.json`);
+          const file = path.join(process.env.HELPER_DIR, `payload-${process.hrtime.bigint()}.json`);
           fs.writeFileSync(file, JSON.stringify(payload));
           execFileSync("node", [path.join(process.env.HELPER_DIR, "callback.mjs"), file], {
             stdio: "inherit",
@@ -213,6 +243,10 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Set up branch
         run: |
           set -euo pipefail
@@ -220,12 +254,13 @@ jobs:
           git config user.email "codex-security@aurixasystems.com.au"
           git checkout -b "$BRANCH_NAME"
 
+      # ── The fix itself ─────────────────────────────────────────────────
       - name: Author the fix with Codex
         id: codex
         run: |
           set -euo pipefail
           if [ -z "${OPENAI_API_KEY:-}" ]; then
-            echo "::error::OPENAI_API_KEY is not configured on this repository."
+            echo "::error::OPENAI_API_KEY is not configured on this repository. Run the GitHub Actions secret sync from Mission Control settings."
             exit 1
           fi
           npm install -g @openai/codex@latest >/dev/null 2>&1
@@ -240,8 +275,17 @@ jobs:
 
           Rules:
           - Make the smallest change that actually removes the vulnerability.
+            Do not paper over it (no suppression comments, no disabling the
+            rule, no widening a test's tolerance).
+          - Match the conventions of the surrounding code.
           - Do not reformat unrelated code, bump unrelated dependencies, or
             rename things beyond what the fix requires.
+          - NEVER write a credential, token, or key into the repository. If
+            the finding IS a committed secret, remove it and read it from an
+            environment variable or secret store instead; the credential must
+            still be rotated by a human.
+          - Keep the project building: if you change a signature, update its
+            callers.
           - Do not add or modify tests unless the fix is untestable without it.
           - If the finding is a false positive, change nothing and write your
             reasoning to CODEX_FIX_NOTES.md instead.
@@ -249,11 +293,11 @@ jobs:
             changed and why it closes the finding to CODEX_FIX_SUMMARY.md.
           PROMPT
 
-          timeout 25m codex exec \
+          timeout 30m codex exec \
             --sandbox workspace-write \
             "$(cat "$RUNNER_TEMP/prompt.txt")"
 
-          # CODEX_FIX_SUMMARY.md is a report artifact, not part of the patch.
+          # These two are report artifacts, not part of the patch.
           if [ -f CODEX_FIX_SUMMARY.md ]; then
             cp CODEX_FIX_SUMMARY.md "$RUNNER_TEMP/summary.md"
             rm -f CODEX_FIX_SUMMARY.md
@@ -289,28 +333,230 @@ jobs:
           node "$HELPER_DIR/notify.mjs" "$ARG"
           echo "::warning::Codex produced no change; no PR was opened."
 
-      - name: Commit and push
+      # ── Blast radius ───────────────────────────────────────────────────
+      - name: Measure the patch
+        id: radius
         if: steps.codex.outputs.changed == 'true'
         run: |
           set -euo pipefail
           git add -A
+          # Captured BEFORE verification runs: `npm ci`/`npm run build` can
+          # drop artifacts into the tree, and only what Codex changed may be
+          # committed.
+          git diff --cached --name-only > "$RUNNER_TEMP/changed-files.txt"
+          FILES=$(wc -l < "$RUNNER_TEMP/changed-files.txt" | tr -d ' ')
+          ADDED=$(git diff --cached --numstat | awk '{a+=$1} END {print a+0}')
+          REMOVED=$(git diff --cached --numstat | awk '{r+=$2} END {print r+0}')
+          echo "files=$FILES"     >> "$GITHUB_OUTPUT"
+          echo "added=$ADDED"     >> "$GITHUB_OUTPUT"
+          echo "removed=$REMOVED" >> "$GITHUB_OUTPUT"
+          git diff --cached --stat > "$RUNNER_TEMP/diffstat.txt"
+          echo "Patch touches $FILES file(s): +$ADDED / -$REMOVED"
+
+      # ── Hard stop: never push a patch that introduces a secret ─────────
+      - name: Secret-leak guard
+        id: secrets
+        if: steps.codex.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          curl -sSfL --retry 3 \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o "$RUNNER_TEMP/gitleaks.tgz"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+          chmod +x "$RUNNER_TEMP/gitleaks"
+
+          "$RUNNER_TEMP/gitleaks" detect \
+            --no-git --source . \
+            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" \
+            --redact --exit-code 0 --no-banner
+          COUNT=$(node -e '
+            const fs=require("fs");
+            let n=0;
+            try {
+              const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/gitleaks.json","utf8")||"[]");
+              n=Array.isArray(r)?r.length:0;
+            } catch {}
+            process.stdout.write(String(n));
+          ')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" != "0" ]; then
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+            echo "::error::gitleaks found $COUNT secret(s) in the patched tree — refusing to push."
+          else
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Abort on leaked secret
+        if: steps.codex.outputs.changed == 'true' && steps.secrets.outputs.clean != 'true'
+        env:
+          LEAK_COUNT: ${{ steps.secrets.outputs.count }}
+        run: |
+          set -euo pipefail
+          ARG=$(node -e '
+            process.stdout.write(JSON.stringify({
+              event: "workflow.failed",
+              error: "Refused to push: the patched tree still contains " +
+                     process.env.LEAK_COUNT + " secret(s) per gitleaks. " +
+                     "A remediation must never commit a credential.",
+              verification: { secrets_clean: false, ok: false, checks: [] },
+            }));
+          ')
+          node "$HELPER_DIR/notify.mjs" "$ARG"
+          exit 1
+
+      # ── Does the patched tree still work? ──────────────────────────────
+      # Failures are reported, not fatal: a reviewer must be able to see a
+      # broken fix rather than have it silently discarded.
+      - name: Verify the patched tree
+        id: verify
+        if: steps.codex.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          cat > "$RUNNER_TEMP/verify.mjs" <<'VERIFY'
+          import { execSync } from "node:child_process";
+          import fs from "node:fs";
+
+          const checks = [];
+          const hasPkg = fs.existsSync("package.json");
+
+          function record(name, fn) {
+            const started = Date.now();
+            try {
+              fn();
+              checks.push({ name, ok: true, skipped: false, ms: Date.now() - started });
+              console.log(`PASS ${name}`);
+            } catch (err) {
+              const detail = String(err.stdout || err.message || err).slice(-1500);
+              checks.push({ name, ok: false, skipped: false, ms: Date.now() - started, detail });
+              console.log(`FAIL ${name}\n${detail}`);
+            }
+          }
+
+          const run = (cmd, ms) => () =>
+            execSync(cmd, { stdio: ["ignore", "pipe", "pipe"], timeout: ms, encoding: "utf8" });
+
+          if (!hasPkg) {
+            checks.push({
+              name: "project checks",
+              ok: true,
+              skipped: true,
+              detail: "No package.json — nothing to verify automatically.",
+            });
+          } else {
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const scripts = pkg.scripts || {};
+
+            record(
+              "install",
+              run("npm ci --no-audit --no-fund || npm install --no-audit --no-fund", 10 * 60_000),
+            );
+
+            // Run whichever of these the repo actually defines, in the order
+            // that fails fastest and most informatively.
+            const candidates = [
+              [
+                "typecheck",
+                scripts.typecheck ? "typecheck" : scripts["type-check"] ? "type-check" : null,
+              ],
+              ["lint", scripts.lint ? "lint" : null],
+              ["test", scripts.test ? "test" : null],
+              ["build", scripts.build ? "build" : null],
+            ];
+            for (const [label, script] of candidates) {
+              if (!script) {
+                checks.push({
+                  name: label,
+                  ok: true,
+                  skipped: true,
+                  detail: "not defined in package.json",
+                });
+                continue;
+              }
+              record(label, run(`npm run ${script} --silent`, 10 * 60_000));
+            }
+          }
+
+          const ran = checks.filter((c) => !c.skipped);
+          const ok = ran.length > 0 && ran.every((c) => c.ok);
+          fs.writeFileSync(
+            process.env.RUNNER_TEMP + "/verification.json",
+            JSON.stringify({ checks, ok: ran.length === 0 ? null : ok, secrets_clean: true }),
+          );
+          console.log(`verification: ${ran.length === 0 ? "UNKNOWN" : ok ? "PASS" : "FAIL"}`);
+          VERIFY
+          node "$RUNNER_TEMP/verify.mjs"
+          node -e '
+            const fs = require("fs");
+            let ok = null;
+            try {
+              ok = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/verification.json","utf8")).ok;
+            } catch {}
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `ok=${ok}\n`);
+          '
+
+      # ── Ship it as a draft ─────────────────────────────────────────────
+      - name: Commit and push
+        if: steps.codex.outputs.changed == 'true' && steps.secrets.outputs.clean == 'true'
+        run: |
+          set -euo pipefail
+          # Verification may have dropped build output into the tree. Stage
+          # exactly the paths Codex touched, nothing else. `git add -A --
+          # <paths>` covers modifications, additions and deletions.
+          git reset
+          xargs -a "$RUNNER_TEMP/changed-files.txt" -d '\n' git add -A --
           git commit -F "$RUNNER_TEMP/commit-message.txt"
           git push origin "$BRANCH_NAME"
           node "$HELPER_DIR/notify.mjs" '{"event":"branch.pushed"}'
 
       - name: Open draft PR
         id: openpr
-        if: steps.codex.outputs.changed == 'true'
+        if: steps.codex.outputs.changed == 'true' && steps.secrets.outputs.clean == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FILES:   ${{ steps.radius.outputs.files }}
+          ADDED:   ${{ steps.radius.outputs.added }}
+          REMOVED: ${{ steps.radius.outputs.removed }}
         run: |
           set -euo pipefail
+          # Every value below is a number or a fixed string, or is `cat`-ed in
+          # as data — no finding-derived text is interpolated here.
           {
             cat "$RUNNER_TEMP/pr-header.md"
+            echo "- Blast radius: ${FILES} file(s), +${ADDED} / -${REMOVED}"
+            echo "- Secret scan: clean"
+            echo
             echo "## What changed"
             cat "$RUNNER_TEMP/summary.md"
             echo
-            echo "> Opened as a **draft**. Human review is required before merge."
+            echo "## Files touched"
+            echo '```'
+            cat "$RUNNER_TEMP/diffstat.txt"
+            echo '```'
+            echo
+            echo "## Verification"
+            node -e '
+              const fs = require("fs");
+              let v = { checks: [] };
+              try {
+                v = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/verification.json", "utf8"));
+              } catch {}
+              if (!(v.checks || []).length) {
+                console.log("_No checks were run._");
+              }
+              for (const c of v.checks || []) {
+                const mark = c.skipped ? "-" : c.ok ? "PASS" : "FAIL";
+                console.log(`- **${c.name}**: ${c.skipped ? "skipped" : mark}`);
+                if (!c.ok && c.detail) {
+                  console.log("  <details><summary>output</summary>\n");
+                  console.log("  ```\n  " + String(c.detail).split("\n").join("\n  ") + "\n  ```");
+                  console.log("  </details>");
+                }
+              }
+            '
+            echo
+            echo "> Opened as a **draft**. Merging requires two independent admin approvals"
+            echo "> in Mission Control — this PR is never auto-merged."
           } > "$RUNNER_TEMP/pr-body.md"
 
           # "$(cat ...)" passes the title as one argv element; the shell never
@@ -326,22 +572,38 @@ jobs:
 
       - name: Notify PR opened
         if: steps.openpr.outcome == 'success' && steps.codex.outputs.changed == 'true'
+        env:
+          PR_URL:    ${{ steps.openpr.outputs.pr_url }}
+          PR_NUMBER: ${{ steps.openpr.outputs.pr_number }}
+          FILES:     ${{ steps.radius.outputs.files }}
+          ADDED:     ${{ steps.radius.outputs.added }}
+          REMOVED:   ${{ steps.radius.outputs.removed }}
         run: |
           set -euo pipefail
           ARG=$(node -e '
+            const fs = require("fs");
+            let verification = { checks: [], ok: null, secrets_clean: true };
+            try {
+              verification = JSON.parse(
+                fs.readFileSync(process.env.RUNNER_TEMP + "/verification.json", "utf8"),
+              );
+            } catch {}
             process.stdout.write(JSON.stringify({
               event: "pr.opened",
               pr_number: Number(process.env.PR_NUMBER),
               pr_url: process.env.PR_URL,
               pr_state: "draft_open",
+              verification,
+              files_changed: Number(process.env.FILES),
+              lines_added: Number(process.env.ADDED),
+              lines_removed: Number(process.env.REMOVED),
             }));
           ')
           node "$HELPER_DIR/notify.mjs" "$ARG"
-        env:
-          PR_URL:    ${{ steps.openpr.outputs.pr_url }}
-          PR_NUMBER: ${{ steps.openpr.outputs.pr_number }}
 
+      # Skipped when the secret-leak guard already reported a specific
+      # failure, so its precise reason is not overwritten by this generic one.
       - name: Notify failure
-        if: failure()
+        if: failure() && steps.secrets.outputs.clean != 'false'
         run: |
           node "$HELPER_DIR/notify.mjs" '{"event":"workflow.failed","error":"Codex remediation workflow failed. See the run log."}'

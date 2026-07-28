@@ -96,6 +96,92 @@ minutes, backing off 5/10/15 minutes across at most 3 attempts, then fails
 it. A `running` job with no terminal callback after 75 minutes (the workflow
 itself times out at 45) is failed as `scan_timeout`.
 
+## Remediation — what "Draft Fix PR" actually does
+
+Yes, it writes real code. The button does **not** apply a patch from an API;
+it starts an agent inside the target repository.
+
+```
+ Mission Control                          Target repo (Prime or clone)
+ ───────────────                          ────────────────────────────
+ draftRemediationPR(findingId)
+   ├── admin gate + in-flight dedup
+   ├── insert codex_remediations (queued)
+   └── workflow_dispatch ───────────────► codex-remediation.yml
+        (GitHub App, awaited)               │
+                                            ├─ checkout base_ref, new branch
+                                            ├─ codex exec --sandbox workspace-write
+                                            │    ← edits real files in the tree
+                                            ├─ measure blast radius
+                                            ├─ gitleaks on patched tree ── HARD STOP
+                                            ├─ repo's own checks (report only)
+                                            ├─ commit + push
+                                            └─ gh pr create --draft
+                                                    │
+ /api/public/hooks/codex-remediation ◄─────────────┘
+   ├── persist PR + verification + blast radius
+   └── mirror finding state
+                │
+     two independent admin approvals
+                │
+        mergeRemediationPR ──────────────► mark ready, squash-merge
+                │
+        cascade to fleet (Prime only)
+                │
+        next full scan ── finding gone? ── fix_confirmed_at
+```
+
+### The engine
+
+**OpenAI Codex CLI (`@openai/codex`)**, run headless as `codex exec` on the
+target repo's own GitHub Actions runner, sandboxed with
+`--sandbox workspace-write`. It gets a checkout of `base_ref` and edits files
+directly — which is why the patch follows the conventions of the surrounding
+code rather than being a context-free diff.
+
+It is given the finding's title, severity, file, line, CWE, description, the
+reporting scanner and rule id, and the offending source excerpt captured at
+scan time. Authentication is `OPENAI_API_KEY`, pushed into each managed repo
+by the settings-page secret sync. **Without that key remediation cannot run
+at all** — scans still work, since gitleaks/semgrep/osv-scanner need no key.
+
+Recorded on every remediation row as `engine` (`codex_cli`), so a future
+engine swap stays auditable.
+
+### What stands between the model and your default branch
+
+| Guard | Behaviour |
+|---|---|
+| Secret-leak scan | gitleaks runs on the patched tree. A patch containing a secret is **never pushed** — the only hard stop in the workflow. |
+| Repo's own checks | `typecheck`, `lint`, `test`, `build` — whichever `package.json` defines — run against the patched tree. Failures are reported, not fatal: a reviewer must be able to see a broken fix rather than have it silently discarded. |
+| Blast radius | Files touched and lines added/removed are measured and shown, so a "smallest possible change" that sprawled across 40 files is visible before approval. |
+| Draft PR | Always opened as a draft. Nothing auto-merges. |
+| Two-key merge | Two distinct admin approvals required; the requester cannot approve their own. Enforced server-side from the database, never from client state. |
+| Draft→ready | GitHub refuses to merge a draft and has no REST endpoint to clear the flag, so the merge path clears it via the GraphQL `markPullRequestReadyForReview` mutation first. |
+| Fix confirmation | Merging proves a patch landed, not that the vulnerability is gone. When a later full-tree scan no longer reports the finding, the remediation is stamped `fix_confirmed_at`. |
+
+Only the commit step is scoped to the exact paths Codex touched — captured
+before the verification step runs, so `npm ci` / build output can never end
+up in the PR.
+
+### Failure modes, and what each one leaves behind
+
+| Outcome | Result |
+|---|---|
+| No `OPENAI_API_KEY` in the repo | Workflow fails immediately with a message pointing at the settings-page secret sync. |
+| Codex changes nothing (e.g. judges it a false positive) | Reported as `workflow.failed` carrying Codex's own reasoning from `CODEX_FIX_NOTES.md`; no PR is opened. |
+| Patch introduces a secret | Push refused, remediation failed with the leak count. |
+| Repo checks fail | Draft PR still opened, marked ⚠️ on the PR and in Mission Control. |
+| Workflow dies at any point | Remediation set to `failed`, and the finding is returned to `open` — it must not sit in `fix_drafted` with no PR behind it. |
+
+### Reviewing one
+
+The scan-detail sheet shows, per finding: the engine that wrote the patch,
+blast radius, secret-scan verdict, each verification check with output for
+failures, the PR and run links, the approval count, and whether a later scan
+has confirmed the fix. An expandable explainer above the findings list spells
+out the whole pipeline in-product.
+
 ## Secrets
 
 | Name | Required | Notes |
