@@ -49,6 +49,7 @@ type Plan = {
   retired?: string[];
   notes?: string[];
   errors?: string[];
+  storefrontRefreshed?: boolean;
 };
 
 export function PackSyncCard() {
@@ -222,6 +223,19 @@ export function PackSyncCard() {
             {n}
           </p>
         ))}
+
+        {/* The catalog being right and the pricing page showing it are two
+            different things, and the gap between them is invisible from here
+            unless it is stated. Prominent when it fails, because that is when
+            an operator needs to know not to go looking for a bug that isn't
+            there. */}
+        {plan?.storefrontRefreshed === false && (
+          <p className="flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            The packs are live here, but the pricing page still shows the old ones until the
+            15-minute reconcile runs.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

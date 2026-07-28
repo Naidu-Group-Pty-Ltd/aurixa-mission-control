@@ -17,6 +17,13 @@ import {
 import { upsertInvoiceRecord } from "@/server/invoices.server";
 import { recordTenantTaxIdFromSession } from "@/server/billing-contact.server";
 import { balanceSnapshot, fireTokenWebhook } from "@/server/token-webhooks.server";
+import {
+  advanceBillingPeriod,
+  billingHintFromMetadata,
+  grantPlanAllowance,
+  planChangeRef,
+  tenantForSubscription,
+} from "@/server/plan-allowance.server";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -302,6 +309,35 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
         .from("clone_seat_entitlements")
         .insert({ clone_id: cloneId, seats_used: 0, ...patch });
     }
+
+    // The tier's included credits. Until this, buying a plan wrote the
+    // entitlement above and granted nothing spendable — a workspace could pay
+    // for Scale and have a balance of zero. Keyed on the checkout session, so
+    // a redelivered webhook credits once.
+    //
+    // Best-effort by design: the subscription itself is already recorded, and
+    // failing the webhook here would have Stripe retry a delivery whose only
+    // remaining work is a grant the hourly issuer will make anyway once the
+    // plan is set.
+    const allowance = await grantPlanAllowance({
+      tenantId,
+      cloneId,
+      billingUserId: billingHintFromMetadata(md),
+      seatPlanId: itemId,
+      sourceRef: planChangeRef("session", session.id, itemId),
+    });
+    if (!allowance.ok) {
+      console.error("[webhook] plan allowance not granted", {
+        session: session.id,
+        error: allowance.error,
+      });
+    } else if (allowance.creditsGranted) {
+      console.log("[webhook] plan allowance granted", {
+        session: session.id,
+        plan: allowance.toPlan,
+        credits: allowance.creditsGranted,
+      });
+    }
     return;
   }
 
@@ -348,6 +384,56 @@ async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
       .from("clone_seat_entitlements")
       .update({ ...patch, stripe_subscription_id: sub.id })
       .eq("clone_id", cloneId);
+  }
+
+  // Two things follow from a subscription changing, and only an active one
+  // earns either: a cancelled or past-due plan must not keep granting credits.
+  if (status !== "active" || !seatPlanId) return;
+
+  // 1. A switch of plan — upgrade or downgrade, whether through checkout or
+  //    Stripe's own portal. Keyed on the subscription AND the plan, so moving
+  //    Growth → Scale is a new change while a routine subscription update on
+  //    the same plan is not.
+  const allowance = await grantPlanAllowance({
+    tenantId: md.tenant_id || null,
+    cloneId,
+    billingUserId: billingHintFromMetadata(md),
+    seatPlanId,
+    sourceRef: planChangeRef("subscription", sub.id, seatPlanId),
+  });
+  if (!allowance.ok) {
+    console.error("[webhook] subscription plan allowance not granted", {
+      subscription: sub.id,
+      error: allowance.error,
+    });
+    return;
+  }
+
+  // 2. A renewal. The allowance is issued once per billing period, so it only
+  //    renews if the period moves — and Stripe is the only thing that knows it
+  //    has. Without this a workspace would receive its included credits once,
+  //    at purchase, and never again.
+  const periodStartTs =
+    subAny.current_period_start ?? subAny.items?.data?.[0]?.current_period_start ?? null;
+  if (!periodStartTs) return;
+
+  const tenant = await tenantForSubscription({
+    tenantId: md.tenant_id || null,
+    cloneId,
+    billingUserId: billingHintFromMetadata(md),
+  });
+  if (!tenant.ok) return;
+
+  const advanced = await advanceBillingPeriod({
+    tenantId: tenant.tenantId,
+    periodStart: new Date(periodStartTs * 1000),
+    periodEnd: periodEnd ? new Date(periodEnd) : null,
+  });
+  if (!advanced.ok) {
+    console.error("[webhook] billing period not advanced", {
+      subscription: sub.id,
+      error: advanced.error,
+    });
   }
 }
 

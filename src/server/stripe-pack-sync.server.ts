@@ -17,6 +17,7 @@
 import Stripe from "stripe";
 import { getStripe } from "@/server/stripe.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { describeRefresh, refreshStorefrontMirror } from "@/server/storefront-refresh.server";
 import {
   TOPUP_PACKS,
   gstComponentCents,
@@ -218,6 +219,8 @@ export type PackApplyResult = {
   retired: string[];
   notes: string[];
   errors: string[];
+  /** Whether the storefront's read mirror picked the change up straight away. */
+  storefrontRefreshed?: boolean;
 };
 
 /**
@@ -280,6 +283,10 @@ export async function applyPackSync(
   if (result.errors.length) {
     result.applied = false;
     result.notes.push("Superseded packs left on sale — nothing was retired.");
+    // Still refresh: some packs may have gone live before the failure, and
+    // leaving the mirror behind would hide half a cutover as well as a whole
+    // one.
+    await refreshInto(result);
     return result;
   }
 
@@ -311,6 +318,22 @@ export async function applyPackSync(
     }
   }
 
+  await refreshInto(result);
   result.applied = result.errors.length === 0;
   return result;
+}
+
+/**
+ * Closes the loop rather than trusting the database trigger to do it.
+ *
+ * The storefront reads a mirror, and until that mirror refreshes the pricing
+ * page keeps advertising the packs this cutover just retired — which is
+ * exactly what happened on the first run: prices went live at 21:38 and the
+ * page caught up at 21:45, when the 15-minute cron ran. Reported, never fatal
+ * — the catalog is already correct either way.
+ */
+async function refreshInto(result: PackApplyResult): Promise<void> {
+  const refresh = await refreshStorefrontMirror();
+  result.storefrontRefreshed = refresh.ok;
+  result.notes.push(describeRefresh(refresh, "ladder"));
 }

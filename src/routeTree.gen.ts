@@ -92,6 +92,7 @@ import { Route as ClonesCloneIdSecretsRouteImport } from './routes/clones.$clone
 import { Route as ClientsHandoffTokenRouteImport } from './routes/clients.handoff.$token'
 import { Route as ApiPublicPurchasesRouteImport } from './routes/api.public.purchases'
 import { Route as ApiPublicTokensReserveRouteImport } from './routes/api.public.tokens.reserve'
+import { Route as ApiPublicTokensPlanChangeRouteImport } from './routes/api.public.tokens.plan-change'
 import { Route as ApiPublicTokensPacksRouteImport } from './routes/api.public.tokens.packs'
 import { Route as ApiPublicTokensCommitRouteImport } from './routes/api.public.tokens.commit'
 import { Route as ApiPublicTokensCancelRouteImport } from './routes/api.public.tokens.cancel'
@@ -100,6 +101,7 @@ import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api.public.
 import { Route as ApiPublicStorefrontWalletRouteImport } from './routes/api.public.storefront.wallet'
 import { Route as ApiPublicStorefrontSetupRouteImport } from './routes/api.public.storefront.setup'
 import { Route as ApiPublicStorefrontSessionRouteImport } from './routes/api.public.storefront.session'
+import { Route as ApiPublicStorefrontPlanChangeRouteImport } from './routes/api.public.storefront.plan-change'
 import { Route as ApiPublicStorefrontIdentityRouteImport } from './routes/api.public.storefront.identity'
 import { Route as ApiPublicStorefrontHandoffRouteImport } from './routes/api.public.storefront.handoff'
 import { Route as ApiPublicStorefrontCheckoutRouteImport } from './routes/api.public.storefront.checkout'
@@ -549,6 +551,12 @@ const ApiPublicTokensReserveRoute = ApiPublicTokensReserveRouteImport.update({
   path: '/api/public/tokens/reserve',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTokensPlanChangeRoute =
+  ApiPublicTokensPlanChangeRouteImport.update({
+    id: '/api/public/tokens/plan-change',
+    path: '/api/public/tokens/plan-change',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicTokensPacksRoute = ApiPublicTokensPacksRouteImport.update({
   id: '/api/public/tokens/packs',
   path: '/api/public/tokens/packs',
@@ -590,6 +598,12 @@ const ApiPublicStorefrontSessionRoute =
   ApiPublicStorefrontSessionRouteImport.update({
     id: '/api/public/storefront/session',
     path: '/api/public/storefront/session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontPlanChangeRoute =
+  ApiPublicStorefrontPlanChangeRouteImport.update({
+    id: '/api/public/storefront/plan-change',
+    path: '/api/public/storefront/plan-change',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicStorefrontIdentityRoute =
@@ -857,6 +871,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
+  '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
   '/api/public/storefront/session': typeof ApiPublicStorefrontSessionRoute
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
@@ -865,6 +880,7 @@ export interface FileRoutesByFullPath {
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
+  '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
@@ -977,6 +993,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
+  '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
   '/api/public/storefront/session': typeof ApiPublicStorefrontSessionRoute
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
@@ -985,6 +1002,7 @@ export interface FileRoutesByTo {
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
+  '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
@@ -1099,6 +1117,7 @@ export interface FileRoutesById {
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
+  '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
   '/api/public/storefront/session': typeof ApiPublicStorefrontSessionRoute
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
@@ -1107,6 +1126,7 @@ export interface FileRoutesById {
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
+  '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
@@ -1222,6 +1242,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
+    | '/api/public/storefront/plan-change'
     | '/api/public/storefront/session'
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
@@ -1230,6 +1251,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
     | '/api/public/tokens/packs'
+    | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
@@ -1342,6 +1364,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
+    | '/api/public/storefront/plan-change'
     | '/api/public/storefront/session'
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
@@ -1350,6 +1373,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
     | '/api/public/tokens/packs'
+    | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
@@ -1463,6 +1487,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
+    | '/api/public/storefront/plan-change'
     | '/api/public/storefront/session'
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
@@ -1471,6 +1496,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
     | '/api/public/tokens/packs'
+    | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
@@ -1564,6 +1590,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontCheckoutRoute: typeof ApiPublicStorefrontCheckoutRoute
   ApiPublicStorefrontHandoffRoute: typeof ApiPublicStorefrontHandoffRoute
   ApiPublicStorefrontIdentityRoute: typeof ApiPublicStorefrontIdentityRoute
+  ApiPublicStorefrontPlanChangeRoute: typeof ApiPublicStorefrontPlanChangeRoute
   ApiPublicStorefrontSessionRoute: typeof ApiPublicStorefrontSessionRoute
   ApiPublicStorefrontSetupRoute: typeof ApiPublicStorefrontSetupRoute
   ApiPublicStorefrontWalletRoute: typeof ApiPublicStorefrontWalletRoute
@@ -1572,6 +1599,7 @@ export interface RootRouteChildren {
   ApiPublicTokensCancelRoute: typeof ApiPublicTokensCancelRoute
   ApiPublicTokensCommitRoute: typeof ApiPublicTokensCommitRoute
   ApiPublicTokensPacksRoute: typeof ApiPublicTokensPacksRoute
+  ApiPublicTokensPlanChangeRoute: typeof ApiPublicTokensPlanChangeRoute
   ApiPublicTokensReserveRoute: typeof ApiPublicTokensReserveRoute
   ApiPublicSeatsDevicesHeartbeatRoute: typeof ApiPublicSeatsDevicesHeartbeatRoute
   ApiPublicSeatsDevicesListRoute: typeof ApiPublicSeatsDevicesListRoute
@@ -2162,6 +2190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTokensReserveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/tokens/plan-change': {
+      id: '/api/public/tokens/plan-change'
+      path: '/api/public/tokens/plan-change'
+      fullPath: '/api/public/tokens/plan-change'
+      preLoaderRoute: typeof ApiPublicTokensPlanChangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/tokens/packs': {
       id: '/api/public/tokens/packs'
       path: '/api/public/tokens/packs'
@@ -2216,6 +2251,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/storefront/session'
       fullPath: '/api/public/storefront/session'
       preLoaderRoute: typeof ApiPublicStorefrontSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/plan-change': {
+      id: '/api/public/storefront/plan-change'
+      path: '/api/public/storefront/plan-change'
+      fullPath: '/api/public/storefront/plan-change'
+      preLoaderRoute: typeof ApiPublicStorefrontPlanChangeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/identity': {
@@ -2607,6 +2649,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontCheckoutRoute: ApiPublicStorefrontCheckoutRoute,
   ApiPublicStorefrontHandoffRoute: ApiPublicStorefrontHandoffRoute,
   ApiPublicStorefrontIdentityRoute: ApiPublicStorefrontIdentityRoute,
+  ApiPublicStorefrontPlanChangeRoute: ApiPublicStorefrontPlanChangeRoute,
   ApiPublicStorefrontSessionRoute: ApiPublicStorefrontSessionRoute,
   ApiPublicStorefrontSetupRoute: ApiPublicStorefrontSetupRoute,
   ApiPublicStorefrontWalletRoute: ApiPublicStorefrontWalletRoute,
@@ -2615,6 +2658,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTokensCancelRoute: ApiPublicTokensCancelRoute,
   ApiPublicTokensCommitRoute: ApiPublicTokensCommitRoute,
   ApiPublicTokensPacksRoute: ApiPublicTokensPacksRoute,
+  ApiPublicTokensPlanChangeRoute: ApiPublicTokensPlanChangeRoute,
   ApiPublicTokensReserveRoute: ApiPublicTokensReserveRoute,
   ApiPublicSeatsDevicesHeartbeatRoute: ApiPublicSeatsDevicesHeartbeatRoute,
   ApiPublicSeatsDevicesListRoute: ApiPublicSeatsDevicesListRoute,
@@ -2624,3 +2668,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
