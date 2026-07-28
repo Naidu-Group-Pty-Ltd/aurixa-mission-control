@@ -16,6 +16,7 @@ import {
 } from "@/server/payment-methods.server";
 import { upsertInvoiceRecord } from "@/server/invoices.server";
 import { recordTenantTaxIdFromSession } from "@/server/billing-contact.server";
+import { balanceSnapshot, fireTokenWebhook } from "@/server/token-webhooks.server";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -29,6 +30,15 @@ function json(body: unknown, status = 200) {
 // reason is recorded on the event row. Anything else is transient → 5xx so
 // Stripe retries, and we leave the event unprocessed for the next attempt.
 class PermanentError extends Error {}
+
+/**
+ * Has this session's money actually landed? `paid` is the normal card outcome;
+ * `no_payment_required` covers a fully discounted order. Anything else (most
+ * often `unpaid` for a delayed payment method) is not yet spendable.
+ */
+function isPaidSession(session: Stripe.Checkout.Session): boolean {
+  return session.payment_status === "paid" || session.payment_status === "no_payment_required";
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
@@ -158,6 +168,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     throw err;
   }
 
+  // A delayed payment method's `completed` event arrives before the money
+  // does. Nothing has been fulfilled yet, so leave the purchase in its
+  // 'initiated' state and let checkout.session.async_payment_succeeded (or
+  // _failed) settle it — marking it completed here would show a paid purchase
+  // for funds that may never clear, and would fire the "purchase completed"
+  // notification twice.
+  if (!isPaidSession(session)) return;
+
   // Idempotent upsert keyed on the session id — safe on webhook replays and
   // covers sessions whose initiated-insert never landed.
   await finalizePurchaseFromSession(session, "completed");
@@ -187,6 +205,17 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
 
   if (mode === "topup") {
     if (!tenantId) throw new PermanentError("missing_tenant");
+    // Only credit money we actually have. `checkout.session.completed` fires
+    // for delayed payment methods with payment_status 'unpaid'; those become
+    // spendable credits on checkout.session.async_payment_succeeded instead,
+    // which routes back through here once the funds clear.
+    if (!isPaidSession(session)) {
+      console.log("[webhook] topup deferred until payment clears", {
+        session: session.id,
+        payment_status: session.payment_status,
+      });
+      return;
+    }
     const attr = attributionFromMetadata(md as Record<string, string>);
     // adminAny: generated DB types don't yet include apply_topup's _metadata param.
     const { data, error } = await adminAny.rpc("apply_topup", {
@@ -205,6 +234,17 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
       // Logical failure from the RPC (e.g. pack_not_found) — retrying won't help.
       throw new PermanentError((data as { error?: string }).error ?? "apply_topup_failed");
     }
+
+    // The credits exist now; tell the clone so its dashboard reflects them
+    // immediately. Without this the balance only moves on the clone's next
+    // poll, so a buyer returning straight from Stripe sees the old number and
+    // reasonably concludes the top-up didn't work. Fire-and-forget: the ledger
+    // is already correct, and the clone re-reads on its own schedule anyway.
+    balanceSnapshot(tenantId)
+      .then((snap) =>
+        fireTokenWebhook("tokens.balance.updated", { ...snap, source: "topup" }, cloneId),
+      )
+      .catch((err) => console.error("topup balance webhook failed", err));
     return;
   }
 
@@ -442,8 +482,21 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
 
         try {
           switch (event.type) {
+            // A delayed payment method clearing after the fact. Same
+            // fulfilment path — apply_topup is idempotent on the session id,
+            // so a session that somehow ran both events credits once.
+            case "checkout.session.async_payment_succeeded":
             case "checkout.session.completed":
               await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+              break;
+            // The funds never cleared. Nothing was credited (fulfilment waits
+            // for `paid`), so this only settles the purchases ledger.
+            case "checkout.session.async_payment_failed":
+              await finalizePurchaseFromSession(
+                event.data.object as Stripe.Checkout.Session,
+                "failed",
+                "async_payment_failed",
+              );
               break;
             case "customer.subscription.created":
             case "customer.subscription.updated":

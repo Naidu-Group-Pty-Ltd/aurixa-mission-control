@@ -7,7 +7,7 @@
 // is the headless billing engine — the customer never needs its UI.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
-import { ensureTenant } from "@/server/clone-api-keys.server";
+import { resolveCloneBillingTenant } from "@/server/billing-tenant.server";
 import {
   attributionMetadata,
   consumeHandoff,
@@ -153,9 +153,18 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
       .eq("id", cloneId)
       .maybeSingle();
     if (!clone) return { ok: false as const, error: "clone_not_found" };
-    const ensured = await ensureTenant(clone.id, `clone:${clone.slug ?? clone.id}`, clone.name);
-    if (!ensured.ok) return { ok: false as const, error: ensured.error };
-    tenantId = ensured.tenantId;
+    // Credit the tenant the clone actually SPENDS from. Provisioning
+    // `clone:<slug>` here created a second tenant alongside the one the
+    // clone meters under (`prime:<project-ref>`), so a top-up landed on a
+    // balance the dashboard never reads — money taken, balance unchanged.
+    const resolved = await resolveCloneBillingTenant(clone.id, {
+      billingUserId:
+        args.attribution.originSource === "storefront_uid" ? args.attribution.originUserId : null,
+      fallbackExternalRef: `clone:${clone.slug ?? clone.id}`,
+      fallbackDisplayName: clone.name,
+    });
+    if (!resolved.ok) return { ok: false as const, error: resolved.error };
+    tenantId = resolved.tenantId;
   }
 
   const contact = args.contact ?? EMPTY_CONTACT;
@@ -411,9 +420,15 @@ export async function startUidCheckout(input: UidCheckoutInput) {
   if (clone) {
     cloneId = clone.id;
     displayName = clone.name ?? clone.slug ?? null;
-    const ensured = await ensureTenant(clone.id, `clone:${clone.slug ?? clone.id}`, clone.name);
-    if (!ensured.ok) return { ok: false as const, error: ensured.error };
-    tenantId = ensured.tenantId;
+    // Same rule as startCheckoutCore: reuse the clone's existing (metering)
+    // tenant rather than provisioning a parallel `clone:<slug>` one.
+    const resolved = await resolveCloneBillingTenant(clone.id, {
+      billingUserId: uid,
+      fallbackExternalRef: `clone:${clone.slug ?? clone.id}`,
+      fallbackDisplayName: clone.name,
+    });
+    if (!resolved.ok) return { ok: false as const, error: resolved.error };
+    tenantId = resolved.tenantId;
   } else {
     const { data: tenant } = await supabaseAdmin
       .from("tenants")
@@ -581,9 +596,15 @@ export async function startUidCardSetup(input: {
   if (clone) {
     cloneId = clone.id;
     displayName = clone.name ?? clone.slug ?? null;
-    const ensured = await ensureTenant(clone.id, `clone:${clone.slug ?? clone.id}`, clone.name);
-    if (!ensured.ok) return { ok: false as const, error: ensured.error };
-    tenantId = ensured.tenantId;
+    // Same rule as startCheckoutCore: reuse the clone's existing (metering)
+    // tenant rather than provisioning a parallel `clone:<slug>` one.
+    const resolved = await resolveCloneBillingTenant(clone.id, {
+      billingUserId: uid,
+      fallbackExternalRef: `clone:${clone.slug ?? clone.id}`,
+      fallbackDisplayName: clone.name,
+    });
+    if (!resolved.ok) return { ok: false as const, error: resolved.error };
+    tenantId = resolved.tenantId;
   } else {
     const { data: tenant } = await supabaseAdmin
       .from("tenants")

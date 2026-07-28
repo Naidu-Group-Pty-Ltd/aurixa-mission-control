@@ -111,13 +111,23 @@ export async function buildSessionSummary(sessionId: string) {
 }
 
 export async function fulfillmentStatus(sessionId: string) {
-  // Was the webhook event seen + processed?
-  const { data: ev } = await adminAny
+  // Was the webhook event seen + processed? A delayed payment method fulfils
+  // on async_payment_succeeded rather than completed, so both count — checking
+  // only `completed` would leave the receipt page reporting "webhook not
+  // processed" forever for those purchases.
+  const { data: events } = await adminAny
     .from("stripe_events")
     .select("processed_at, type, error")
-    .eq("type", "checkout.session.completed")
-    .filter("payload->>id", "eq", sessionId)
-    .maybeSingle();
+    .in("type", ["checkout.session.completed", "checkout.session.async_payment_succeeded"])
+    .filter("payload->>id", "eq", sessionId);
+  const rows = (events ?? []) as Array<{
+    processed_at: string | null;
+    type: string;
+    error: string | null;
+  }>;
+  // Prefer a clean processed row; fall back to whatever we have so a recorded
+  // error still surfaces.
+  const ev = rows.find((r) => r.processed_at && !r.error) ?? rows[0] ?? null;
 
   let mode: string | null = null;
   try {
