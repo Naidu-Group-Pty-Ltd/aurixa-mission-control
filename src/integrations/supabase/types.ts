@@ -3670,6 +3670,143 @@ export type Database = {
         }
         Relationships: []
       }
+      invoices: {
+        Row: {
+          amount_due_cents: number | null
+          amount_paid_cents: number | null
+          amount_remaining_cents: number | null
+          clone_id: string | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          hosted_invoice_url: string | null
+          id: string
+          invoice_pdf_url: string | null
+          issued_at: string | null
+          item_name: string | null
+          item_slug: string | null
+          metadata: Json
+          mode: string | null
+          number: string | null
+          origin_source: string | null
+          origin_user_id: string | null
+          origin_username: string | null
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          purchase_id: string | null
+          status: string | null
+          stripe_customer_id: string | null
+          stripe_invoice_id: string
+          stripe_payment_intent_id: string | null
+          stripe_subscription_id: string | null
+          subtotal_cents: number | null
+          tax_cents: number | null
+          tenant_id: string | null
+          total_cents: number | null
+          updated_at: string
+        }
+        Insert: {
+          amount_due_cents?: number | null
+          amount_paid_cents?: number | null
+          amount_remaining_cents?: number | null
+          clone_id?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_pdf_url?: string | null
+          issued_at?: string | null
+          item_name?: string | null
+          item_slug?: string | null
+          metadata?: Json
+          mode?: string | null
+          number?: string | null
+          origin_source?: string | null
+          origin_user_id?: string | null
+          origin_username?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          purchase_id?: string | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_invoice_id: string
+          stripe_payment_intent_id?: string | null
+          stripe_subscription_id?: string | null
+          subtotal_cents?: number | null
+          tax_cents?: number | null
+          tenant_id?: string | null
+          total_cents?: number | null
+          updated_at?: string
+        }
+        Update: {
+          amount_due_cents?: number | null
+          amount_paid_cents?: number | null
+          amount_remaining_cents?: number | null
+          clone_id?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_pdf_url?: string | null
+          issued_at?: string | null
+          item_name?: string | null
+          item_slug?: string | null
+          metadata?: Json
+          mode?: string | null
+          number?: string | null
+          origin_source?: string | null
+          origin_user_id?: string | null
+          origin_username?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          purchase_id?: string | null
+          status?: string | null
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string
+          stripe_payment_intent_id?: string | null
+          stripe_subscription_id?: string | null
+          subtotal_cents?: number | null
+          tax_cents?: number | null
+          tenant_id?: string | null
+          total_cents?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "invoices_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_cascade_jobs: {
         Row: {
           cascade_event_id: string | null
@@ -4483,6 +4620,7 @@ export type Database = {
           handoff_id: string | null
           id: string
           item_id: string | null
+          item_name: string | null
           item_slug: string | null
           metadata: Json
           mode: string
@@ -4507,6 +4645,7 @@ export type Database = {
           handoff_id?: string | null
           id?: string
           item_id?: string | null
+          item_name?: string | null
           item_slug?: string | null
           metadata?: Json
           mode: string
@@ -4531,6 +4670,7 @@ export type Database = {
           handoff_id?: string | null
           id?: string
           item_id?: string | null
+          item_name?: string | null
           item_slug?: string | null
           metadata?: Json
           mode?: string
