@@ -39,6 +39,7 @@ type Plan = {
   untouched?: string[];
   warnings?: string[];
   createdPrices?: Array<{ tierSlug: string; interval: string; priceId: string }>;
+  errors?: string[];
 };
 
 export function CatalogSyncCard() {
@@ -122,7 +123,19 @@ export function CatalogSyncCard() {
         </div>
 
         {plan && !plan.ok && (
-          <p className="text-sm text-destructive">{plan.error ?? "Sync failed."}</p>
+          <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+            <p className="text-sm font-medium text-destructive">
+              {plan.error ?? "Sync failed."}
+            </p>
+            {/* Per-tier detail. A failure here is usually Stripe or Postgres
+                saying something specific, and hiding it behind a generic
+                message leaves an operator with nothing to act on. */}
+            {plan.errors?.map((e) => (
+              <p key={e} className="font-mono text-xs text-destructive/80">
+                {e}
+              </p>
+            ))}
+          </div>
         )}
 
         {!!plan?.warnings?.length && (
@@ -184,7 +197,8 @@ export function CatalogSyncCard() {
         {applied && !!plan?.createdPrices?.length && (
           <p className="text-xs text-muted-foreground">
             Created {plan.createdPrices.length} Stripe price
-            {plan.createdPrices.length === 1 ? "" : "s"} and repointed the catalog.
+            {plan.createdPrices.length === 1 ? "" : "s"} and repointed the catalog. Prices that
+            already existed at the right amount were reused rather than duplicated.
           </p>
         )}
       </CardContent>
