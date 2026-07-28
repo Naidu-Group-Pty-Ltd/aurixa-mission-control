@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { startHandoffCheckout, startUidCheckout } from "@/server/checkout.server";
+import { normalizeBillingContact } from "@/server/billing-contact.server";
 import { storefrontPricingBase } from "@/server/billing-handoffs.server";
 import { storefrontJson, storefrontPreflight } from "@/server/storefront-cors.server";
 
@@ -25,6 +26,24 @@ const Schema = z
     mode: z.enum(["topup", "seat_plan", "setup_package"]),
     item_id: z.string().uuid(),
     quantity: z.number().int().min(1).max(10).default(1),
+    // Self-declared buyer details from the pricing page. Only ever used to
+    // seed BLANK Stripe Customer fields (see billing-contact.server.ts), so a
+    // public `uid` link cannot repoint an established billing email.
+    contact: z
+      .object({
+        email: z.string().max(320).optional().nullable(),
+        first_name: z.string().max(100).optional().nullable(),
+        last_name: z.string().max(100).optional().nullable(),
+        full_name: z.string().max(200).optional().nullable(),
+        phone: z.string().max(40).optional().nullable(),
+        company: z.string().max(200).optional().nullable(),
+        // Business tax ID (ABN). Validated server-side; an invalid value is
+        // dropped so Stripe Checkout asks the buyer for one instead.
+        tax_id: z.string().max(50).optional().nullable(),
+        tax_id_type: z.string().max(32).optional().nullable(),
+      })
+      .optional()
+      .nullable(),
   })
   .refine((v) => !!v.h !== !!v.uid, {
     message: "exactly one of h or uid is required",
@@ -90,6 +109,9 @@ export const Route = createFileRoute("/api/public/storefront/checkout")({
                 quantity: data.quantity,
                 successUrl,
                 cancelUrl,
+                // A handoff carries its own contact server-side; only the
+                // uid path can be told anything by the browser.
+                contact: normalizeBillingContact(data.contact),
               });
           if (!result.ok) return storefrontJson(result, 400);
           return storefrontJson({ ok: true, url: result.url, session_id: result.sessionId });

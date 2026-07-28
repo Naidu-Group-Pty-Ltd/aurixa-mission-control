@@ -7,6 +7,7 @@
 // opaque `?h=<uuid>` — never the identity fields themselves.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DEFAULT_STOREFRONT_PRICING_URL } from "@/lib/storefront";
+import type { BillingContact } from "@/server/billing-contact.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
@@ -21,6 +22,10 @@ export type CreateHandoffInput = {
   originSource: string;
   intent?: string | null;
   returnUrl?: string | null;
+  /** Buyer contact details, forwarded to Stripe at checkout so the payment
+   *  page arrives prefilled. Travels server-to-server only — the browser
+   *  carries nothing but the opaque handoff id. */
+  contact?: BillingContact | null;
 };
 
 /** Parses the mode prefix out of an intent string ('<mode>' or '<mode>:<item_id>'). */
@@ -120,6 +125,13 @@ export type HandoffRow = {
   return_url: string | null;
   expires_at: string;
   consumed_at: string | null;
+  contact_email: string | null;
+  contact_first_name: string | null;
+  contact_last_name: string | null;
+  contact_phone: string | null;
+  contact_company: string | null;
+  contact_tax_id: string | null;
+  contact_tax_id_type: string | null;
 };
 
 /**
@@ -132,7 +144,9 @@ export async function loadHandoffById(handoffId: string): Promise<HandoffRow | n
   const { data, error } = await adminAny
     .from("billing_handoffs")
     .select(
-      "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at",
+      "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at, " +
+        "contact_email, contact_first_name, contact_last_name, contact_phone, contact_company, " +
+        "contact_tax_id, contact_tax_id_type",
     )
     .eq("id", handoffId)
     .maybeSingle();
@@ -156,6 +170,13 @@ export async function createHandoff(
       origin_source: input.originSource,
       intent: input.intent ?? null,
       return_url: input.returnUrl ?? null,
+      contact_email: input.contact?.email ?? null,
+      contact_first_name: input.contact?.firstName ?? null,
+      contact_last_name: input.contact?.lastName ?? null,
+      contact_phone: input.contact?.phone ?? null,
+      contact_company: input.contact?.company ?? null,
+      contact_tax_id: input.contact?.taxIdValue ?? null,
+      contact_tax_id_type: input.contact?.taxIdType ?? null,
       expires_at: expiresAt,
     })
     .select("id, expires_at")

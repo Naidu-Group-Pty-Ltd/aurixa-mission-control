@@ -1,0 +1,208 @@
+import { describe, expect, it } from "vitest";
+import {
+  contactFromHandoffRow,
+  contactMetadata,
+  EMPTY_CONTACT,
+  hasContactDetail,
+  isValidAbn,
+  normalizeAbn,
+  normalizeBillingContact,
+} from "./billing-contact.server";
+
+describe("normalizeBillingContact", () => {
+  it("accepts both camelCase and snake_case payloads", () => {
+    expect(normalizeBillingContact({ firstName: "Jane", lastName: "Doe" })).toMatchObject({
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+    });
+    expect(normalizeBillingContact({ first_name: "Jane", last_name: "Doe" })).toMatchObject({
+      fullName: "Jane Doe",
+    });
+  });
+
+  it("derives a full name from the parts, but never overrides an explicit one", () => {
+    expect(normalizeBillingContact({ first_name: "Jane", last_name: "Doe" }).fullName).toBe(
+      "Jane Doe",
+    );
+    expect(
+      normalizeBillingContact({ first_name: "Jane", last_name: "Doe", full_name: "Dr Jane Doe" })
+        .fullName,
+    ).toBe("Dr Jane Doe");
+    expect(normalizeBillingContact({ first_name: "Jane" }).fullName).toBe("Jane");
+  });
+
+  it("lowercases and trims emails", () => {
+    expect(normalizeBillingContact({ email: "  Jane.Doe@Example.COM " }).email).toBe(
+      "jane.doe@example.com",
+    );
+  });
+
+  it("drops malformed emails rather than letting Stripe 400 the checkout", () => {
+    for (const bad of ["not-an-email", "jane@", "@example.com", "jane@example", "jane doe@x.com"]) {
+      expect(normalizeBillingContact({ email: bad }).email).toBeNull();
+    }
+  });
+
+  it("strips control characters and collapses whitespace", () => {
+    const contact = normalizeBillingContact({
+      first_name: "Ja\u0000ne",
+      company: "NPC   Services\tPty\nLtd",
+    });
+    expect(contact.firstName).toBe("Ja ne");
+    expect(contact.company).toBe("NPC Services Pty Ltd");
+  });
+
+  it("caps field lengths so Stripe metadata limits are never breached", () => {
+    const contact = normalizeBillingContact({
+      first_name: "a".repeat(500),
+      company: "b".repeat(500),
+      phone: "1".repeat(200),
+    });
+    expect(contact.firstName).toHaveLength(100);
+    expect(contact.company).toHaveLength(200);
+    expect(contact.phone).toHaveLength(40);
+  });
+
+  it("returns an all-null contact for empty, missing or junk input", () => {
+    expect(normalizeBillingContact(undefined)).toEqual(EMPTY_CONTACT);
+    expect(normalizeBillingContact(null)).toEqual(EMPTY_CONTACT);
+    expect(normalizeBillingContact({})).toEqual(EMPTY_CONTACT);
+    expect(normalizeBillingContact({ email: 42, first_name: {} })).toEqual(EMPTY_CONTACT);
+  });
+});
+
+describe("hasContactDetail", () => {
+  it("is false for nothing usable and true as soon as one field lands", () => {
+    expect(hasContactDetail(null)).toBe(false);
+    expect(hasContactDetail(EMPTY_CONTACT)).toBe(false);
+    expect(hasContactDetail(normalizeBillingContact({ company: "NPC" }))).toBe(false);
+    expect(hasContactDetail(normalizeBillingContact({ email: "a@b.com" }))).toBe(true);
+    expect(hasContactDetail(normalizeBillingContact({ first_name: "Jane" }))).toBe(true);
+  });
+});
+
+describe("contactFromHandoffRow", () => {
+  it("reads the handoff's contact columns", () => {
+    const contact = contactFromHandoffRow({
+      contact_email: "Jane@Example.com",
+      contact_first_name: "Jane",
+      contact_last_name: "Doe",
+      contact_phone: "+61 400 000 000",
+      contact_company: "NPC Services",
+    });
+    expect(contact).toEqual({
+      email: "jane@example.com",
+      firstName: "Jane",
+      lastName: "Doe",
+      fullName: "Jane Doe",
+      phone: "+61 400 000 000",
+      company: "NPC Services",
+      taxIdType: null,
+      taxIdValue: null,
+    });
+  });
+
+  it("is empty for a handoff minted before contact details existed", () => {
+    expect(contactFromHandoffRow({ id: "abc", origin_user_id: "u1" })).toEqual(EMPTY_CONTACT);
+    expect(contactFromHandoffRow(null)).toEqual(EMPTY_CONTACT);
+  });
+});
+
+describe("contactMetadata", () => {
+  it("emits only the keys that have values", () => {
+    expect(contactMetadata(normalizeBillingContact({ email: "a@b.com" }))).toEqual({
+      buyer_email: "a@b.com",
+    });
+    expect(contactMetadata(EMPTY_CONTACT)).toEqual({});
+  });
+
+  it("carries the buyer identity a shared org Customer cannot", () => {
+    const meta = contactMetadata(
+      normalizeBillingContact({
+        email: "jane@npc.com",
+        first_name: "Jane",
+        last_name: "Doe",
+        company: "NPC Services",
+      }),
+    );
+    expect(meta).toEqual({
+      buyer_email: "jane@npc.com",
+      buyer_name: "Jane Doe",
+      buyer_first_name: "Jane",
+      buyer_last_name: "Doe",
+      buyer_company: "NPC Services",
+    });
+  });
+});
+
+// The ATO's own published example ABNs — real, checksum-valid numbers.
+const VALID_ABNS = ["51824753556", "53004085616", "83914571673"];
+
+describe("isValidAbn", () => {
+  it("accepts checksum-valid ABNs in any common formatting", () => {
+    for (const abn of VALID_ABNS) {
+      expect(isValidAbn(abn)).toBe(true);
+      expect(
+        isValidAbn(`${abn.slice(0, 2)} ${abn.slice(2, 5)} ${abn.slice(5, 8)} ${abn.slice(8)}`),
+      ).toBe(true);
+    }
+  });
+
+  it("rejects wrong lengths, non-digits and bad checksums", () => {
+    expect(isValidAbn("")).toBe(false);
+    expect(isValidAbn("5182475355")).toBe(false); // 10 digits
+    expect(isValidAbn("518247535566")).toBe(false); // 12 digits
+    expect(isValidAbn("51824753557")).toBe(false); // last digit changed
+    expect(isValidAbn("abcdefghijk")).toBe(false);
+    // A leading 0 makes the first weighted digit negative — must not wrap.
+    expect(isValidAbn("01824753556")).toBe(false);
+  });
+});
+
+describe("normalizeAbn", () => {
+  it("strips spaces and punctuation", () => {
+    expect(normalizeAbn("51 824 753 556")).toBe("51824753556");
+    expect(normalizeAbn("51-824-753-556")).toBe("51824753556");
+  });
+});
+
+describe("tax ID normalisation", () => {
+  it("accepts a valid ABN and defaults the type", () => {
+    const contact = normalizeBillingContact({ abn: "51 824 753 556" });
+    expect(contact.taxIdType).toBe("au_abn");
+    expect(contact.taxIdValue).toBe("51824753556");
+  });
+
+  it("reads tax_id / taxIdValue as well as abn", () => {
+    expect(normalizeBillingContact({ tax_id: VALID_ABNS[1] }).taxIdValue).toBe(VALID_ABNS[1]);
+    expect(normalizeBillingContact({ taxIdValue: VALID_ABNS[2] }).taxIdValue).toBe(VALID_ABNS[2]);
+  });
+
+  it("drops an ABN that fails the checksum", () => {
+    // Critical: Stripe hides the tax-ID form once a Customer has ANY tax ID,
+    // so pre-attaching a bad ABN would be permanent and unfixable by the buyer.
+    const contact = normalizeBillingContact({ abn: "12345678901" });
+    expect(contact.taxIdValue).toBeNull();
+    expect(contact.taxIdType).toBeNull();
+  });
+
+  it("passes other Stripe tax-ID types through for Stripe to validate", () => {
+    const contact = normalizeBillingContact({ tax_id: "DE123456789", tax_id_type: "EU_VAT" });
+    expect(contact.taxIdType).toBe("eu_vat");
+    expect(contact.taxIdValue).toBe("DE123456789");
+  });
+
+  it("reads the tax ID off a handoff row", () => {
+    const contact = contactFromHandoffRow({
+      contact_tax_id: "51 824 753 556",
+      contact_tax_id_type: "au_abn",
+    });
+    expect(contact.taxIdValue).toBe("51824753556");
+  });
+
+  it("carries the tax ID into Stripe metadata", () => {
+    const meta = contactMetadata(normalizeBillingContact({ abn: VALID_ABNS[0] }));
+    expect(meta.buyer_tax_id).toBe(`au_abn:${VALID_ABNS[0]}`);
+  });
+});

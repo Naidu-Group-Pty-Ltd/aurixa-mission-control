@@ -290,7 +290,6 @@ function TopupBody() {
           </CardHeader>
           <CardContent className="grid grid-cols-3 gap-4 text-sm">
             <Stat label="Available" value={tenantQ.data.balance?.available ?? 0} />
-            <Stat label="Reserved" value={tenantQ.data.balance?.reserved ?? 0} />
             <Stat label="Lifetime spent" value={tenantQ.data.balance?.lifetime_spent ?? 0} />
           </CardContent>
         </Card>

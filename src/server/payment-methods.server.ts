@@ -36,6 +36,8 @@ export type PaymentMethodRow = {
   exp_month: number | null;
   exp_year: number | null;
   funding: string | null;
+  billing_name: string | null;
+  billing_email: string | null;
   priority: number;
   status: string;
   origin_user_id: string | null;
@@ -46,8 +48,8 @@ export type PaymentMethodRow = {
 
 const ROW_COLS =
   "id, tenant_id, clone_id, stripe_customer_id, stripe_payment_method_id, brand, last4, " +
-  "exp_month, exp_year, funding, priority, status, origin_user_id, origin_username, " +
-  "origin_source, created_at";
+  "exp_month, exp_year, funding, billing_name, billing_email, priority, status, " +
+  "origin_user_id, origin_username, origin_source, created_at";
 
 export async function listActivePaymentMethods(tenantId: string): Promise<PaymentMethodRow[]> {
   const { data, error } = await adminAny
@@ -155,6 +157,8 @@ export async function savePaymentMethodFromSetupSession(
           stripe_checkout_session_id: session.id,
           exp_month: card?.exp_month ?? null,
           exp_year: card?.exp_year ?? null,
+          billing_name: pm.billing_details?.name ?? null,
+          billing_email: pm.billing_details?.email ?? null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", dupe.id);
@@ -189,6 +193,11 @@ export async function savePaymentMethodFromSetupSession(
       exp_month: card?.exp_month ?? null,
       exp_year: card?.exp_year ?? null,
       funding: card?.funding ?? null,
+      // Cardholder identity as Stripe captured it on the hosted page. Display
+      // only (no card data): it is what turns an anonymous "Visa •••• 4242"
+      // row in the dashboard into "Visa •••• 4242 — Jane Doe".
+      billing_name: pm.billing_details?.name ?? null,
+      billing_email: pm.billing_details?.email ?? null,
       card_fingerprint: fingerprint,
       priority,
       status: "active",

@@ -158,10 +158,9 @@ function ReportJobsPage() {
         </Link>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Jobs" value={fmt(totals?.jobs)} />
-        <StatCard label="Reserved" value={fmt(totals?.reserved)} hint="estimated" />
-        <StatCard label="Committed" value={fmt(totals?.committed)} hint="actual" />
+        <StatCard label="Used" value={fmt(totals?.committed)} hint="tokens charged" />
         <StatCard label="Canceled" value={fmt(totals?.canceled)} hint="released" />
         <StatCard label="Refunded" value={fmt(totals?.refunded)} />
       </div>
@@ -243,8 +242,7 @@ function ReportJobsPage() {
                   <TableHead>Clone</TableHead>
                   <TableHead>Kind</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Reserved</TableHead>
-                  <TableHead className="text-right">Charged</TableHead>
+                  <TableHead className="text-right">Used</TableHead>
                   <TableHead>Started</TableHead>
                   <TableHead className="font-mono text-[10px]">Idempotency</TableHead>
                 </TableRow>
@@ -278,9 +276,6 @@ function ReportJobsPage() {
                       {j.error && (
                         <p className="mt-1 line-clamp-1 text-[10px] text-destructive">{j.error}</p>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {fmt(j.estimated_tokens)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">
                       {j.charged_tokens != null ? fmt(j.charged_tokens) : "—"}
@@ -419,7 +414,6 @@ function JobDetailDrawer({
               <Field label="Idempotency key">
                 <span className="font-mono text-[11px]">{job.idempotency_key}</span>
               </Field>
-              <Field label="Estimated tokens">{fmt(job.estimated_tokens)}</Field>
               <Field label="Charged tokens">
                 {job.charged_tokens != null ? fmt(job.charged_tokens) : "—"}
               </Field>

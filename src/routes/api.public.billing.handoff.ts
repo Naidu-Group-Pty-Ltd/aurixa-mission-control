@@ -9,6 +9,7 @@ import {
   storefrontPricingBase,
   validateReturnUrl,
 } from "@/server/billing-handoffs.server";
+import { normalizeBillingContact } from "@/server/billing-contact.server";
 
 /**
  * POST /api/public/billing/handoff
@@ -30,6 +31,24 @@ const Schema = z.object({
   origin_source: z.string().max(100).optional().nullable(),
   intent: z.string().max(200).optional().nullable(),
   return_url: z.string().max(500).optional().nullable(),
+  // Buyer contact block. Optional and best-effort: anything malformed is
+  // dropped by normalizeBillingContact rather than rejected, because a
+  // purchase CTA must never fail over a prefill nicety.
+  contact: z
+    .object({
+      email: z.string().max(320).optional().nullable(),
+      first_name: z.string().max(100).optional().nullable(),
+      last_name: z.string().max(100).optional().nullable(),
+      full_name: z.string().max(200).optional().nullable(),
+      phone: z.string().max(40).optional().nullable(),
+      company: z.string().max(200).optional().nullable(),
+      // Business tax ID (ABN). Validated server-side; an invalid value is
+      // dropped so Stripe Checkout asks the buyer for one instead.
+      tax_id: z.string().max(50).optional().nullable(),
+      tax_id_type: z.string().max(32).optional().nullable(),
+    })
+    .optional()
+    .nullable(),
 });
 
 export const Route = createFileRoute("/api/public/billing/handoff")({
@@ -110,6 +129,7 @@ export const Route = createFileRoute("/api/public/billing/handoff")({
           originSource,
           intent: data.intent,
           returnUrl: returnCheck.url,
+          contact: normalizeBillingContact(data.contact),
         });
         if (!created.ok) return jsonResponse({ ok: false, error: created.error }, 500);
 

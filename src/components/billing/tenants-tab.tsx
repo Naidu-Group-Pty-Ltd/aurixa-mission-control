@@ -63,7 +63,6 @@ export function TenantsTab() {
               <TableHead>Tenant</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead className="text-right">Available</TableHead>
-              <TableHead className="text-right">Reserved</TableHead>
               <TableHead className="text-right">Spent</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
@@ -89,7 +88,6 @@ export function TenantsTab() {
                   </TableCell>
                   <TableCell>{plan?.name ?? "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmt(bal?.available)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmt(bal?.reserved)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {fmt(bal?.lifetime_spent)}
                   </TableCell>
@@ -159,14 +157,10 @@ function TenantDetail({ id, onClose }: { id: string; onClose: () => void }) {
       </SheetHeader>
       <div className="mt-4 space-y-4">
         <Card>
-          <CardContent className="grid grid-cols-3 gap-3 pt-4 text-sm">
+          <CardContent className="grid grid-cols-2 gap-3 pt-4 text-sm">
             <div>
               <p className="text-[10px] uppercase text-muted-foreground">Available</p>
               <p className="text-lg font-semibold">{fmt(data.balance?.available)}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase text-muted-foreground">Reserved</p>
-              <p className="text-lg font-semibold">{fmt(data.balance?.reserved)}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase text-muted-foreground">Spent</p>
@@ -297,7 +291,7 @@ function TenantDetail({ id, onClose }: { id: string; onClose: () => void }) {
                   </div>
                 </div>
                 <div className="text-right tabular-nums">
-                  {fmt(j.charged_tokens ?? j.estimated_tokens)}
+                  {j.charged_tokens != null ? fmt(j.charged_tokens) : "—"}
                 </div>
                 {j.status === "completed" && (
                   <Button
