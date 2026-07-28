@@ -28,8 +28,7 @@ export const Route = createFileRoute("/api/public/tokens/balance")({
         // passes, but nothing rewrites the cache — so without this the tenant
         // keeps seeing credits that are already free again as "reserved". The
         // RPC no-ops unless the cached row is actually stale.
-        await supabaseAdmin
-          .rpc("refresh_token_balance", { _tenant_id: tenant.tenantId, _max_age_seconds: 60 })
+        await (supabaseAdmin.rpc as any)("refresh_token_balance", { _tenant_id: tenant.tenantId, _max_age_seconds: 60 })
           .then(
             ({ error }) => {
               if (error) console.warn("[tokens/balance] refresh failed", error.message);
