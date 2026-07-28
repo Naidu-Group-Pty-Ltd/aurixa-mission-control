@@ -26,7 +26,14 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
 
-export type PlanRow = { id: string; slug: string; name: string; price_cents: number | null };
+export type PlanRow = {
+  id: string;
+  slug: string;
+  name: string;
+  price_cents: number | null;
+  /** The price the row currently sells at — used to find its Stripe product. */
+  stripe_price_id?: string | null;
+};
 
 export type RenameOp = { from: string; to: string; name: string };
 
@@ -99,14 +106,39 @@ export function planCatalogSync(rows: readonly PlanRow[]): SyncPlan {
   const warnings: string[] = [];
   const missing: string[] = [];
 
-  const desired = TIERS.map((t) => ({
-    from: t.replacesSlug ?? t.slug,
-    to: t.slug,
-    name: t.name,
-  })).filter((d) => {
-    if (bySlug.has(d.from)) return true;
+  // Which row belongs to which tier. Slugs alone are ambiguous: after a full
+  // cutover the catalog holds {launch, growth, scale}, and before one it holds
+  // {launch, professional, growth} — in both, a row called 'growth' exists, but
+  // in the first it IS the Growth tier and in the second it is the row destined
+  // to become Scale. Getting that wrong either re-runs a rename that already
+  // happened or skips one that has not.
+  //
+  // A tier whose replaced row is gone but whose own slug is present has already
+  // been moved, so it settles there and no one else may claim that slug. Every
+  // remaining tier then takes the row it replaces, if that row is still free.
+  const settled = new Set<string>();
+  for (const t of TIERS) {
+    const replaces = t.replacesSlug ?? t.slug;
+    if (replaces !== t.slug && !bySlug.has(replaces) && bySlug.has(t.slug)) {
+      settled.add(t.slug);
+    }
+  }
+
+  const desired = TIERS.map((t) => {
+    const replaces = t.replacesSlug ?? t.slug;
+    // A row already settled on another tier is never available to take, even
+    // if it happens to be the row this tier nominally replaces.
+    const from =
+      bySlug.has(replaces) && !settled.has(replaces)
+        ? replaces
+        : bySlug.has(t.slug)
+          ? t.slug
+          : null;
+    return { from, to: t.slug, name: t.name };
+  }).filter((d): d is { from: string; to: string; name: string } => {
+    if (d.from !== null) return true;
     missing.push(d.to);
-    warnings.push(`No catalog row '${d.from}' to become '${d.to}' — it will be created.`);
+    warnings.push(`No catalog row available to become '${d.to}' — it will be created.`);
     return false;
   });
 
@@ -142,26 +174,110 @@ export function planCatalogSync(rows: readonly PlanRow[]): SyncPlan {
 export async function loadPlanRows(): Promise<PlanRow[]> {
   const { data, error } = await adminAny
     .from("seat_plans")
-    .select("id, slug, name, price_cents")
+    .select("id, slug, name, price_cents, stripe_price_id")
     .order("price_cents", { ascending: true });
   if (error) throw new Error(`seat_plans_read_failed: ${error.message}`);
   return (data ?? []) as PlanRow[];
 }
 
-async function ensureProduct(stripe: Stripe, tier: Tier): Promise<string> {
-  // Keyed on our own slug rather than the display name, so renaming the tier
-  // never orphans the product it has history against.
-  const lookup = `aurixa_tier_${tier.slug}`;
-  const existing = await stripe.products.search({ query: `metadata['aurixa_tier']:'${tier.slug}'` });
-  if (existing.data[0]) {
-    await stripe.products.update(existing.data[0].id, { name: `Aurixa ${tier.name}` });
-    return existing.data[0].id;
+/**
+ * The Stripe product this tier's row already sells through, or a new one.
+ *
+ * Resolution order matters. The row's CURRENT `stripe_price_id` is the only
+ * fully reliable pointer: it is a direct lookup, and the product behind it is
+ * the one existing subscriptions are attached to — exactly what reusing rows
+ * was meant to preserve. Search is the fallback, and only the fallback,
+ * because Stripe's search index is eventually consistent: a product created
+ * moments ago may not be found, and a retry after a failed Apply would then
+ * create a second product for the same tier.
+ */
+async function ensureProduct(stripe: Stripe, tier: Tier, row?: PlanRow): Promise<string> {
+  if (row?.stripe_price_id) {
+    try {
+      const price = await stripe.prices.retrieve(row.stripe_price_id);
+      const productId = typeof price.product === "string" ? price.product : price.product?.id;
+      if (productId) {
+        await stripe.products.update(productId, {
+          name: `Aurixa ${tier.name}`,
+          metadata: { aurixa_tier: tier.slug },
+        });
+        return productId;
+      }
+    } catch {
+      // Price deleted or from another account — fall through and look it up.
+    }
   }
+
+  try {
+    const found = await stripe.products.search({
+      query: `metadata['aurixa_tier']:'${tier.slug}'`,
+    });
+    if (found.data[0]) {
+      await stripe.products.update(found.data[0].id, { name: `Aurixa ${tier.name}` });
+      return found.data[0].id;
+    }
+  } catch {
+    // Search unavailable on this account — creating is still correct.
+  }
+
   const created = await stripe.products.create({
     name: `Aurixa ${tier.name}`,
-    metadata: { aurixa_tier: tier.slug, lookup },
+    metadata: { aurixa_tier: tier.slug, lookup: `aurixa_tier_${tier.slug}` },
   });
   return created.id;
+}
+
+/**
+ * The price for this amount/interval on this product, reusing one if it exists.
+ *
+ * Stripe prices are immutable, so the natural implementation is "always
+ * create" — but Apply is a button a human presses, and the first press of this
+ * one failed partway. Minting a fresh price on every attempt leaves a trail of
+ * identical active prices on the product, and it is not obvious afterwards
+ * which one the catalog points at. Matching on the fields that define a price
+ * makes pressing Apply twice a no-op instead.
+ */
+async function ensurePrice(
+  stripe: Stripe,
+  productId: string,
+  op: PriceOp,
+  tierSlug: string,
+): Promise<{ id: string; created: boolean }> {
+  const existing = await stripe.prices.list({ product: productId, active: true, limit: 100 });
+  const match = existing.data.find(
+    (p) =>
+      p.unit_amount === op.unitAmount &&
+      p.currency === "aud" &&
+      p.recurring?.interval === op.interval &&
+      p.tax_behavior === "inclusive",
+  );
+  if (match) return { id: match.id, created: false };
+
+  const price = await stripe.prices.create({
+    product: productId,
+    currency: "aud",
+    unit_amount: op.unitAmount,
+    tax_behavior: "inclusive",
+    recurring: { interval: op.interval },
+    metadata: { aurixa_tier: tierSlug, gst_component_cents: String(op.gstComponent) },
+  });
+  return { id: price.id, created: true };
+}
+
+/**
+ * The order tiers must be written in, taken from the plan's rename ordering.
+ *
+ * This is the whole point of `orderRenames`, and applying in TIERS declaration
+ * order silently threw it away: Growth (from the old Professional row) would
+ * be written before the old Growth row had vacated to Scale, so the slug
+ * collided and the update failed. Tiers that are not moving slug sort first —
+ * they cannot collide with anything.
+ */
+export function tierApplyOrder(plan: SyncPlan): Tier[] {
+  const position = new Map(plan.renames.map((r, i) => [r.to, i]));
+  return [...TIERS].sort(
+    (a, b) => (position.get(a.slug) ?? -1) - (position.get(b.slug) ?? -1),
+  );
 }
 
 export type ApplyResult = {
@@ -182,36 +298,32 @@ export type ApplyResult = {
  * the sheet already contains GST. Left at Stripe's default, enabling Stripe
  * Tax later would ADD 10% on top and quietly overcharge every customer.
  */
-export async function applyCatalogSync(plan: SyncPlan): Promise<ApplyResult> {
+export async function applyCatalogSync(plan: SyncPlan, rows: readonly PlanRow[] = []): Promise<ApplyResult> {
   const stripe = getStripe();
   const result: ApplyResult = { applied: true, renamed: [], createdPrices: [], errors: [] };
+  const bySlug = new Map(rows.map((r) => [r.slug, r]));
 
-  for (const tier of TIERS) {
+  for (const tier of tierApplyOrder(plan)) {
     try {
-      const productId = await ensureProduct(stripe, tier);
+      const rename = plan.renames.find((r) => r.to === tier.slug);
+      const sourceSlug = rename?.from ?? tier.slug;
+      const productId = await ensureProduct(stripe, tier, bySlug.get(sourceSlug));
       const wanted = plan.prices.filter((p) => p.tierSlug === tier.slug);
       const ids: Record<string, string> = {};
 
       for (const p of wanted) {
-        const price = await stripe.prices.create({
-          product: productId,
-          currency: "aud",
-          unit_amount: p.unitAmount,
-          tax_behavior: "inclusive",
-          recurring: { interval: p.interval },
-          metadata: { aurixa_tier: tier.slug, gst_component_cents: String(p.gstComponent) },
-        });
+        const price = await ensurePrice(stripe, productId, p, tier.slug);
         ids[p.interval] = price.id;
-        result.createdPrices.push({
-          tierSlug: tier.slug,
-          interval: p.interval,
-          priceId: price.id,
-          amount: p.unitAmount,
-        });
+        if (price.created) {
+          result.createdPrices.push({
+            tierSlug: tier.slug,
+            interval: p.interval,
+            priceId: price.id,
+            amount: p.unitAmount,
+          });
+        }
       }
 
-      const rename = plan.renames.find((r) => r.to === tier.slug);
-      const targetSlug = rename?.from ?? tier.slug;
       const { error } = await adminAny
         .from("seat_plans")
         .update({
@@ -235,7 +347,7 @@ export async function applyCatalogSync(plan: SyncPlan): Promise<ApplyResult> {
             annual_stripe_price_id: ids.year ?? null,
           },
         })
-        .eq("slug", targetSlug);
+        .eq("slug", sourceSlug);
       if (error) throw new Error(error.message);
       if (rename) result.renamed.push(rename);
     } catch (err) {

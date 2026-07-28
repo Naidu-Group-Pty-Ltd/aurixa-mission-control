@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { orderRenames, planCatalogSync, type PlanRow } from "./stripe-catalog-sync.server";
+import {
+  orderRenames,
+  planCatalogSync,
+  tierApplyOrder,
+  type PlanRow,
+} from "./stripe-catalog-sync.server";
 import { annualCents, gstComponentCents } from "@/lib/pricing/aurixa-catalog";
 
 // The live catalog as it stands: four plans, of which two are being repurposed.
@@ -113,13 +118,113 @@ describe("planCatalogSync", () => {
   });
 
   it("flags a tier with no row to reuse instead of silently skipping it", () => {
+    // With Professional gone, the surviving 'growth' row is read as the Growth
+    // tier itself rather than as Scale's source — so it is Scale that has
+    // nothing left to reuse, and Scale that gets reported.
     const withoutProfessional = LIVE.filter((r) => r.slug !== "professional");
     const p = planCatalogSync(withoutProfessional);
-    expect(p.missing).toContain("growth");
-    expect(p.warnings.join(" ")).toMatch(/no catalog row 'professional'/i);
+    expect(p.missing).toContain("scale");
+    expect(p.renames.find((r) => r.to === "growth")).toBeUndefined();
+    expect(p.warnings.join(" ")).toMatch(/no catalog row available to become 'scale'/i);
   });
 
   it("is stable — planning twice gives the same plan", () => {
     expect(planCatalogSync(LIVE)).toEqual(plan);
+  });
+});
+
+describe("tierApplyOrder — the bug that made Apply fail", () => {
+  // Apply iterated TIERS in declaration order (launch, growth, scale) and threw
+  // away the ordering the planner had just computed. So it tried to rename the
+  // old Professional row to 'growth' while the live Growth row still held that
+  // slug, and Postgres rejected it on the unique index. The plan was right; the
+  // execution ignored it.
+  const plan = planCatalogSync(LIVE);
+
+  it("writes Scale before Growth, so the slug has vacated first", () => {
+    const order = tierApplyOrder(plan).map((t) => t.slug);
+    expect(order.indexOf("scale")).toBeLessThan(order.indexOf("growth"));
+  });
+
+  it("puts tiers that are not moving slug first — they cannot collide", () => {
+    expect(tierApplyOrder(plan)[0].slug).toBe("launch");
+  });
+
+  it("never drops or duplicates a tier", () => {
+    const order = tierApplyOrder(plan).map((t) => t.slug).sort();
+    expect(order).toEqual(["growth", "launch", "scale"]);
+  });
+
+  it("no slug is ever written while still occupied", () => {
+    // Replays the whole cutover against the live slug set.
+    const occupied = new Set(LIVE.map((r) => r.slug));
+    for (const tier of tierApplyOrder(plan)) {
+      const rename = plan.renames.find((r) => r.to === tier.slug);
+      if (!rename) continue;
+      expect(occupied.has(rename.to)).toBe(false);
+      occupied.delete(rename.from);
+      occupied.add(rename.to);
+    }
+  });
+
+  it("is a no-op ordering when nothing needs renaming", () => {
+    const settled: PlanRow[] = [
+      { id: "1", slug: "launch", name: "Launch", price_cents: 69900 },
+      { id: "2", slug: "growth", name: "Growth", price_cents: 105500 },
+      { id: "3", slug: "scale", name: "Scale", price_cents: 221000 },
+    ];
+    const p = planCatalogSync(settled);
+    expect(p.renames).toEqual([]);
+    expect(tierApplyOrder(p).map((t) => t.slug)).toEqual(["launch", "growth", "scale"]);
+  });
+});
+
+describe("the cutover can be re-run after a partial failure", () => {
+  // The state their first Apply left behind: Scale was renamed successfully,
+  // Growth collided and never moved. A retry has to pick up from here.
+  const HALF_APPLIED: PlanRow[] = [
+    { id: "1", slug: "launch", name: "Launch", price_cents: 69900 },
+    { id: "2", slug: "professional", name: "Professional", price_cents: 275000 },
+    { id: "3", slug: "scale", name: "Scale", price_cents: 221000 },
+    { id: "4", slug: "enterprise", name: "Enterprise", price_cents: 1750000 },
+  ];
+
+  it("does not warn about a rename a previous run already made", () => {
+    // This is what blocked recovery: runCatalogSync refuses to apply while
+    // there are warnings, so a half-finished cutover could never be finished.
+    const p = planCatalogSync(HALF_APPLIED);
+    expect(p.warnings).toEqual([]);
+    expect(p.missing).toEqual([]);
+  });
+
+  it("still moves the rename that failed", () => {
+    const p = planCatalogSync(HALF_APPLIED);
+    expect(p.renames.map((r) => `${r.from}->${r.to}`)).toEqual(["professional->growth"]);
+  });
+
+  it("leaves the already-moved tier in place and still writes it", () => {
+    const p = planCatalogSync(HALF_APPLIED);
+    // No rename for scale means apply targets `scale` itself, so its row is
+    // still brought up to the new price rather than skipped.
+    expect(p.renames.find((r) => r.to === "scale")).toBeUndefined();
+    expect(p.prices.filter((x) => x.tierSlug === "scale")).toHaveLength(2);
+  });
+
+  it("is idempotent once fully applied", () => {
+    const DONE: PlanRow[] = [
+      { id: "1", slug: "launch", name: "Launch", price_cents: 69900 },
+      { id: "2", slug: "growth", name: "Growth", price_cents: 105500 },
+      { id: "3", slug: "scale", name: "Scale", price_cents: 221000 },
+      { id: "4", slug: "enterprise", name: "Enterprise", price_cents: 1750000 },
+    ];
+    const p = planCatalogSync(DONE);
+    expect(p.renames).toEqual([]);
+    expect(p.warnings).toEqual([]);
+    expect(p.untouched).toEqual(["enterprise"]);
+  });
+
+  it("still reports a tier that genuinely has no row at all", () => {
+    const p = planCatalogSync([{ id: "1", slug: "launch", name: "Launch", price_cents: 69900 }]);
+    expect(p.missing.sort()).toEqual(["growth", "scale"]);
   });
 });
