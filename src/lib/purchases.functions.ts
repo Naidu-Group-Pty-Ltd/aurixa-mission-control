@@ -8,7 +8,8 @@
 // so we can embed the clone relation regardless of the caller's RLS view.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireOperator } from "@/integrations/supabase/role-middleware";
+import { requireAdmin, requireOperator } from "@/integrations/supabase/role-middleware";
+import { reconcilePurchasesFromStripe } from "@/server/purchase-backfill.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aggregatePurchases } from "@/lib/purchase-rollups";
 
@@ -180,4 +181,36 @@ export const clonePurchaseSummary = createServerFn({ method: "POST" })
       adminActionCount: rollups.adminActionCount,
       recent: all.slice(0, 5),
     };
+  });
+
+/**
+ * Rebuilds missing `purchases` rows from Stripe for a date window.
+ *
+ * Admin-gated, matching gift-tokens: this repairs the reporting ledger, but it
+ * grants nothing and moves no money. Defaults to a dry run — the caller has to
+ * ask for the write explicitly, so an accidental click reports instead of
+ * mutating the ledger.
+ */
+export const backfillPurchases = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((input) =>
+    z
+      .object({
+        since: z.string().datetime(),
+        until: z.string().datetime().optional(),
+        apply: z.boolean().default(false),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const report = await reconcilePurchasesFromStripe({
+        since: new Date(data.since),
+        until: data.until ? new Date(data.until) : undefined,
+        dryRun: !data.apply,
+      });
+      return { ok: true as const, dryRun: !data.apply, ...report };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+    }
   });

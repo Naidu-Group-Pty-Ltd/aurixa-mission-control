@@ -60,7 +60,7 @@ function stripeId(v: string | { id: string } | null | undefined): string | null 
  * Everything outside this set is descriptive: nice to have, never worth losing
  * the row over.
  */
-const PURCHASE_IDENTITY_COLUMNS = [
+export const PURCHASE_IDENTITY_COLUMNS = [
   "stripe_checkout_session_id",
   "mode",
   "item_id",
@@ -111,7 +111,7 @@ type WriteResult = { error: { message?: string | null; code?: string | null } | 
  * Retries are bounded by the number of droppable columns, and an identity
  * column being rejected aborts rather than degrades.
  */
-async function writeToleratingSchemaDrift(
+export async function writeToleratingSchemaDrift(
   write: (row: Record<string, unknown>) => Promise<WriteResult>,
   row: Record<string, unknown>,
   identityColumns: readonly string[],
@@ -145,9 +145,11 @@ async function writeToleratingSchemaDrift(
  * Used both at completion time (webhook) and as the upsert body when the
  * initiated-insert never happened (pre-feature sessions, insert failures).
  */
+export type PurchaseStatus = "initiated" | "completed" | "failed" | "refunded" | "abandoned";
+
 export function purchaseRowFromSession(
   session: Stripe.Checkout.Session,
-  status: "completed" | "failed",
+  status: PurchaseStatus,
   error?: string,
 ): Record<string, unknown> {
   const md = (session.metadata ?? {}) as Record<string, string>;
