@@ -141,6 +141,13 @@ export type Database = {
         Row: {
           clone_id: string | null
           consumed_at: string | null
+          contact_company: string | null
+          contact_email: string | null
+          contact_first_name: string | null
+          contact_last_name: string | null
+          contact_phone: string | null
+          contact_tax_id: string | null
+          contact_tax_id_type: string | null
           created_at: string
           expires_at: string
           id: string
@@ -154,6 +161,13 @@ export type Database = {
         Insert: {
           clone_id?: string | null
           consumed_at?: string | null
+          contact_company?: string | null
+          contact_email?: string | null
+          contact_first_name?: string | null
+          contact_last_name?: string | null
+          contact_phone?: string | null
+          contact_tax_id?: string | null
+          contact_tax_id_type?: string | null
           created_at?: string
           expires_at?: string
           id?: string
@@ -167,6 +181,13 @@ export type Database = {
         Update: {
           clone_id?: string | null
           consumed_at?: string | null
+          contact_company?: string | null
+          contact_email?: string | null
+          contact_first_name?: string | null
+          contact_last_name?: string | null
+          contact_phone?: string | null
+          contact_tax_id?: string | null
+          contact_tax_id_type?: string | null
           created_at?: string
           expires_at?: string
           id?: string
@@ -4186,6 +4207,8 @@ export type Database = {
       }
       payment_methods: {
         Row: {
+          billing_email: string | null
+          billing_name: string | null
           brand: string | null
           card_fingerprint: string | null
           clone_id: string | null
@@ -4210,6 +4233,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_email?: string | null
+          billing_name?: string | null
           brand?: string | null
           card_fingerprint?: string | null
           clone_id?: string | null
@@ -4234,6 +4259,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_email?: string | null
+          billing_name?: string | null
           brand?: string | null
           card_fingerprint?: string | null
           clone_id?: string | null
@@ -4613,6 +4640,39 @@ export type Database = {
           p256dh?: string
           user_agent?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      report_cost_revisions: {
+        Row: {
+          cascade_result: Json
+          changes: Json
+          costs: Json
+          created_at: string
+          id: string
+          note: string | null
+          published_by: string | null
+          version: number
+        }
+        Insert: {
+          cascade_result?: Json
+          changes?: Json
+          costs?: Json
+          created_at?: string
+          id?: string
+          note?: string | null
+          published_by?: string | null
+          version?: never
+        }
+        Update: {
+          cascade_result?: Json
+          changes?: Json
+          costs?: Json
+          created_at?: string
+          id?: string
+          note?: string | null
+          published_by?: string | null
+          version?: never
         }
         Relationships: []
       }
@@ -5794,6 +5854,10 @@ export type Database = {
           plan_started_at: string | null
           status: Database["public"]["Enums"]["tenant_status"]
           stripe_customer_id: string | null
+          tax_id_business_name: string | null
+          tax_id_captured_at: string | null
+          tax_id_type: string | null
+          tax_id_value: string | null
           updated_at: string
         }
         Insert: {
@@ -5812,6 +5876,10 @@ export type Database = {
           plan_started_at?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
           stripe_customer_id?: string | null
+          tax_id_business_name?: string | null
+          tax_id_captured_at?: string | null
+          tax_id_type?: string | null
+          tax_id_value?: string | null
           updated_at?: string
         }
         Update: {
@@ -5830,6 +5898,10 @@ export type Database = {
           plan_started_at?: string | null
           status?: Database["public"]["Enums"]["tenant_status"]
           stripe_customer_id?: string | null
+          tax_id_business_name?: string | null
+          tax_id_captured_at?: string | null
+          tax_id_type?: string | null
+          tax_id_value?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -6432,6 +6504,11 @@ export type Database = {
         Args: { _partner_id: string }
         Returns: boolean
       }
+      issue_due_plan_allowances: { Args: never; Returns: Json }
+      issue_plan_allowance: {
+        Args: { _period_start?: string; _tenant_id: string }
+        Returns: Json
+      }
       purge_log_tables: {
         Args: never
         Returns: {
@@ -6447,6 +6524,10 @@ export type Database = {
       recompute_token_balance: {
         Args: { _tenant_id: string }
         Returns: undefined
+      }
+      refresh_token_balance: {
+        Args: { _max_age_seconds?: number; _tenant_id: string }
+        Returns: Json
       }
       refund_job: { Args: { _job_id: string; _reason?: string }; Returns: Json }
       register_device: {
@@ -6473,6 +6554,10 @@ export type Database = {
       }
       release_seat: {
         Args: { _clone_id: string; _external_user_id: string; _reason?: string }
+        Returns: Json
+      }
+      release_token_job: {
+        Args: { _job_id: string; _reason?: string }
         Returns: Json
       }
       reorder_payment_methods: {
@@ -6516,6 +6601,16 @@ export type Database = {
         Returns: string
       }
       tenant_usage_summary: { Args: { _tenant_id: string }; Returns: Json }
+      token_expiry_days: { Args: never; Returns: number }
+      token_expiry_schedule: {
+        Args: { _tenant_id: string }
+        Returns: {
+          expires_at: string
+          kind: string
+          reason: string
+          remaining: number
+        }[]
+      }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "operator" | "user" | "high_king"
