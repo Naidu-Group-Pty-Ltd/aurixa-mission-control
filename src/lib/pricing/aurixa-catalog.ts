@@ -61,6 +61,16 @@ export type Tier = {
    * customers see is derived from this — see tierHeadlineCents.
    */
   monthlyInclGstCents: number;
+  /**
+   * Report credits included with the tier, every month.
+   *
+   * Issued as real credits on the same 30-day clock as everything else — an
+   * allowance is not a separate currency, it is a grant into the same balance
+   * a top-up pack credits. Which also means it is spent by the same
+   * soonest-to-expire rule, so an allowance is always consumed before a
+   * top-up bought later.
+   */
+  monthlyCredits: number;
   blurb: string;
 };
 
@@ -81,6 +91,7 @@ export const TIERS: readonly Tier[] = [
     seatMin: 1,
     seatMax: 4,
     monthlyInclGstCents: 50400,
+    monthlyCredits: 7_000,
     blurb: "For a solo adviser or a small team getting started.",
   },
   {
@@ -90,6 +101,7 @@ export const TIERS: readonly Tier[] = [
     seatMin: 5,
     seatMax: 15,
     monthlyInclGstCents: 86000,
+    monthlyCredits: 35_000,
     blurb: "For a growing practice running comparisons and a deal pipeline.",
   },
   {
@@ -99,6 +111,7 @@ export const TIERS: readonly Tier[] = [
     seatMin: 16,
     seatMax: 30,
     monthlyInclGstCents: 201500,
+    monthlyCredits: 75_000,
     blurb: "The full platform, with finance, marketing and agreements.",
   },
 ];
@@ -494,6 +507,17 @@ export function tierPriceCents(
 /** Whether a tier includes a module without paying for it separately. */
 export function tierIncludesModule(tierSlug: string, moduleSlug: string): boolean {
   return moduleBySlug(moduleSlug)?.includedIn.includes(tierSlug) ?? false;
+}
+
+/**
+ * What a tier's included credits work out to per credit, in cents.
+ *
+ * Not a price — nothing sells credits at this rate — but the number that says
+ * whether the allowance is worth having. Measured against the tier's headline,
+ * because that is what is actually paid.
+ */
+export function tierCreditRateCents(tier: Tier): number {
+  return tier.monthlyCredits > 0 ? tierHeadlineCents(tier) / tier.monthlyCredits : 0;
 }
 
 /** Modules a tier does NOT include, i.e. what it can still be upgraded with. */

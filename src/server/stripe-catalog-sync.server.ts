@@ -49,6 +49,8 @@ export type PriceOp = {
   baseAmount: number;
   /** Whether unitAmount includes the AML/CTF module. */
   includesAml: boolean;
+  /** Report credits the tier includes each month, whatever the billing period. */
+  monthlyCredits: number;
 };
 
 export type SyncPlan = {
@@ -161,6 +163,11 @@ export function planCatalogSync(rows: readonly PlanRow[]): SyncPlan {
         gstComponent: gstComponentCents(amount),
         baseAmount: tierBaseCents(tier, period),
         includesAml: TIER_INCLUDES_AML,
+        // Per MONTH on both prices. An annual plan bills twelve months at
+        // once; it does not hand over a year of credits on day one, because
+        // credits expire 30 days after they are issued and eleven months of
+        // them would lapse unused.
+        monthlyCredits: tier.monthlyCredits,
       });
     }
   }
@@ -182,6 +189,36 @@ export async function loadPlanRows(): Promise<PlanRow[]> {
 }
 
 /**
+ * How a tier's product presents itself in Stripe.
+ *
+ * The included credits belong here, not only on the pricing page. A Stripe
+ * product is what an invoice line, a receipt and the billing portal all read
+ * from, so a customer looking at a charge should be able to see what the
+ * subscription actually entitles them to — and support answering "what do I
+ * get for this" should not have to open a different system. The metadata is
+ * the machine-readable half of the same fact.
+ */
+function productShape(tier: Tier): {
+  name: string;
+  description: string;
+  metadata: Record<string, string>;
+} {
+  return {
+    name: `Aurixa ${tier.name}`,
+    description:
+      `${tier.monthlyCredits.toLocaleString("en-AU")} report credits included every month. ` +
+      `${tier.seatMin}\u2013${tier.seatMax} seats. ${tier.blurb}`,
+    metadata: {
+      aurixa_tier: tier.slug,
+      monthly_credits: String(tier.monthlyCredits),
+      seat_min: String(tier.seatMin),
+      seat_max: String(tier.seatMax),
+      includes_aml_ctf: String(TIER_INCLUDES_AML),
+    },
+  };
+}
+
+/**
  * The Stripe product this tier's row already sells through, or a new one.
  *
  * Resolution order matters. The row's CURRENT `stripe_price_id` is the only
@@ -198,10 +235,7 @@ async function ensureProduct(stripe: Stripe, tier: Tier, row?: PlanRow): Promise
       const price = await stripe.prices.retrieve(row.stripe_price_id);
       const productId = typeof price.product === "string" ? price.product : price.product?.id;
       if (productId) {
-        await stripe.products.update(productId, {
-          name: `Aurixa ${tier.name}`,
-          metadata: { aurixa_tier: tier.slug },
-        });
+        await stripe.products.update(productId, productShape(tier));
         return productId;
       }
     } catch {
@@ -214,16 +248,17 @@ async function ensureProduct(stripe: Stripe, tier: Tier, row?: PlanRow): Promise
       query: `metadata['aurixa_tier']:'${tier.slug}'`,
     });
     if (found.data[0]) {
-      await stripe.products.update(found.data[0].id, { name: `Aurixa ${tier.name}` });
+      await stripe.products.update(found.data[0].id, productShape(tier));
       return found.data[0].id;
     }
   } catch {
     // Search unavailable on this account — creating is still correct.
   }
 
+  const shape = productShape(tier);
   const created = await stripe.products.create({
-    name: `Aurixa ${tier.name}`,
-    metadata: { aurixa_tier: tier.slug, lookup: `aurixa_tier_${tier.slug}` },
+    ...shape,
+    metadata: { ...shape.metadata, lookup: `aurixa_tier_${tier.slug}` },
   });
   return created.id;
 }
@@ -260,7 +295,11 @@ async function ensurePrice(
     unit_amount: op.unitAmount,
     tax_behavior: "inclusive",
     recurring: { interval: op.interval },
-    metadata: { aurixa_tier: tierSlug, gst_component_cents: String(op.gstComponent) },
+    metadata: {
+      aurixa_tier: tierSlug,
+      gst_component_cents: String(op.gstComponent),
+      monthly_credits: String(op.monthlyCredits),
+    },
   });
   return { id: price.id, created: true };
 }
@@ -352,6 +391,10 @@ export async function applyCatalogSync(plan: SyncPlan, rows: readonly PlanRow[] 
             seat_max: tier.seatMax,
             annual_price_cents: tierHeadlineCents(tier, "annual"),
             includes_aml_ctf: TIER_INCLUDES_AML,
+            // Read by the storefront mirror so the pricing page can state the
+            // allowance. billing_plans stays authoritative for what is
+            // actually granted; this is the display copy of it.
+            monthly_credits: tier.monthlyCredits,
             base_price_cents: tierBaseCents(tier, "monthly"),
             base_annual_price_cents: tierBaseCents(tier, "annual"),
             annual_stripe_price_id: ids.year ?? null,

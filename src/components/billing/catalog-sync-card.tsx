@@ -35,6 +35,7 @@ type Plan = {
     gstComponent: number;
     baseAmount: number;
     includesAml: boolean;
+    monthlyCredits: number;
   }>;
   untouched?: string[];
   warnings?: string[];
@@ -95,6 +96,10 @@ export function CatalogSyncCard() {
           Every figure is tax-inclusive — GST is contained in the amount, not added to it — and
           Stripe prices are created with <code className="mx-1">tax_behavior: inclusive</code> so
           enabling Stripe Tax later cannot inflate a total. Annual bills twelve months less 10%.
+          Each tier's included credits are written onto the Stripe product and price, so an invoice
+          and the billing portal say what the subscription entitles the customer to — and are
+          granted per month on both billing periods, since credits lapse 30 days after they are
+          issued.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -162,6 +167,7 @@ export function CatalogSyncCard() {
                   <TableHead className="text-right">Price (incl GST)</TableHead>
                   <TableHead className="text-right">of which GST</TableHead>
                   <TableHead className="text-right">Without AML/CTF</TableHead>
+                  <TableHead className="text-right">Credits / month</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -179,6 +185,9 @@ export function CatalogSyncCard() {
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
                       {aud(p.baseAmount)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {p.monthlyCredits.toLocaleString("en-AU")}
                     </TableCell>
                   </TableRow>
                 ))}

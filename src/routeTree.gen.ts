@@ -100,6 +100,7 @@ import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api.public.
 import { Route as ApiPublicStorefrontWalletRouteImport } from './routes/api.public.storefront.wallet'
 import { Route as ApiPublicStorefrontSetupRouteImport } from './routes/api.public.storefront.setup'
 import { Route as ApiPublicStorefrontSessionRouteImport } from './routes/api.public.storefront.session'
+import { Route as ApiPublicStorefrontPlanChangeRouteImport } from './routes/api.public.storefront.plan-change'
 import { Route as ApiPublicStorefrontIdentityRouteImport } from './routes/api.public.storefront.identity'
 import { Route as ApiPublicStorefrontHandoffRouteImport } from './routes/api.public.storefront.handoff'
 import { Route as ApiPublicStorefrontCheckoutRouteImport } from './routes/api.public.storefront.checkout'
@@ -592,6 +593,12 @@ const ApiPublicStorefrontSessionRoute =
     path: '/api/public/storefront/session',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicStorefrontPlanChangeRoute =
+  ApiPublicStorefrontPlanChangeRouteImport.update({
+    id: '/api/public/storefront/plan-change',
+    path: '/api/public/storefront/plan-change',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontIdentityRoute =
   ApiPublicStorefrontIdentityRouteImport.update({
     id: '/api/public/storefront/identity',
@@ -857,6 +864,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
+  '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
   '/api/public/storefront/session': typeof ApiPublicStorefrontSessionRoute
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
@@ -977,6 +985,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
+  '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
   '/api/public/storefront/session': typeof ApiPublicStorefrontSessionRoute
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
@@ -1099,6 +1108,7 @@ export interface FileRoutesById {
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
+  '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
   '/api/public/storefront/session': typeof ApiPublicStorefrontSessionRoute
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
@@ -1222,6 +1232,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
+    | '/api/public/storefront/plan-change'
     | '/api/public/storefront/session'
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
@@ -1342,6 +1353,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
+    | '/api/public/storefront/plan-change'
     | '/api/public/storefront/session'
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
@@ -1463,6 +1475,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/checkout'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
+    | '/api/public/storefront/plan-change'
     | '/api/public/storefront/session'
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
@@ -1564,6 +1577,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontCheckoutRoute: typeof ApiPublicStorefrontCheckoutRoute
   ApiPublicStorefrontHandoffRoute: typeof ApiPublicStorefrontHandoffRoute
   ApiPublicStorefrontIdentityRoute: typeof ApiPublicStorefrontIdentityRoute
+  ApiPublicStorefrontPlanChangeRoute: typeof ApiPublicStorefrontPlanChangeRoute
   ApiPublicStorefrontSessionRoute: typeof ApiPublicStorefrontSessionRoute
   ApiPublicStorefrontSetupRoute: typeof ApiPublicStorefrontSetupRoute
   ApiPublicStorefrontWalletRoute: typeof ApiPublicStorefrontWalletRoute
@@ -2218,6 +2232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStorefrontSessionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/storefront/plan-change': {
+      id: '/api/public/storefront/plan-change'
+      path: '/api/public/storefront/plan-change'
+      fullPath: '/api/public/storefront/plan-change'
+      preLoaderRoute: typeof ApiPublicStorefrontPlanChangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/storefront/identity': {
       id: '/api/public/storefront/identity'
       path: '/api/public/storefront/identity'
@@ -2607,6 +2628,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontCheckoutRoute: ApiPublicStorefrontCheckoutRoute,
   ApiPublicStorefrontHandoffRoute: ApiPublicStorefrontHandoffRoute,
   ApiPublicStorefrontIdentityRoute: ApiPublicStorefrontIdentityRoute,
+  ApiPublicStorefrontPlanChangeRoute: ApiPublicStorefrontPlanChangeRoute,
   ApiPublicStorefrontSessionRoute: ApiPublicStorefrontSessionRoute,
   ApiPublicStorefrontSetupRoute: ApiPublicStorefrontSetupRoute,
   ApiPublicStorefrontWalletRoute: ApiPublicStorefrontWalletRoute,
@@ -2624,3 +2646,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

@@ -5,6 +5,7 @@
 // "Downgrade" to one on a dearer tier. Without it every card says "Get
 // started", which is wrong for anyone who already pays us.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { rankTenantCandidates, type TenantCandidate } from "@/server/billing-tenant.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
@@ -24,12 +25,17 @@ export async function planForTenant(tenantId: string | null): Promise<CurrentPla
 }
 
 /**
- * The plan behind a storefront `?uid=` link.
+ * Which workspace a storefront `?uid=` link points at — without creating one.
  *
- * Mirrors how uid checkout resolves its tenant, so the plan shown on the
- * pricing page is the plan the purchase would actually change.
+ * Ranked exactly as checkout and the subscription webhook rank it, because it
+ * has to reach the same answer they do. A plan change is recorded against the
+ * tenant the webhook picked; looking it up against a different one would show
+ * the workspace nothing and leave the notice unread forever.
+ *
+ * Deliberately read-only: the purchase path may provision a tenant for a clone
+ * that has none, but merely looking at a pricing page must not.
  */
-export async function planForBillingUserId(uid: string): Promise<CurrentPlan> {
+export async function tenantIdForBillingUserId(uid: string): Promise<string | null> {
   const { data: clone } = await adminAny
     .from("clones")
     .select("id")
@@ -37,14 +43,14 @@ export async function planForBillingUserId(uid: string): Promise<CurrentPlan> {
     .maybeSingle();
 
   if (clone?.id) {
-    const { data: tenant } = await adminAny
+    const { data: rows } = await adminAny
       .from("tenants")
-      .select("id")
-      .eq("clone_id", clone.id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (tenant?.id) return planForTenant(tenant.id);
+      .select("id, external_ref, billing_user_id, created_at")
+      .eq("clone_id", clone.id);
+    const best = rankTenantCandidates((rows ?? []) as TenantCandidate[], {
+      billingUserId: uid,
+    })[0];
+    if (best?.id) return best.id;
   }
 
   const { data: direct } = await adminAny
@@ -52,5 +58,15 @@ export async function planForBillingUserId(uid: string): Promise<CurrentPlan> {
     .select("id")
     .eq("billing_user_id", uid)
     .maybeSingle();
-  return planForTenant(direct?.id ?? null);
+  return direct?.id ?? null;
+}
+
+/**
+ * The plan behind a storefront `?uid=` link.
+ *
+ * Mirrors how uid checkout resolves its tenant, so the plan shown on the
+ * pricing page is the plan the purchase would actually change.
+ */
+export async function planForBillingUserId(uid: string): Promise<CurrentPlan> {
+  return planForTenant(await tenantIdForBillingUserId(uid));
 }
