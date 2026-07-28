@@ -92,6 +92,7 @@ import { Route as ClonesCloneIdSecretsRouteImport } from './routes/clones.$clone
 import { Route as ClientsHandoffTokenRouteImport } from './routes/clients.handoff.$token'
 import { Route as ApiPublicPurchasesRouteImport } from './routes/api.public.purchases'
 import { Route as ApiPublicTokensReserveRouteImport } from './routes/api.public.tokens.reserve'
+import { Route as ApiPublicTokensPlanChangeRouteImport } from './routes/api.public.tokens.plan-change'
 import { Route as ApiPublicTokensPacksRouteImport } from './routes/api.public.tokens.packs'
 import { Route as ApiPublicTokensCommitRouteImport } from './routes/api.public.tokens.commit'
 import { Route as ApiPublicTokensCancelRouteImport } from './routes/api.public.tokens.cancel'
@@ -550,6 +551,12 @@ const ApiPublicTokensReserveRoute = ApiPublicTokensReserveRouteImport.update({
   path: '/api/public/tokens/reserve',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTokensPlanChangeRoute =
+  ApiPublicTokensPlanChangeRouteImport.update({
+    id: '/api/public/tokens/plan-change',
+    path: '/api/public/tokens/plan-change',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicTokensPacksRoute = ApiPublicTokensPacksRouteImport.update({
   id: '/api/public/tokens/packs',
   path: '/api/public/tokens/packs',
@@ -873,6 +880,7 @@ export interface FileRoutesByFullPath {
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
+  '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
@@ -994,6 +1002,7 @@ export interface FileRoutesByTo {
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
+  '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
@@ -1117,6 +1126,7 @@ export interface FileRoutesById {
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
+  '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
@@ -1241,6 +1251,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
     | '/api/public/tokens/packs'
+    | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
@@ -1362,6 +1373,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
     | '/api/public/tokens/packs'
+    | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
@@ -1484,6 +1496,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
     | '/api/public/tokens/packs'
+    | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
@@ -1586,6 +1599,7 @@ export interface RootRouteChildren {
   ApiPublicTokensCancelRoute: typeof ApiPublicTokensCancelRoute
   ApiPublicTokensCommitRoute: typeof ApiPublicTokensCommitRoute
   ApiPublicTokensPacksRoute: typeof ApiPublicTokensPacksRoute
+  ApiPublicTokensPlanChangeRoute: typeof ApiPublicTokensPlanChangeRoute
   ApiPublicTokensReserveRoute: typeof ApiPublicTokensReserveRoute
   ApiPublicSeatsDevicesHeartbeatRoute: typeof ApiPublicSeatsDevicesHeartbeatRoute
   ApiPublicSeatsDevicesListRoute: typeof ApiPublicSeatsDevicesListRoute
@@ -2176,6 +2190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTokensReserveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/tokens/plan-change': {
+      id: '/api/public/tokens/plan-change'
+      path: '/api/public/tokens/plan-change'
+      fullPath: '/api/public/tokens/plan-change'
+      preLoaderRoute: typeof ApiPublicTokensPlanChangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/tokens/packs': {
       id: '/api/public/tokens/packs'
       path: '/api/public/tokens/packs'
@@ -2637,6 +2658,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTokensCancelRoute: ApiPublicTokensCancelRoute,
   ApiPublicTokensCommitRoute: ApiPublicTokensCommitRoute,
   ApiPublicTokensPacksRoute: ApiPublicTokensPacksRoute,
+  ApiPublicTokensPlanChangeRoute: ApiPublicTokensPlanChangeRoute,
   ApiPublicTokensReserveRoute: ApiPublicTokensReserveRoute,
   ApiPublicSeatsDevicesHeartbeatRoute: ApiPublicSeatsDevicesHeartbeatRoute,
   ApiPublicSeatsDevicesListRoute: ApiPublicSeatsDevicesListRoute,
