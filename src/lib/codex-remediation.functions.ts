@@ -3,6 +3,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+// Mirrors REMEDIATION_ENGINE in @/server/codex-remediation.server. Declared
+// literally rather than imported: this module is loaded by route components,
+// and a static `*.server.ts` import would fail client import protection.
+const REMEDIATION_ENGINE = "codex_cli";
+
 const DraftInput = z.object({
   findingId: z.string().uuid(),
   baseRef: z.string().optional(),
@@ -71,7 +76,7 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
     const { data: finding, error: fErr } = await supabase
       .from("codex_findings")
       .select(
-        "id, scan_job_id, clone_id, codex_finding_id, title, severity, description, affected_file, affected_line, cwe, state",
+        "id, scan_job_id, clone_id, codex_finding_id, title, severity, description, affected_file, affected_line, cwe, state, snippet, scanner, rule_id",
       )
       .eq("id", data.findingId)
       .maybeSingle();
@@ -110,6 +115,9 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
         base_ref: baseRef,
         branch_name: branchName,
         status: "queued",
+        // The patch is authored by the OpenAI Codex CLI on the target repo's
+        // Actions runner — recorded so a reviewer can see what wrote it.
+        engine: REMEDIATION_ENGINE,
         requested_by: userId,
         dispatch_payload: {
           finding_id: finding.codex_finding_id,
@@ -153,6 +161,11 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
             file: finding.affected_file,
             line: finding.affected_line,
             cwe: finding.cwe,
+            // Give the model the offending source and which rule fired —
+            // a title and a line number alone make for weak patches.
+            snippet: finding.snippet,
+            scanner: finding.scanner,
+            ruleId: finding.rule_id,
           },
           callbackUrl: remediationCallbackUrl(),
           callbackSecret,
@@ -225,13 +238,32 @@ export const listRemediations = createServerFn({ method: "GET" })
     let q = context.supabase
       .from("codex_remediations")
       .select(
-        "id, finding_id, scan_job_id, repo_full_name, base_ref, branch_name, workflow_run_id, workflow_run_url, pr_number, pr_url, pr_state, status, last_error, dispatched_at, completed_at, created_at, requested_by, approvals_required, merged_at, merged_by, merge_commit_sha, clone_id, cascade_event_id",
+        "id, finding_id, scan_job_id, repo_full_name, base_ref, branch_name, workflow_run_id, workflow_run_url, pr_number, pr_url, pr_state, status, last_error, dispatched_at, completed_at, created_at, requested_by, approvals_required, merged_at, merged_by, merge_commit_sha, clone_id, cascade_event_id, engine, model, verification, verified, files_changed, lines_added, lines_removed, fix_confirmed_at",
       )
       .order("created_at", { ascending: false })
       .limit(100);
     if (data.jobId) q = q.eq("scan_job_id", data.jobId);
     if (data.findingId) q = q.eq("finding_id", data.findingId);
     const { data: rows, error } = await q;
-    if (error) throw error;
+    // A deployment that has not applied 20260728090000 yet does not have the
+    // verification columns; fall back to the base set rather than blanking
+    // the whole remediation list.
+    if (error) {
+      if (error.code !== "42703" && !/column .* does not exist/i.test(error.message ?? "")) {
+        throw error;
+      }
+      let fallback = context.supabase
+        .from("codex_remediations")
+        .select(
+          "id, finding_id, scan_job_id, repo_full_name, base_ref, branch_name, workflow_run_id, workflow_run_url, pr_number, pr_url, pr_state, status, last_error, dispatched_at, completed_at, created_at, requested_by, approvals_required, merged_at, merged_by, merge_commit_sha, clone_id, cascade_event_id",
+        )
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (data.jobId) fallback = fallback.eq("scan_job_id", data.jobId);
+      if (data.findingId) fallback = fallback.eq("finding_id", data.findingId);
+      const { data: legacyRows, error: legacyErr } = await fallback;
+      if (legacyErr) throw legacyErr;
+      return { remediations: legacyRows ?? [] };
+    }
     return { remediations: rows ?? [] };
   });

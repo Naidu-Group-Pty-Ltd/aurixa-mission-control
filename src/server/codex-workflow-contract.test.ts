@@ -127,6 +127,9 @@ describe("remediation dispatch payload", () => {
     line: 42,
     cwe: "CWE-89",
     description: "Concatenated user input into a query.",
+    scanner: "semgrep",
+    ruleId: "javascript.lang.security.audit.sqli",
+    snippet: "db.query(`SELECT * FROM reports WHERE id = ${req.params.id}`)",
   };
 
   async function dispatch() {
@@ -170,7 +173,24 @@ describe("remediation dispatch payload", () => {
       line: "42",
       cwe: "CWE-89",
       description: "Concatenated user input into a query.",
+      // Provenance and the offending source travel as their own fields:
+      // a title and a line number alone make for weak patches.
+      scanner: "semgrep",
+      ruleId: "javascript.lang.security.audit.sqli",
+      snippet: "db.query(`SELECT * FROM reports WHERE id = ${req.params.id}`)",
     });
+  });
+
+  it("gives the workflow's renderer every field it reads", async () => {
+    // The render step clamps a fixed field list; anything the dispatcher
+    // sends that it does not know about is silently dropped on the floor.
+    const rendered = readFileSync(
+      path.join(process.cwd(), ".github", "workflows", "codex-remediation.yml"),
+      "utf8",
+    );
+    for (const field of Object.keys(JSON.parse((await dispatch()).finding))) {
+      expect(rendered, `render step ignores finding.${field}`).toContain(`${field}:`);
+    }
   });
 });
 

@@ -226,6 +226,41 @@ export const Route = createFileRoute("/api/public/hooks/codex-security")({
 });
 
 /**
+ * Stamp merged remediations whose finding a later full-tree scan can no
+ * longer see. Merging a PR proves a patch landed; it does not prove the
+ * vulnerability is gone. This is the only place that distinction is made.
+ */
+async function confirmMergedFixes(
+  admin: any,
+  resolvedFindingIds: string[],
+  jobId: string,
+  nowIso: string,
+): Promise<number> {
+  const { data: merged } = await admin
+    .from("codex_remediations")
+    .select("id, finding_id")
+    .in("finding_id", resolvedFindingIds)
+    .eq("status", "merged")
+    .is("fix_confirmed_at", null);
+
+  const ids = (merged ?? []).map((r: any) => r.id);
+  if (!ids.length) return 0;
+
+  await admin
+    .from("codex_remediations")
+    .update({ fix_confirmed_at: nowIso, fix_confirmed_by_job_id: jobId })
+    .in("id", ids);
+
+  await admin.from("codex_scan_events").insert({
+    job_id: jobId,
+    event_type: "remediation.fix_confirmed",
+    payload: { count: ids.length, remediation_ids: ids },
+  });
+
+  return ids.length;
+}
+
+/**
  * Close out a scan: recount severities from what was actually stored, and
  * for full-tree scans resolve anything the previous scan of this target
  * reported that this one no longer does.
@@ -246,6 +281,7 @@ async function finalizeScan(admin: any, job: any, payload: any, nowIso: string) 
   }
 
   let autoResolved = 0;
+  let confirmedFixes = 0;
   if (canAutoResolve(job.kind)) {
     const previousQuery = admin
       .from("codex_scan_jobs")
@@ -284,6 +320,11 @@ async function finalizeScan(admin: any, job: any, payload: any, nowIso: string) 
           event_type: "findings_auto_resolved",
           payload: { count: autoResolved, previous_job_id: previousJobId },
         });
+
+        // Closing the loop: a finding that had a merged remediation and is
+        // now absent from a fresh full-tree scan is independent evidence the
+        // patch actually worked — not just that a PR was merged.
+        confirmedFixes = await confirmMergedFixes(admin, goneIds, job.id, nowIso);
       }
     }
   }
@@ -293,6 +334,7 @@ async function finalizeScan(admin: any, job: any, payload: any, nowIso: string) 
     ...counts,
     open_total: Object.values(counts).reduce((a, b) => a + b, 0),
     auto_resolved: autoResolved,
+    confirmed_fixes: confirmedFixes,
     engine: payload.engine ?? "github_actions",
   };
 

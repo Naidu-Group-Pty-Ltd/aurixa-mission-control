@@ -6,6 +6,8 @@ import {
   earliestTimestamp,
   emptySeverityCounts,
   mostDecisiveState,
+  shouldReopenOnRemediationFailure,
+  summarizeVerification,
 } from "@/lib/codex-finding-state";
 
 describe("carryForwardState", () => {
@@ -111,6 +113,71 @@ describe("canAutoResolve", () => {
     expect(canAutoResolve("pr_open")).toBe(false);
     expect(canAutoResolve("targeted_path")).toBe(false);
     expect(canAutoResolve("something_new")).toBe(false);
+  });
+});
+
+describe("shouldReopenOnRemediationFailure", () => {
+  it("reopens a finding parked on a fix that never landed", () => {
+    // Without this the finding stays "fix drafted" with no PR behind it,
+    // drops out of the open count, and is silently never fixed.
+    expect(shouldReopenOnRemediationFailure("fix_drafted")).toBe(true);
+    expect(shouldReopenOnRemediationFailure("pr_open")).toBe(true);
+  });
+
+  it("leaves settled states alone", () => {
+    for (const state of [
+      "open",
+      "triaging",
+      "fix_merged",
+      "resolved",
+      "dismissed",
+      "false_positive",
+    ]) {
+      expect(shouldReopenOnRemediationFailure(state)).toBe(false);
+    }
+    expect(shouldReopenOnRemediationFailure(null)).toBe(false);
+    expect(shouldReopenOnRemediationFailure(undefined)).toBe(false);
+  });
+});
+
+describe("summarizeVerification", () => {
+  it("passes only when every executed check passed", () => {
+    const s = summarizeVerification({
+      checks: [
+        { name: "typecheck", ok: true },
+        { name: "test", ok: true },
+      ],
+    });
+    expect(s).toEqual({ ran: 2, failed: [], ok: true });
+  });
+
+  it("reports the failing checks", () => {
+    const s = summarizeVerification({
+      checks: [
+        { name: "typecheck", ok: true },
+        { name: "test", ok: false, detail: "1 failing" },
+      ],
+    });
+    expect(s.ok).toBe(false);
+    expect(s.failed.map((c) => c.name)).toEqual(["test"]);
+  });
+
+  it("does not count skipped checks as evidence", () => {
+    const s = summarizeVerification({
+      checks: [
+        { name: "test", ok: true, skipped: true },
+        { name: "build", ok: true, skipped: true },
+      ],
+    });
+    // A repo with no test script has proved nothing about the patch — that
+    // must read as unknown, never as a pass.
+    expect(s).toEqual({ ran: 0, failed: [], ok: null });
+  });
+
+  it("returns unknown for missing verification data", () => {
+    expect(summarizeVerification(null).ok).toBeNull();
+    expect(summarizeVerification(undefined).ok).toBeNull();
+    expect(summarizeVerification({}).ok).toBeNull();
   });
 });
 

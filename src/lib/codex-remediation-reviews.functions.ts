@@ -35,17 +35,15 @@ export const reviewRemediation = createServerFn({ method: "POST" })
     }
 
     // Upsert reviewer's decision (one review per admin per remediation).
-    const { error: upErr } = await supabase
-      .from("codex_remediation_reviews")
-      .upsert(
-        {
-          remediation_id: rem.id,
-          reviewer_id: userId,
-          decision: data.decision,
-          comment: data.comment ?? null,
-        },
-        { onConflict: "remediation_id,reviewer_id" },
-      );
+    const { error: upErr } = await supabase.from("codex_remediation_reviews").upsert(
+      {
+        remediation_id: rem.id,
+        reviewer_id: userId,
+        decision: data.decision,
+        comment: data.comment ?? null,
+      },
+      { onConflict: "remediation_id,reviewer_id" },
+    );
     if (upErr) throw upErr;
 
     // Recompute aggregate status.
@@ -55,14 +53,11 @@ export const reviewRemediation = createServerFn({ method: "POST" })
       .eq("remediation_id", rem.id);
     const approvals = (reviews ?? []).filter((r: any) => r.decision === "approve").length;
     const rejects = (reviews ?? []).filter((r: any) => r.decision === "reject").length;
-    const changes = (reviews ?? []).filter(
-      (r: any) => r.decision === "changes_requested",
-    ).length;
+    const changes = (reviews ?? []).filter((r: any) => r.decision === "changes_requested").length;
 
     let newStatus: string | null = null;
     if (rejects > 0) newStatus = "rejected";
-    else if (changes > 0 && approvals < rem.approvals_required)
-      newStatus = "changes_requested";
+    else if (changes > 0 && approvals < rem.approvals_required) newStatus = "changes_requested";
     else if (approvals >= rem.approvals_required) newStatus = "approved";
 
     if (newStatus && newStatus !== rem.status) {
@@ -143,9 +138,7 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
     );
     const uniqueApprovers = new Set(approvals.map((r: any) => r.reviewer_id));
     if (uniqueApprovers.size < rem.approvals_required) {
-      throw new Error(
-        `Insufficient approvals: ${uniqueApprovers.size}/${rem.approvals_required}`,
-      );
+      throw new Error(`Insufficient approvals: ${uniqueApprovers.size}/${rem.approvals_required}`);
     }
     if ((reviews ?? []).some((r: any) => r.decision === "reject")) {
       throw new Error("A reviewer rejected this remediation");
@@ -157,15 +150,13 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
     const [owner, repo] = (rem.repo_full_name || "").split("/");
     if (!owner || !repo) throw new Error("Invalid repo on remediation");
 
-    // Resolve installation id from prime_config or clones.
+    // Resolve installation id from prime_config or clones. The clone lookup
+    // goes through the tolerant loader — naming an optional column inline
+    // fails the whole select on an unmigrated deployment.
     let installationId: string | null = null;
     if (rem.clone_id) {
-      const { data: c } = await supabase
-        .from("clones")
-        .select("github_app_installation_id")
-        .eq("id", rem.clone_id)
-        .maybeSingle();
-      installationId = c?.github_app_installation_id ?? null;
+      const { loadCloneInstallationId } = await import("@/server/clone-installation.server");
+      installationId = await loadCloneInstallationId(supabase, rem.clone_id);
     } else {
       const { data: p } = await supabase
         .from("prime_config")
@@ -175,9 +166,7 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
       installationId = p?.github_app_installation_id ?? null;
     }
 
-    const { mergeRemediationPRViaGitHub } = await import(
-      "@/server/codex-remediation.server"
-    );
+    const { mergeRemediationPRViaGitHub } = await import("@/server/codex-remediation.server");
     const merge = await mergeRemediationPRViaGitHub({
       owner,
       repo,
@@ -214,9 +203,7 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
         const sourceBranch = prime?.default_branch || rem.base_ref || "main";
         const title = (finding?.title || "security patch").slice(0, 140);
         const severity = (finding?.severity || "").toUpperCase();
-        const { createCascadeForAllClones } = await import(
-          "@/server/cascade-trigger.server"
-        );
+        const { createCascadeForAllClones } = await import("@/server/cascade-trigger.server");
         const cascade = await createCascadeForAllClones({
           supabase: supabaseAdmin as any,
           mode,
@@ -286,6 +273,10 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
     return {
       ok: true,
       sha: merge.sha,
+      // Remediation PRs are opened as drafts and GitHub refuses to merge a
+      // draft; the merge helper clears the flag first. Surfaced so the
+      // operator knows the PR left draft state on their behalf.
+      wasDraft: merge.wasDraft,
       cascadeEventId,
       cascadeError,
     };

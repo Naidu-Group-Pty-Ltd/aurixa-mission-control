@@ -7,16 +7,39 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import {
-  ShieldAlert, PlayCircle, RefreshCw, GitPullRequest, ExternalLink,
-  CheckCircle2, AlertTriangle, XCircle, Activity,
+  ShieldAlert,
+  PlayCircle,
+  RefreshCw,
+  GitPullRequest,
+  ExternalLink,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Activity,
 } from "lucide-react";
 import { getCodexEngineHealth } from "@/lib/codex-engine-health.functions";
-import { enqueueScan, listScanJobs, getScanDetail, getSchedulingConfig, updateSchedulingConfig, runNightlyNow, listCloneCodexOverview, runCloneScanNow, setCloneNightly } from "@/lib/codex-security.functions";
+import { summarizeVerification } from "@/lib/codex-finding-state";
+import {
+  enqueueScan,
+  listScanJobs,
+  getScanDetail,
+  getSchedulingConfig,
+  updateSchedulingConfig,
+  runNightlyNow,
+  listCloneCodexOverview,
+  runCloneScanNow,
+  setCloneNightly,
+} from "@/lib/codex-security.functions";
 import { Link } from "@tanstack/react-router";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -107,7 +130,6 @@ function CodexScansPage() {
       <FleetOverviewPanel />
 
       <Card>
-
         <CardHeader>
           <CardTitle>Recent scans</CardTitle>
           <CardDescription>Last 100 jobs across Prime and clone fleet.</CardDescription>
@@ -134,8 +156,12 @@ function CodexScansPage() {
                       {j.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-xs">{j.started_at?.slice(0, 19).replace("T", " ") || "—"}</TableCell>
-                  <TableCell className="text-xs">{j.completed_at?.slice(0, 19).replace("T", " ") || "—"}</TableCell>
+                  <TableCell className="text-xs">
+                    {j.started_at?.slice(0, 19).replace("T", " ") || "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {j.completed_at?.slice(0, 19).replace("T", " ") || "—"}
+                  </TableCell>
                   <TableCell>
                     <Button size="sm" variant="ghost" onClick={() => setOpenJob(j.id)}>
                       View
@@ -201,14 +227,19 @@ function ScanDetail({ jobId }: { jobId: string }) {
       ) : (
         <>
           <div className="text-sm space-y-1">
-            <div><span className="text-muted-foreground">Repo:</span> {d.job.repo_full_name}</div>
-            <div><span className="text-muted-foreground">Status:</span> {d.job.status}</div>
+            <div>
+              <span className="text-muted-foreground">Repo:</span> {d.job.repo_full_name}
+            </div>
+            <div>
+              <span className="text-muted-foreground">Status:</span> {d.job.status}
+            </div>
             {d.job.last_error && (
               <div className="text-red-500 text-xs whitespace-pre-wrap">{d.job.last_error}</div>
             )}
           </div>
           <div>
             <h3 className="font-semibold mb-2">Findings ({d.findings.length})</h3>
+            {d.findings.length > 0 && <RemediationExplainer />}
             <div className="space-y-2">
               {d.findings.map((f: any) => {
                 const rem = remByFinding[f.id];
@@ -216,13 +247,18 @@ function ScanDetail({ jobId }: { jobId: string }) {
                 return (
                   <div key={f.id} className="border rounded p-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className={`inline-block w-2 h-2 rounded-full ${sevColor[f.severity]}`} />
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${sevColor[f.severity]}`}
+                      />
                       <span className="font-medium">{f.title}</span>
-                      <Badge variant="outline" className="ml-auto">{f.state}</Badge>
+                      <Badge variant="outline" className="ml-auto">
+                        {f.state}
+                      </Badge>
                     </div>
                     {f.affected_file && (
                       <div className="text-xs font-mono text-muted-foreground">
-                        {f.affected_file}{f.affected_line ? `:${f.affected_line}` : ""}
+                        {f.affected_file}
+                        {f.affected_line ? `:${f.affected_line}` : ""}
                       </div>
                     )}
                     {f.description && <p className="text-xs">{f.description}</p>}
@@ -237,7 +273,9 @@ function ScanDetail({ jobId }: { jobId: string }) {
                         {rem ? (canDraft ? "Retry Fix PR" : "Fix in flight") : "Draft Fix PR"}
                       </Button>
                       {rem && (
-                        <Badge variant="outline" className="text-[10px]">rem: {rem.status}</Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          rem: {rem.status}
+                        </Badge>
                       )}
                       {rem?.pr_url && (
                         <a
@@ -263,6 +301,7 @@ function ScanDetail({ jobId }: { jobId: string }) {
                         <span className="text-[10px] text-red-500">{rem.last_error}</span>
                       )}
                     </div>
+                    {rem && <RemediationEvidence remediation={rem} />}
                     {rem && !["failed", "closed"].includes(rem.status) && (
                       <RemediationReviewPanel remediation={rem} />
                     )}
@@ -291,6 +330,142 @@ function ScanDetail({ jobId }: { jobId: string }) {
   );
 }
 
+/**
+ * Spells out what "Draft Fix PR" actually does. Operators were being asked
+ * to trigger autonomous code changes against production repositories with
+ * no in-product statement of what writes the code or what stops it.
+ */
+function RemediationExplainer() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3 rounded-md border bg-muted/20 p-2 text-[11px]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1 text-left font-medium"
+      >
+        <GitPullRequest className="h-3 w-3" />
+        What “Draft Fix PR” does
+        <span className="ml-auto text-muted-foreground">{open ? "hide" : "show"}</span>
+      </button>
+      {open && (
+        <ol className="mt-2 list-decimal space-y-1 pl-4 text-muted-foreground">
+          <li>
+            Mission Control dispatches <code>codex-remediation.yml</code> in the finding&apos;s own
+            repository through the Aurixa GitHub App. It never edits code itself.
+          </li>
+          <li>
+            On that runner, the <strong>OpenAI Codex CLI</strong> (<code>codex exec</code>,
+            sandboxed to the workspace) reads the repo and edits real files to fix the finding — it
+            is given the title, severity, file, line, CWE and the offending code excerpt.
+          </li>
+          <li>
+            The patch is measured (files touched, lines added/removed) and scanned with gitleaks.
+            <strong> A patch that introduces a secret is never pushed.</strong>
+          </li>
+          <li>
+            The repo&apos;s own checks — typecheck, lint, test, build, whichever exist — run against
+            the patched tree. Failures do not block the PR; they are reported on it so you can see a
+            broken fix rather than have it discarded.
+          </li>
+          <li>
+            A <strong>draft</strong> pull request is opened. Merging requires two independent admin
+            approvals here; the requester cannot approve their own.
+          </li>
+          <li>
+            After merge, a Prime patch cascades to the fleet, and the next full scan confirms the
+            finding is actually gone before the fix is marked verified.
+          </li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What produced this patch and whether it holds up. Reviewers were
+ * previously asked to approve a PR link with no visibility into what wrote
+ * it, whether the patched tree still builds, or how much it touched.
+ */
+function RemediationEvidence({ remediation: rem }: { remediation: any }) {
+  const v = rem.verification ?? {};
+  const checks: any[] = Array.isArray(v.checks) ? v.checks : [];
+  const ran = checks.filter((c) => !c.skipped);
+  const { failed } = summarizeVerification(v);
+  const hasRadius = rem.files_changed != null;
+
+  // Nothing reported back yet (still dispatching, or a pre-migration row).
+  if (!hasRadius && checks.length === 0 && rem.verified == null) return null;
+
+  return (
+    <div className="mt-2 space-y-1 rounded-md border bg-muted/20 p-2 text-[11px]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-muted-foreground">
+          patched by{" "}
+          <span className="font-mono text-foreground">
+            {rem.engine === "codex_cli" ? "OpenAI Codex CLI" : (rem.engine ?? "unknown")}
+          </span>
+        </span>
+        {hasRadius && (
+          <span className="text-muted-foreground">
+            {rem.files_changed} file{rem.files_changed === 1 ? "" : "s"}{" "}
+            <span className="text-emerald-500">+{rem.lines_added ?? 0}</span>{" "}
+            <span className="text-red-500">-{rem.lines_removed ?? 0}</span>
+          </span>
+        )}
+        {v.secrets_clean === true && (
+          <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-500">
+            no secrets
+          </Badge>
+        )}
+        {v.secrets_clean === false && (
+          <Badge variant="destructive" className="text-[9px]">
+            secret leak — not pushed
+          </Badge>
+        )}
+        {rem.verified === true && (
+          <Badge className="bg-emerald-600 text-[9px]">checks passing</Badge>
+        )}
+        {rem.verified === false && (
+          <Badge variant="destructive" className="text-[9px]">
+            checks failing
+          </Badge>
+        )}
+        {rem.fix_confirmed_at && (
+          <Badge
+            className="bg-blue-600 text-[9px]"
+            title="A later full scan no longer reports this finding"
+          >
+            fix confirmed by re-scan
+          </Badge>
+        )}
+      </div>
+
+      {ran.length > 0 && (
+        <div className="flex flex-wrap gap-2 text-muted-foreground">
+          {ran.map((c) => (
+            <span key={c.name} className={c.ok ? "text-emerald-500" : "text-red-500"}>
+              {c.ok ? "✓" : "✗"} {c.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {failed.length > 0 && failed[0].detail && (
+        <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words rounded border border-destructive/20 bg-destructive/5 p-1 font-mono text-[10px] text-destructive">
+          {failed[0].detail.slice(-600)}
+        </pre>
+      )}
+
+      {rem.verified === false && (
+        <p className="text-muted-foreground">
+          The fix is still opened as a draft PR on purpose — review it rather than merging.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RemediationReviewPanel({ remediation }: { remediation: any }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -305,7 +480,9 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
   const mergeFn = useServerFn(mergeRemediationPR);
   const review = useMutation({
     mutationFn: (decision: "approve" | "reject" | "changes_requested") =>
-      reviewFn({ data: { remediationId: remediation.id, decision, comment: comment || undefined } }),
+      reviewFn({
+        data: { remediationId: remediation.id, decision, comment: comment || undefined },
+      }),
     onSuccess: () => {
       toast.success("Review recorded");
       setComment("");
@@ -318,6 +495,10 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
     mutationFn: () => mergeFn({ data: { remediationId: remediation.id } }),
     onSuccess: (r: any) => {
       const sha = r?.sha ? ` ${r.sha.slice(0, 7)}` : "";
+      if (r?.wasDraft) {
+        // GitHub cannot merge a draft; the server clears the flag first.
+        toast.info("PR was in draft — marked ready for review before merging.");
+      }
       if (r?.cascadeEventId) {
         toast.success(`Merged${sha} — cascade queued`);
       } else if (r?.cascadeError) {
@@ -351,9 +532,15 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
     <div className="mt-2 border-t pt-2 space-y-2">
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
         <span>
-          Approvals: <b className={approvers.size >= required ? "text-emerald-500" : ""}>{approvers.size}</b>/{required}
+          Approvals:{" "}
+          <b className={approvers.size >= required ? "text-emerald-500" : ""}>{approvers.size}</b>/
+          {required}
         </span>
-        {rejected && <Badge variant="destructive" className="text-[10px]">rejected</Badge>}
+        {rejected && (
+          <Badge variant="destructive" className="text-[10px]">
+            rejected
+          </Badge>
+        )}
         {remediation.status === "approved" && (
           <Badge className="text-[10px] bg-emerald-600">approved</Badge>
         )}
@@ -387,7 +574,9 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
               >
                 {r.decision}
               </Badge>
-              {r.comment && <span className="italic text-muted-foreground truncate">{r.comment}</span>}
+              {r.comment && (
+                <span className="italic text-muted-foreground truncate">{r.comment}</span>
+              )}
             </div>
           ))}
         </div>
@@ -397,7 +586,9 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
           <Textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder={alreadyReviewed ? "Update comment (optional)" : "Review comment (optional)"}
+            placeholder={
+              alreadyReviewed ? "Update comment (optional)" : "Review comment (optional)"
+            }
             className="text-xs min-h-[48px]"
           />
           <div className="flex gap-1 flex-wrap">
@@ -584,7 +775,9 @@ function SchedulingPanel() {
   const runNow = useMutation({
     mutationFn: () => runNowFn({}),
     onSuccess: (r: any) => {
-      toast.success(`Nightly triggered — ${r.enqueued?.length ?? 0} queued, ${r.skipped?.length ?? 0} skipped`);
+      toast.success(
+        `Nightly triggered — ${r.enqueued?.length ?? 0} queued, ${r.skipped?.length ?? 0} skipped`,
+      );
       qc.invalidateQueries({ queryKey: ["codex-scan-jobs"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -601,7 +794,12 @@ function SchedulingPanel() {
             Nightly full scans, PR-driven scans, and post-merge revalidation.
           </CardDescription>
         </div>
-        <Button size="sm" variant="outline" onClick={() => runNow.mutate()} disabled={runNow.isPending}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => runNow.mutate()}
+          disabled={runNow.isPending}
+        >
           <PlayCircle className="h-4 w-4 mr-1" />
           {runNow.isPending ? "Running…" : "Run nightly now"}
         </Button>
@@ -610,7 +808,9 @@ function SchedulingPanel() {
         <div className="flex items-center justify-between rounded-md border p-3">
           <div>
             <Label className="font-medium">Nightly full scans</Label>
-            <p className="text-xs text-muted-foreground">Prime + every clone with nightly enabled.</p>
+            <p className="text-xs text-muted-foreground">
+              Prime + every clone with nightly enabled.
+            </p>
           </div>
           <Switch
             checked={!!cfg.codex_nightly_enabled}
@@ -620,7 +820,9 @@ function SchedulingPanel() {
         <div className="flex items-center justify-between rounded-md border p-3">
           <div>
             <Label className="font-medium">PR-open scans</Label>
-            <p className="text-xs text-muted-foreground">Scan every opened / updated PR head SHA.</p>
+            <p className="text-xs text-muted-foreground">
+              Scan every opened / updated PR head SHA.
+            </p>
           </div>
           <Switch
             checked={!!cfg.codex_pr_scan_enabled}
@@ -630,7 +832,9 @@ function SchedulingPanel() {
         <div className="flex items-center justify-between rounded-md border p-3">
           <div>
             <Label className="font-medium">Post-merge revalidate</Label>
-            <p className="text-xs text-muted-foreground">Re-scan Prime after each merge to catch fix regressions.</p>
+            <p className="text-xs text-muted-foreground">
+              Re-scan Prime after each merge to catch fix regressions.
+            </p>
           </div>
           <Switch
             checked={cfg.codex_post_merge_revalidate !== false}
@@ -679,7 +883,8 @@ function SchedulingPanel() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Recorded for reference — the active schedule is set in pg_cron. Update the cron job SQL to change fire time.
+            Recorded for reference — the active schedule is set in pg_cron. Update the cron job SQL
+            to change fire time.
           </p>
         </div>
       </CardContent>
@@ -726,7 +931,9 @@ function FleetOverviewPanel() {
           const r: any = await runFn({ data: { cloneId: c.id } });
           if (r?.skipped) skipped++;
           else queued++;
-        } catch { skipped++; }
+        } catch {
+          skipped++;
+        }
       }
       return { queued, skipped };
     },
@@ -802,7 +1009,9 @@ function FleetOverviewPanel() {
                           {last.status}
                         </Badge>
                         <div className="text-muted-foreground">
-                          {(last.completed_at ?? last.started_at ?? last.created_at)?.slice(0, 19).replace("T", " ")}
+                          {(last.completed_at ?? last.started_at ?? last.created_at)
+                            ?.slice(0, 19)
+                            .replace("T", " ")}
                         </div>
                       </div>
                     ) : (
