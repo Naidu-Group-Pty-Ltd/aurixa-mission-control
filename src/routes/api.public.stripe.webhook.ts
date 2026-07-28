@@ -362,9 +362,24 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
     .eq("stripe_subscription_id", sub.id);
 }
 
+/**
+ * The invoice ledger is a read-only mirror for the billing & usage page. It is
+ * bookkeeping, and it must never be the reason an entitlement update does not
+ * happen: when `public.invoices` was missing in production, an unguarded mirror
+ * here failed every `invoice.paid` event, which meant a renewal that Stripe had
+ * collected never cleared `past_due` on the subscription.
+ */
+async function mirrorInvoice(invoice: Stripe.Invoice) {
+  try {
+    await upsertInvoiceRecord(invoice);
+  } catch (err) {
+    console.error("[webhook] invoice mirror failed (continuing)", err);
+  }
+}
+
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // Mirror every invoice into the invoices ledger (billing & usage page).
-  await upsertInvoiceRecord(invoice);
+  await mirrorInvoice(invoice);
 
   // Renewal succeeded — clear past_due if it was set.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -381,7 +396,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 async function handleInvoiceFailed(invoice: Stripe.Invoice) {
-  await upsertInvoiceRecord(invoice);
+  await mirrorInvoice(invoice);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subId = (invoice as any).subscription as string | null | undefined;
@@ -513,7 +528,7 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             case "invoice.voided":
             case "invoice.marked_uncollectible":
               // Keep the mirrored ledger row in step with Stripe's lifecycle.
-              await upsertInvoiceRecord(event.data.object as Stripe.Invoice);
+              await mirrorInvoice(event.data.object as Stripe.Invoice);
               break;
             case "invoice.payment_failed":
             case "payment_intent.payment_failed":

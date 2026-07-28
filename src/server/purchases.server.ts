@@ -52,6 +52,95 @@ function stripeId(v: string | { id: string } | null | undefined): string | null 
 }
 
 /**
+ * Columns that ARE the purchase record. If one of these is rejected the row is
+ * not worth writing — a purchase with no session id or no attribution is worse
+ * than a logged failure, because it looks like a record while answering none of
+ * the questions the ledger exists to answer.
+ *
+ * Everything outside this set is descriptive: nice to have, never worth losing
+ * the row over.
+ */
+const PURCHASE_IDENTITY_COLUMNS = [
+  "stripe_checkout_session_id",
+  "mode",
+  "item_id",
+  "clone_id",
+  "tenant_id",
+  "handoff_id",
+  "origin_user_id",
+  "origin_username",
+  "origin_source",
+  "status",
+] as const;
+
+/**
+ * Pulls the offending column name out of a Postgres/PostgREST error.
+ *
+ * Two shapes mean the same thing, and both have been seen in production:
+ *   • SQLSTATE 42703 — `column purchases.item_name does not exist`
+ *     (the column genuinely is not there)
+ *   • PGRST204      — `Could not find the 'item_name' column of 'purchases'
+ *     in the schema cache` (it is there, but PostgREST has not noticed yet)
+ *
+ * Returns null for anything else, so real errors are never mistaken for drift.
+ */
+export function unknownColumnFromError(
+  error: { message?: string | null; code?: string | null } | null | undefined,
+): string | null {
+  const msg = error?.message ?? "";
+  if (!msg) return null;
+  const missing = /column\s+(?:[\w.]+\.)?["']?(\w+)["']?\s+does not exist/i.exec(msg);
+  if (missing) return missing[1];
+  const cache = /could not find the ['"]?(\w+)['"]? column/i.exec(msg);
+  if (cache) return cache[1];
+  return null;
+}
+
+type WriteResult = { error: { message?: string | null; code?: string | null } | null };
+
+/**
+ * Writes a row, degrading around columns the database does not have.
+ *
+ * A schema that has drifted behind the code should cost us the columns that
+ * drifted, not the record. This is not hypothetical: migration 20260725150000
+ * added `purchases.item_name` and only partly applied in production, so from
+ * 2026-07-25 every insert here failed on that one descriptive column and the
+ * purchase ledger silently stopped recording — while checkout itself, and the
+ * money, carried on working perfectly.
+ *
+ * Retries are bounded by the number of droppable columns, and an identity
+ * column being rejected aborts rather than degrades.
+ */
+async function writeToleratingSchemaDrift(
+  write: (row: Record<string, unknown>) => Promise<WriteResult>,
+  row: Record<string, unknown>,
+  identityColumns: readonly string[],
+): Promise<{ dropped: string[] }> {
+  let payload = { ...row };
+  const dropped: string[] = [];
+  const droppable = Object.keys(row).filter((k) => !identityColumns.includes(k));
+
+  for (let attempt = 0; attempt <= droppable.length; attempt++) {
+    const { error } = await write(payload);
+    if (!error) return { dropped };
+
+    const column = unknownColumnFromError(error);
+    if (!column || !(column in payload) || identityColumns.includes(column)) {
+      throw new Error(error.message ?? "purchase_write_failed");
+    }
+
+    const { [column]: _gone, ...rest } = payload;
+    payload = rest;
+    dropped.push(column);
+    console.warn(
+      `[purchases] column '${column}' rejected by the database; retrying without it. ` +
+        `Schema is behind the code — apply pending migrations.`,
+    );
+  }
+  throw new Error("purchase_write_failed: exhausted column fallbacks");
+}
+
+/**
  * Maps a checkout session onto a `purchases` row patch. Pure — unit tested.
  * Used both at completion time (webhook) and as the upsert body when the
  * initiated-insert never happened (pre-feature sessions, insert failures).
@@ -105,22 +194,25 @@ export async function recordPurchaseInitiated(input: {
   attribution: OriginAttribution;
 }): Promise<void> {
   try {
-    const { error } = await adminAny.from("purchases").insert({
-      stripe_checkout_session_id: input.sessionId,
-      mode: input.mode,
-      item_id: input.itemId,
-      item_slug: input.itemSlug,
-      item_name: input.itemName ?? null,
-      quantity: input.quantity,
-      clone_id: input.cloneId,
-      tenant_id: input.tenantId,
-      handoff_id: input.attribution.handoffId,
-      origin_user_id: input.attribution.originUserId,
-      origin_username: input.attribution.originUsername,
-      origin_source: input.attribution.originSource,
-      status: "initiated",
-    });
-    if (error) throw new Error(error.message);
+    await writeToleratingSchemaDrift(
+      (row) => adminAny.from("purchases").insert(row),
+      {
+        stripe_checkout_session_id: input.sessionId,
+        mode: input.mode,
+        item_id: input.itemId,
+        item_slug: input.itemSlug,
+        item_name: input.itemName ?? null,
+        quantity: input.quantity,
+        clone_id: input.cloneId,
+        tenant_id: input.tenantId,
+        handoff_id: input.attribution.handoffId,
+        origin_user_id: input.attribution.originUserId,
+        origin_username: input.attribution.originUsername,
+        origin_source: input.attribution.originSource,
+        status: "initiated",
+      },
+      PURCHASE_IDENTITY_COLUMNS,
+    );
   } catch (err) {
     console.error("recordPurchaseInitiated failed", err);
     try {
@@ -149,10 +241,16 @@ export async function finalizePurchaseFromSession(
   error?: string,
 ): Promise<void> {
   const row = purchaseRowFromSession(session, status, error);
-  const { error: dbError } = await adminAny
-    .from("purchases")
-    .upsert(row, { onConflict: "stripe_checkout_session_id" });
-  if (dbError) throw new Error(`finalize_purchase_failed: ${dbError.message}`);
+  try {
+    await writeToleratingSchemaDrift(
+      (r) => adminAny.from("purchases").upsert(r, { onConflict: "stripe_checkout_session_id" }),
+      row,
+      PURCHASE_IDENTITY_COLUMNS,
+    );
+  } catch (dbError) {
+    const message = dbError instanceof Error ? dbError.message : String(dbError);
+    throw new Error(`finalize_purchase_failed: ${message}`);
+  }
 }
 
 /** Marks the purchase matching a refunded charge's payment intent. */

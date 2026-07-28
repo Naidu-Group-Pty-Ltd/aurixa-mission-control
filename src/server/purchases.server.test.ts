@@ -11,7 +11,13 @@ const state = vi.hoisted(() => ({
   upserts: [] as { table: string; values: unknown; options: unknown }[],
   updates: [] as { table: string; values: unknown }[],
   insertError: null as { message: string } | null,
+  // Errors returned one per write, oldest first, so a test can reproduce a
+  // database that rejects the first attempt and accepts a later one.
+  errorQueue: [] as ({ message: string } | null)[],
 }));
+
+const nextWriteError = () =>
+  state.errorQueue.length ? state.errorQueue.shift()! : state.insertError;
 
 vi.mock("@/integrations/supabase/client.server", () => {
   const builder = (table: string) => {
@@ -22,11 +28,11 @@ vi.mock("@/integrations/supabase/client.server", () => {
       maybeSingle: async () => ({ data: state.row, error: state.error }),
       insert: async (values: unknown) => {
         state.inserts.push({ table, values });
-        return { error: state.insertError };
+        return { error: nextWriteError() };
       },
       upsert: async (values: unknown, options: unknown) => {
         state.upserts.push({ table, values, options });
-        return { error: state.insertError };
+        return { error: nextWriteError() };
       },
       update: (values: unknown) => {
         state.updates.push({ table, values });
@@ -40,6 +46,7 @@ vi.mock("@/integrations/supabase/client.server", () => {
 
 import {
   OPERATOR_SOURCE,
+  unknownColumnFromError,
   attributionFromMetadata,
   attributionMetadata,
   finalizePurchaseFromSession,
@@ -55,6 +62,7 @@ beforeEach(() => {
   state.upserts = [];
   state.updates = [];
   state.insertError = null;
+  state.errorQueue = [];
 });
 
 const attribution = {
@@ -257,5 +265,122 @@ describe("loadValidHandoff", () => {
     expect(await loadValidHandoff("nope")).toBeNull();
     state.error = { message: "boom" };
     expect(await loadValidHandoff("h1")).toBeNull();
+  });
+});
+
+describe("unknownColumnFromError", () => {
+  it("reads the column out of a Postgres 42703", () => {
+    expect(
+      unknownColumnFromError({ code: "42703", message: "column purchases.item_name does not exist" }),
+    ).toBe("item_name");
+  });
+
+  it("reads the column out of a PostgREST schema-cache miss", () => {
+    expect(
+      unknownColumnFromError({
+        code: "PGRST204",
+        message: "Could not find the 'item_name' column of 'purchases' in the schema cache",
+      }),
+    ).toBe("item_name");
+  });
+
+  it("returns null for anything else, so real errors are never mistaken for drift", () => {
+    expect(unknownColumnFromError({ message: "duplicate key value violates unique constraint" })).toBeNull();
+    expect(unknownColumnFromError({ message: "" })).toBeNull();
+    expect(unknownColumnFromError(null)).toBeNull();
+  });
+});
+
+// The 2026-07-25 outage: migration 20260725150000 only partly applied, so
+// `purchases.item_name` did not exist while the code was sending it. Every
+// insert failed on that one descriptive column and the ledger silently stopped.
+describe("schema drift must cost the column, not the purchase", () => {
+  const missingItemName = { message: "column purchases.item_name does not exist" };
+
+  it("still records the purchase when item_name does not exist", async () => {
+    state.errorQueue = [missingItemName, null];
+    await recordPurchaseInitiated({
+      sessionId: "cs_drift",
+      mode: "topup",
+      itemId: "item-1",
+      itemSlug: "pack-small",
+      itemName: "100 Credit Pack",
+      quantity: 1,
+      cloneId: "clone-1",
+      tenantId: "tenant-1",
+      attribution,
+    });
+
+    const writes = state.inserts.filter((i) => i.table === "purchases");
+    expect(writes).toHaveLength(2);
+    expect(writes[0].values).toHaveProperty("item_name");
+    // The retry keeps everything that identifies the purchase.
+    expect(writes[1].values).not.toHaveProperty("item_name");
+    expect(writes[1].values).toMatchObject({
+      stripe_checkout_session_id: "cs_drift",
+      status: "initiated",
+      item_slug: "pack-small",
+      tenant_id: "tenant-1",
+      origin_source: "clone:npc",
+    });
+    // Succeeded on the retry, so nothing is logged as a failure.
+    expect(state.inserts.some((i) => i.table === "audit_log")).toBe(false);
+  });
+
+  it("finalises a completed purchase rather than throwing the webhook into retry", async () => {
+    state.errorQueue = [missingItemName, null];
+    await expect(finalizePurchaseFromSession(makeSession(), "completed")).resolves.toBeUndefined();
+    expect(state.upserts).toHaveLength(2);
+    expect(state.upserts[1].values).not.toHaveProperty("item_name");
+    expect(state.upserts[1].values).toMatchObject({
+      stripe_checkout_session_id: "cs_test_abc",
+      status: "completed",
+    });
+  });
+
+  it("refuses to write a row stripped of what identifies it", async () => {
+    // A rejected identity column is not drift we can degrade around — a
+    // purchase with no session id answers none of the questions the ledger
+    // exists to answer, so it must fail loudly instead.
+    state.errorQueue = [
+      { message: "column purchases.stripe_checkout_session_id does not exist" },
+      null,
+    ];
+    await expect(finalizePurchaseFromSession(makeSession(), "completed")).rejects.toThrow(
+      /finalize_purchase_failed/,
+    );
+    expect(state.upserts).toHaveLength(1);
+  });
+
+  it("drops each unknown column in turn, then gives up rather than looping", async () => {
+    state.errorQueue = [
+      { message: "column purchases.item_name does not exist" },
+      { message: "column purchases.quantity does not exist" },
+      null,
+    ];
+    await recordPurchaseInitiated({
+      sessionId: "cs_two",
+      mode: "topup",
+      itemId: "item-1",
+      itemSlug: null,
+      itemName: "Pack",
+      quantity: 1,
+      cloneId: null,
+      tenantId: null,
+      attribution,
+    });
+    const writes = state.inserts.filter((i) => i.table === "purchases");
+    expect(writes).toHaveLength(3);
+    expect(writes[2].values).not.toHaveProperty("item_name");
+    expect(writes[2].values).not.toHaveProperty("quantity");
+    expect(writes[2].values).toMatchObject({ stripe_checkout_session_id: "cs_two" });
+  });
+
+  it("does not retry an error that is not about a column", async () => {
+    state.errorQueue = [{ message: "permission denied for table purchases" }, null];
+    await expect(finalizePurchaseFromSession(makeSession(), "completed")).rejects.toThrow(
+      /permission denied/,
+    );
+    expect(state.upserts).toHaveLength(1);
   });
 });
