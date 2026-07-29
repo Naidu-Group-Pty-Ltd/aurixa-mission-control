@@ -38,6 +38,7 @@ import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SecurityIndexRouteImport } from './routes/security.index'
+import { Route as CrmIndexRouteImport } from './routes/crm.index'
 import { Route as SettingsRolesRouteImport } from './routes/settings.roles'
 import { Route as SettingsRoleAuditRouteImport } from './routes/settings.role-audit'
 import { Route as SettingsProvisioningPreviewRouteImport } from './routes/settings.provisioning-preview'
@@ -276,6 +277,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
 const SecurityIndexRoute = SecurityIndexRouteImport.update({
   id: '/security/',
   path: '/security/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmIndexRoute = CrmIndexRouteImport.update({
+  id: '/crm/',
+  path: '/crm/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRolesRoute = SettingsRolesRouteImport.update({
@@ -857,6 +863,7 @@ export interface FileRoutesByFullPath {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
@@ -981,6 +988,7 @@ export interface FileRoutesByTo {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/crm': typeof CrmIndexRoute
   '/security': typeof SecurityIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
@@ -1107,6 +1115,7 @@ export interface FileRoutesById {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
@@ -1234,6 +1243,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/crm/'
     | '/security/'
     | '/settings/'
     | '/api/public/purchases'
@@ -1358,6 +1368,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/crm'
     | '/security'
     | '/settings'
     | '/api/public/purchases'
@@ -1483,6 +1494,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/crm/'
     | '/security/'
     | '/settings/'
     | '/api/public/purchases'
@@ -1590,6 +1602,7 @@ export interface RootRouteChildren {
   JoinTokenRoute: typeof JoinTokenRoute
   SecurityIntakeRoute: typeof SecurityIntakeRoute
   SecurityScansRoute: typeof SecurityScansRoute
+  CrmIndexRoute: typeof CrmIndexRoute
   SecurityIndexRoute: typeof SecurityIndexRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
   ClientsHandoffTokenRoute: typeof ClientsHandoffTokenRoute
@@ -1838,6 +1851,13 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/security/'
       preLoaderRoute: typeof SecurityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm/': {
+      id: '/crm/'
+      path: '/crm'
+      fullPath: '/crm/'
+      preLoaderRoute: typeof CrmIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/roles': {
@@ -2665,6 +2685,7 @@ const rootRouteChildren: RootRouteChildren = {
   JoinTokenRoute: JoinTokenRoute,
   SecurityIntakeRoute: SecurityIntakeRoute,
   SecurityScansRoute: SecurityScansRoute,
+  CrmIndexRoute: CrmIndexRoute,
   SecurityIndexRoute: SecurityIndexRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
   ClientsHandoffTokenRoute: ClientsHandoffTokenRoute,
