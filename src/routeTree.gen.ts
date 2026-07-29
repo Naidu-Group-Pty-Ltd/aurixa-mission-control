@@ -94,6 +94,7 @@ import { Route as ApiPublicPurchasesRouteImport } from './routes/api.public.purc
 import { Route as ApiPublicTokensReserveRouteImport } from './routes/api.public.tokens.reserve'
 import { Route as ApiPublicTokensPlanChangeRouteImport } from './routes/api.public.tokens.plan-change'
 import { Route as ApiPublicTokensPacksRouteImport } from './routes/api.public.tokens.packs'
+import { Route as ApiPublicTokensFeedbackPromptRouteImport } from './routes/api.public.tokens.feedback-prompt'
 import { Route as ApiPublicTokensCommitRouteImport } from './routes/api.public.tokens.commit'
 import { Route as ApiPublicTokensCancelRouteImport } from './routes/api.public.tokens.cancel'
 import { Route as ApiPublicTokensBalanceRouteImport } from './routes/api.public.tokens.balance'
@@ -104,6 +105,7 @@ import { Route as ApiPublicStorefrontSessionRouteImport } from './routes/api.pub
 import { Route as ApiPublicStorefrontPlanChangeRouteImport } from './routes/api.public.storefront.plan-change'
 import { Route as ApiPublicStorefrontIdentityRouteImport } from './routes/api.public.storefront.identity'
 import { Route as ApiPublicStorefrontHandoffRouteImport } from './routes/api.public.storefront.handoff'
+import { Route as ApiPublicStorefrontFeedbackRouteImport } from './routes/api.public.storefront.feedback'
 import { Route as ApiPublicStorefrontCheckoutRouteImport } from './routes/api.public.storefront.checkout'
 import { Route as ApiPublicStorefrontCatalogRouteImport } from './routes/api.public.storefront.catalog'
 import { Route as ApiPublicStorefrontAccessRouteImport } from './routes/api.public.storefront.access'
@@ -562,6 +564,12 @@ const ApiPublicTokensPacksRoute = ApiPublicTokensPacksRouteImport.update({
   path: '/api/public/tokens/packs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTokensFeedbackPromptRoute =
+  ApiPublicTokensFeedbackPromptRouteImport.update({
+    id: '/api/public/tokens/feedback-prompt',
+    path: '/api/public/tokens/feedback-prompt',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicTokensCommitRoute = ApiPublicTokensCommitRouteImport.update({
   id: '/api/public/tokens/commit',
   path: '/api/public/tokens/commit',
@@ -616,6 +624,12 @@ const ApiPublicStorefrontHandoffRoute =
   ApiPublicStorefrontHandoffRouteImport.update({
     id: '/api/public/storefront/handoff',
     path: '/api/public/storefront/handoff',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontFeedbackRoute =
+  ApiPublicStorefrontFeedbackRouteImport.update({
+    id: '/api/public/storefront/feedback',
+    path: '/api/public/storefront/feedback',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicStorefrontCheckoutRoute =
@@ -869,6 +883,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/access': typeof ApiPublicStorefrontAccessRoute
   '/api/public/storefront/catalog': typeof ApiPublicStorefrontCatalogRoute
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
+  '/api/public/storefront/feedback': typeof ApiPublicStorefrontFeedbackRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
   '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
@@ -879,6 +894,7 @@ export interface FileRoutesByFullPath {
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
+  '/api/public/tokens/feedback-prompt': typeof ApiPublicTokensFeedbackPromptRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
@@ -991,6 +1007,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/access': typeof ApiPublicStorefrontAccessRoute
   '/api/public/storefront/catalog': typeof ApiPublicStorefrontCatalogRoute
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
+  '/api/public/storefront/feedback': typeof ApiPublicStorefrontFeedbackRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
   '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
@@ -1001,6 +1018,7 @@ export interface FileRoutesByTo {
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
+  '/api/public/tokens/feedback-prompt': typeof ApiPublicTokensFeedbackPromptRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
@@ -1115,6 +1133,7 @@ export interface FileRoutesById {
   '/api/public/storefront/access': typeof ApiPublicStorefrontAccessRoute
   '/api/public/storefront/catalog': typeof ApiPublicStorefrontCatalogRoute
   '/api/public/storefront/checkout': typeof ApiPublicStorefrontCheckoutRoute
+  '/api/public/storefront/feedback': typeof ApiPublicStorefrontFeedbackRoute
   '/api/public/storefront/handoff': typeof ApiPublicStorefrontHandoffRoute
   '/api/public/storefront/identity': typeof ApiPublicStorefrontIdentityRoute
   '/api/public/storefront/plan-change': typeof ApiPublicStorefrontPlanChangeRoute
@@ -1125,6 +1144,7 @@ export interface FileRoutesById {
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
+  '/api/public/tokens/feedback-prompt': typeof ApiPublicTokensFeedbackPromptRoute
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
@@ -1240,6 +1260,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/access'
     | '/api/public/storefront/catalog'
     | '/api/public/storefront/checkout'
+    | '/api/public/storefront/feedback'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
     | '/api/public/storefront/plan-change'
@@ -1250,6 +1271,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
+    | '/api/public/tokens/feedback-prompt'
     | '/api/public/tokens/packs'
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
@@ -1362,6 +1384,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/access'
     | '/api/public/storefront/catalog'
     | '/api/public/storefront/checkout'
+    | '/api/public/storefront/feedback'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
     | '/api/public/storefront/plan-change'
@@ -1372,6 +1395,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
+    | '/api/public/tokens/feedback-prompt'
     | '/api/public/tokens/packs'
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
@@ -1485,6 +1509,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/access'
     | '/api/public/storefront/catalog'
     | '/api/public/storefront/checkout'
+    | '/api/public/storefront/feedback'
     | '/api/public/storefront/handoff'
     | '/api/public/storefront/identity'
     | '/api/public/storefront/plan-change'
@@ -1495,6 +1520,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
+    | '/api/public/tokens/feedback-prompt'
     | '/api/public/tokens/packs'
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
@@ -1588,6 +1614,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontAccessRoute: typeof ApiPublicStorefrontAccessRoute
   ApiPublicStorefrontCatalogRoute: typeof ApiPublicStorefrontCatalogRoute
   ApiPublicStorefrontCheckoutRoute: typeof ApiPublicStorefrontCheckoutRoute
+  ApiPublicStorefrontFeedbackRoute: typeof ApiPublicStorefrontFeedbackRoute
   ApiPublicStorefrontHandoffRoute: typeof ApiPublicStorefrontHandoffRoute
   ApiPublicStorefrontIdentityRoute: typeof ApiPublicStorefrontIdentityRoute
   ApiPublicStorefrontPlanChangeRoute: typeof ApiPublicStorefrontPlanChangeRoute
@@ -1598,6 +1625,7 @@ export interface RootRouteChildren {
   ApiPublicTokensBalanceRoute: typeof ApiPublicTokensBalanceRoute
   ApiPublicTokensCancelRoute: typeof ApiPublicTokensCancelRoute
   ApiPublicTokensCommitRoute: typeof ApiPublicTokensCommitRoute
+  ApiPublicTokensFeedbackPromptRoute: typeof ApiPublicTokensFeedbackPromptRoute
   ApiPublicTokensPacksRoute: typeof ApiPublicTokensPacksRoute
   ApiPublicTokensPlanChangeRoute: typeof ApiPublicTokensPlanChangeRoute
   ApiPublicTokensReserveRoute: typeof ApiPublicTokensReserveRoute
@@ -2204,6 +2232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTokensPacksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/tokens/feedback-prompt': {
+      id: '/api/public/tokens/feedback-prompt'
+      path: '/api/public/tokens/feedback-prompt'
+      fullPath: '/api/public/tokens/feedback-prompt'
+      preLoaderRoute: typeof ApiPublicTokensFeedbackPromptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/tokens/commit': {
       id: '/api/public/tokens/commit'
       path: '/api/public/tokens/commit'
@@ -2272,6 +2307,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/storefront/handoff'
       fullPath: '/api/public/storefront/handoff'
       preLoaderRoute: typeof ApiPublicStorefrontHandoffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/feedback': {
+      id: '/api/public/storefront/feedback'
+      path: '/api/public/storefront/feedback'
+      fullPath: '/api/public/storefront/feedback'
+      preLoaderRoute: typeof ApiPublicStorefrontFeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/checkout': {
@@ -2647,6 +2689,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontAccessRoute: ApiPublicStorefrontAccessRoute,
   ApiPublicStorefrontCatalogRoute: ApiPublicStorefrontCatalogRoute,
   ApiPublicStorefrontCheckoutRoute: ApiPublicStorefrontCheckoutRoute,
+  ApiPublicStorefrontFeedbackRoute: ApiPublicStorefrontFeedbackRoute,
   ApiPublicStorefrontHandoffRoute: ApiPublicStorefrontHandoffRoute,
   ApiPublicStorefrontIdentityRoute: ApiPublicStorefrontIdentityRoute,
   ApiPublicStorefrontPlanChangeRoute: ApiPublicStorefrontPlanChangeRoute,
@@ -2657,6 +2700,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTokensBalanceRoute: ApiPublicTokensBalanceRoute,
   ApiPublicTokensCancelRoute: ApiPublicTokensCancelRoute,
   ApiPublicTokensCommitRoute: ApiPublicTokensCommitRoute,
+  ApiPublicTokensFeedbackPromptRoute: ApiPublicTokensFeedbackPromptRoute,
   ApiPublicTokensPacksRoute: ApiPublicTokensPacksRoute,
   ApiPublicTokensPlanChangeRoute: ApiPublicTokensPlanChangeRoute,
   ApiPublicTokensReserveRoute: ApiPublicTokensReserveRoute,
