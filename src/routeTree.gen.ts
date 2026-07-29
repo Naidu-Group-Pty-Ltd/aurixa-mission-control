@@ -89,6 +89,7 @@ import { Route as BillingInvoicesRouteImport } from './routes/billing.invoices'
 import { Route as BillingCatalogRouteImport } from './routes/billing.catalog'
 import { Route as BillingCancelRouteImport } from './routes/billing.cancel'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
+import { Route as CrmAccountsIndexRouteImport } from './routes/crm.accounts.index'
 import { Route as ClonesCloneIdSecretsRouteImport } from './routes/clones.$cloneId.secrets'
 import { Route as ClientsHandoffTokenRouteImport } from './routes/clients.handoff.$token'
 import { Route as ApiPublicPurchasesRouteImport } from './routes/api.public.purchases'
@@ -539,6 +540,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrmAccountsIndexRoute = CrmAccountsIndexRouteImport.update({
+  id: '/crm/accounts/',
+  path: '/crm/accounts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClonesCloneIdSecretsRoute = ClonesCloneIdSecretsRouteImport.update({
   id: '/secrets',
   path: '/secrets',
@@ -869,6 +875,7 @@ export interface FileRoutesByFullPath {
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
   '/clones/$cloneId/secrets': typeof ClonesCloneIdSecretsRoute
+  '/crm/accounts/': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
   '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
@@ -994,6 +1001,7 @@ export interface FileRoutesByTo {
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
   '/clones/$cloneId/secrets': typeof ClonesCloneIdSecretsRoute
+  '/crm/accounts': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
   '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
@@ -1121,6 +1129,7 @@ export interface FileRoutesById {
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
   '/clones/$cloneId/secrets': typeof ClonesCloneIdSecretsRoute
+  '/crm/accounts/': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
   '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
@@ -1249,6 +1258,7 @@ export interface FileRouteTypes {
     | '/api/public/purchases'
     | '/clients/handoff/$token'
     | '/clones/$cloneId/secrets'
+    | '/crm/accounts/'
     | '/api/public/billing/handoff'
     | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
@@ -1374,6 +1384,7 @@ export interface FileRouteTypes {
     | '/api/public/purchases'
     | '/clients/handoff/$token'
     | '/clones/$cloneId/secrets'
+    | '/crm/accounts'
     | '/api/public/billing/handoff'
     | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
@@ -1500,6 +1511,7 @@ export interface FileRouteTypes {
     | '/api/public/purchases'
     | '/clients/handoff/$token'
     | '/clones/$cloneId/secrets'
+    | '/crm/accounts/'
     | '/api/public/billing/handoff'
     | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
@@ -1606,6 +1618,7 @@ export interface RootRouteChildren {
   SecurityIndexRoute: typeof SecurityIndexRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
   ClientsHandoffTokenRoute: typeof ClientsHandoffTokenRoute
+  CrmAccountsIndexRoute: typeof CrmAccountsIndexRoute
   ApiPublicBillingHandoffRoute: typeof ApiPublicBillingHandoffRoute
   ApiPublicBillingInvoicesRoute: typeof ApiPublicBillingInvoicesRoute
   ApiPublicBillingPaymentMethodsRoute: typeof ApiPublicBillingPaymentMethodsRoute
@@ -2210,6 +2223,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/crm/accounts/': {
+      id: '/crm/accounts/'
+      path: '/crm/accounts'
+      fullPath: '/crm/accounts/'
+      preLoaderRoute: typeof CrmAccountsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clones/$cloneId/secrets': {
       id: '/clones/$cloneId/secrets'
       path: '/secrets'
@@ -2689,6 +2709,7 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityIndexRoute: SecurityIndexRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
   ClientsHandoffTokenRoute: ClientsHandoffTokenRoute,
+  CrmAccountsIndexRoute: CrmAccountsIndexRoute,
   ApiPublicBillingHandoffRoute: ApiPublicBillingHandoffRoute,
   ApiPublicBillingInvoicesRoute: ApiPublicBillingInvoicesRoute,
   ApiPublicBillingPaymentMethodsRoute: ApiPublicBillingPaymentMethodsRoute,
