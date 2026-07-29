@@ -2527,6 +2527,935 @@ export type Database = {
           },
         ]
       }
+      crm_accounts: {
+        Row: {
+          arr_cents: number
+          classification: string | null
+          clone_id: string | null
+          created_at: string
+          created_by: string | null
+          health_computed_at: string | null
+          health_score: number | null
+          id: string
+          last_contacted_at: string | null
+          lifecycle_stage: Database["public"]["Enums"]["crm_lifecycle_stage"]
+          metadata: Json
+          mrr_cents: number
+          name: string
+          notes: string | null
+          owner_user_id: string | null
+          slug: string | null
+          source: string | null
+          tags: string[]
+          tenant_id: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          arr_cents?: number
+          classification?: string | null
+          clone_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          health_computed_at?: string | null
+          health_score?: number | null
+          id?: string
+          last_contacted_at?: string | null
+          lifecycle_stage?: Database["public"]["Enums"]["crm_lifecycle_stage"]
+          metadata?: Json
+          mrr_cents?: number
+          name: string
+          notes?: string | null
+          owner_user_id?: string | null
+          slug?: string | null
+          source?: string | null
+          tags?: string[]
+          tenant_id?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          arr_cents?: number
+          classification?: string | null
+          clone_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          health_computed_at?: string | null
+          health_score?: number | null
+          id?: string
+          last_contacted_at?: string | null
+          lifecycle_stage?: Database["public"]["Enums"]["crm_lifecycle_stage"]
+          metadata?: Json
+          mrr_cents?: number
+          name?: string
+          notes?: string | null
+          owner_user_id?: string | null
+          slug?: string | null
+          source?: string | null
+          tags?: string[]
+          tenant_id?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_accounts_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_accounts_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+        ]
+      }
+      crm_activities: {
+        Row: {
+          account_id: string
+          actor_label: string | null
+          actor_user_id: string | null
+          body: string | null
+          contact_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          kind: Database["public"]["Enums"]["crm_activity_kind"]
+          metadata: Json
+          occurred_at: string
+          title: string
+        }
+        Insert: {
+          account_id: string
+          actor_label?: string | null
+          actor_user_id?: string | null
+          body?: string | null
+          contact_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_activity_kind"]
+          metadata?: Json
+          occurred_at?: string
+          title: string
+        }
+        Update: {
+          account_id?: string
+          actor_label?: string | null
+          actor_user_id?: string | null
+          body?: string | null
+          contact_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_activity_kind"]
+          metadata?: Json
+          occurred_at?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_churn_events: {
+        Row: {
+          account_id: string
+          competitor: string | null
+          contract_id: string | null
+          created_at: string
+          data_retention_until: string | null
+          effective_at: string | null
+          final_invoice_id: string | null
+          id: string
+          metadata: Json
+          purged_at: string | null
+          reason: Database["public"]["Enums"]["crm_churn_reason"]
+          reason_detail: string | null
+          recorded_by: string | null
+          refund_cents: number
+          requested_at: string
+          save_attempted: boolean
+          save_outcome: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          competitor?: string | null
+          contract_id?: string | null
+          created_at?: string
+          data_retention_until?: string | null
+          effective_at?: string | null
+          final_invoice_id?: string | null
+          id?: string
+          metadata?: Json
+          purged_at?: string | null
+          reason?: Database["public"]["Enums"]["crm_churn_reason"]
+          reason_detail?: string | null
+          recorded_by?: string | null
+          refund_cents?: number
+          requested_at?: string
+          save_attempted?: boolean
+          save_outcome?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          competitor?: string | null
+          contract_id?: string | null
+          created_at?: string
+          data_retention_until?: string | null
+          effective_at?: string | null
+          final_invoice_id?: string | null
+          id?: string
+          metadata?: Json
+          purged_at?: string | null
+          reason?: Database["public"]["Enums"]["crm_churn_reason"]
+          reason_detail?: string | null
+          recorded_by?: string | null
+          refund_cents?: number
+          requested_at?: string
+          save_attempted?: boolean
+          save_outcome?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_churn_events_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_churn_events_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_contacts: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          is_primary: boolean
+          job_title: string | null
+          last_name: string | null
+          marketing_consent: boolean
+          metadata: Json
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          is_primary?: boolean
+          job_title?: string | null
+          last_name?: string | null
+          marketing_consent?: boolean
+          metadata?: Json
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          is_primary?: boolean
+          job_title?: string | null
+          last_name?: string | null
+          marketing_consent?: boolean
+          metadata?: Json
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_contracts: {
+        Row: {
+          account_id: string
+          auto_renew: boolean
+          billing_cadence: string
+          committed_seats: number
+          created_at: string
+          deal_id: string | null
+          document_url: string | null
+          id: string
+          metadata: Json
+          mrr_cents: number
+          notice_period_days: number
+          signed_at: string | null
+          signed_by: string | null
+          status: string
+          term_end: string | null
+          term_start: string
+          terms_version_id: string | null
+          tier_slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          auto_renew?: boolean
+          billing_cadence?: string
+          committed_seats?: number
+          created_at?: string
+          deal_id?: string | null
+          document_url?: string | null
+          id?: string
+          metadata?: Json
+          mrr_cents?: number
+          notice_period_days?: number
+          signed_at?: string | null
+          signed_by?: string | null
+          status?: string
+          term_end?: string | null
+          term_start?: string
+          terms_version_id?: string | null
+          tier_slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          auto_renew?: boolean
+          billing_cadence?: string
+          committed_seats?: number
+          created_at?: string
+          deal_id?: string | null
+          document_url?: string | null
+          id?: string
+          metadata?: Json
+          mrr_cents?: number
+          notice_period_days?: number
+          signed_at?: string | null
+          signed_by?: string | null
+          status?: string
+          term_end?: string | null
+          term_start?: string
+          terms_version_id?: string | null
+          tier_slug?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contracts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_contracts_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_deal_line_items: {
+        Row: {
+          created_at: string
+          deal_id: string
+          id: string
+          item_name: string
+          item_slug: string | null
+          kind: string
+          quantity: number
+          recurring: boolean
+          unit_price_cents: number
+        }
+        Insert: {
+          created_at?: string
+          deal_id: string
+          id?: string
+          item_name: string
+          item_slug?: string | null
+          kind: string
+          quantity?: number
+          recurring?: boolean
+          unit_price_cents?: number
+        }
+        Update: {
+          created_at?: string
+          deal_id?: string
+          id?: string
+          item_name?: string
+          item_slug?: string | null
+          kind?: string
+          quantity?: number
+          recurring?: boolean
+          unit_price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_line_items_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_deals: {
+        Row: {
+          account_id: string
+          created_at: string
+          expected_close_date: string | null
+          expected_mrr_cents: number
+          id: string
+          lost_at: string | null
+          lost_reason: string | null
+          metadata: Json
+          name: string
+          owner_user_id: string | null
+          probability: number
+          seats: number
+          setup_fee_cents: number
+          stage: Database["public"]["Enums"]["crm_deal_stage"]
+          stage_changed_at: string
+          storefront_grant_id: string | null
+          tier_slug: string | null
+          updated_at: string
+          won_at: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          expected_close_date?: string | null
+          expected_mrr_cents?: number
+          id?: string
+          lost_at?: string | null
+          lost_reason?: string | null
+          metadata?: Json
+          name: string
+          owner_user_id?: string | null
+          probability?: number
+          seats?: number
+          setup_fee_cents?: number
+          stage?: Database["public"]["Enums"]["crm_deal_stage"]
+          stage_changed_at?: string
+          storefront_grant_id?: string | null
+          tier_slug?: string | null
+          updated_at?: string
+          won_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          expected_close_date?: string | null
+          expected_mrr_cents?: number
+          id?: string
+          lost_at?: string | null
+          lost_reason?: string | null
+          metadata?: Json
+          name?: string
+          owner_user_id?: string | null
+          probability?: number
+          seats?: number
+          setup_fee_cents?: number
+          stage?: Database["public"]["Enums"]["crm_deal_stage"]
+          stage_changed_at?: string
+          storefront_grant_id?: string | null
+          tier_slug?: string | null
+          updated_at?: string
+          won_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_disputes: {
+        Row: {
+          account_id: string | null
+          amount_cents: number
+          blocks_renewal: boolean
+          closed_at: string | null
+          created_at: string
+          currency: string
+          due_at: string | null
+          evidence_url: string | null
+          id: string
+          kind: Database["public"]["Enums"]["crm_dispute_kind"]
+          metadata: Json
+          opened_at: string
+          outcome: string | null
+          owner_user_id: string | null
+          reason: string | null
+          status: Database["public"]["Enums"]["crm_dispute_status"]
+          stripe_dispute_id: string | null
+          stripe_payment_intent_id: string | null
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount_cents?: number
+          blocks_renewal?: boolean
+          closed_at?: string | null
+          created_at?: string
+          currency?: string
+          due_at?: string | null
+          evidence_url?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_dispute_kind"]
+          metadata?: Json
+          opened_at?: string
+          outcome?: string | null
+          owner_user_id?: string | null
+          reason?: string | null
+          status?: Database["public"]["Enums"]["crm_dispute_status"]
+          stripe_dispute_id?: string | null
+          stripe_payment_intent_id?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount_cents?: number
+          blocks_renewal?: boolean
+          closed_at?: string | null
+          created_at?: string
+          currency?: string
+          due_at?: string | null
+          evidence_url?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_dispute_kind"]
+          metadata?: Json
+          opened_at?: string
+          outcome?: string | null
+          owner_user_id?: string | null
+          reason?: string | null
+          status?: Database["public"]["Enums"]["crm_dispute_status"]
+          stripe_dispute_id?: string | null
+          stripe_payment_intent_id?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_disputes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_feedback_requests: {
+        Row: {
+          account_id: string
+          campaign_key: string | null
+          channel: string
+          contact_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          nps_score: number | null
+          requested_at: string
+          requested_by: string | null
+          responded_at: string | null
+          submission_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          campaign_key?: string | null
+          channel?: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          nps_score?: number | null
+          requested_at?: string
+          requested_by?: string | null
+          responded_at?: string | null
+          submission_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          campaign_key?: string | null
+          channel?: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          nps_score?: number | null
+          requested_at?: string
+          requested_by?: string | null
+          responded_at?: string | null
+          submission_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_feedback_requests_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_feedback_requests_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_offboarding_runs: {
+        Row: {
+          account_id: string
+          checklist: Json
+          churn_event_id: string | null
+          created_at: string
+          destroy_after: string | null
+          destroyed_at: string | null
+          export_checksum: string | null
+          export_delivered_at: string | null
+          export_manifest: Json
+          handoff_id: string | null
+          id: string
+          notes: string | null
+          owner_user_id: string | null
+          path: Database["public"]["Enums"]["crm_offboarding_path"]
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          checklist?: Json
+          churn_event_id?: string | null
+          created_at?: string
+          destroy_after?: string | null
+          destroyed_at?: string | null
+          export_checksum?: string | null
+          export_delivered_at?: string | null
+          export_manifest?: Json
+          handoff_id?: string | null
+          id?: string
+          notes?: string | null
+          owner_user_id?: string | null
+          path?: Database["public"]["Enums"]["crm_offboarding_path"]
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          checklist?: Json
+          churn_event_id?: string | null
+          created_at?: string
+          destroy_after?: string | null
+          destroyed_at?: string | null
+          export_checksum?: string | null
+          export_delivered_at?: string | null
+          export_manifest?: Json
+          handoff_id?: string | null
+          id?: string
+          notes?: string | null
+          owner_user_id?: string | null
+          path?: Database["public"]["Enums"]["crm_offboarding_path"]
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_offboarding_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_offboarding_runs_churn_event_id_fkey"
+            columns: ["churn_event_id"]
+            isOneToOne: false
+            referencedRelation: "crm_churn_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_onboarding_tasks: {
+        Row: {
+          account_id: string
+          auto_source: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          label: string
+          notes: string | null
+          position: number
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          auto_source?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          label: string
+          notes?: string | null
+          position?: number
+          status?: string
+          step_key: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          auto_source?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          label?: string
+          notes?: string | null
+          position?: number
+          status?: string
+          step_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_onboarding_tasks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_tasks: {
+        Row: {
+          account_id: string | null
+          assignee_user_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deal_id: string | null
+          description: string | null
+          due_at: string | null
+          id: string
+          metadata: Json
+          status: Database["public"]["Enums"]["crm_task_status"]
+          ticket_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          assignee_user_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          status?: Database["public"]["Enums"]["crm_task_status"]
+          ticket_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          assignee_user_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          status?: Database["public"]["Enums"]["crm_task_status"]
+          ticket_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_tasks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_ticket_messages: {
+        Row: {
+          author_label: string | null
+          author_user_id: string | null
+          body: string
+          created_at: string
+          id: string
+          internal: boolean
+          ticket_id: string
+        }
+        Insert: {
+          author_label?: string | null
+          author_user_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          internal?: boolean
+          ticket_id: string
+        }
+        Update: {
+          author_label?: string | null
+          author_user_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          internal?: boolean
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "crm_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_tickets: {
+        Row: {
+          account_id: string
+          assignee_user_id: string | null
+          codex_finding_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          first_response_at: string | null
+          id: string
+          metadata: Json
+          reference: string | null
+          resolution: string | null
+          resolved_at: string | null
+          route_error_id: string | null
+          severity: Database["public"]["Enums"]["crm_ticket_severity"]
+          sla_due_at: string | null
+          status: Database["public"]["Enums"]["crm_ticket_status"]
+          subject: string
+          type: Database["public"]["Enums"]["crm_ticket_type"]
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          assignee_user_id?: string | null
+          codex_finding_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          first_response_at?: string | null
+          id?: string
+          metadata?: Json
+          reference?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          route_error_id?: string | null
+          severity?: Database["public"]["Enums"]["crm_ticket_severity"]
+          sla_due_at?: string | null
+          status?: Database["public"]["Enums"]["crm_ticket_status"]
+          subject: string
+          type?: Database["public"]["Enums"]["crm_ticket_type"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          assignee_user_id?: string | null
+          codex_finding_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          first_response_at?: string | null
+          id?: string
+          metadata?: Json
+          reference?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          route_error_id?: string | null
+          severity?: Database["public"]["Enums"]["crm_ticket_severity"]
+          sla_due_at?: string | null
+          status?: Database["public"]["Enums"]["crm_ticket_status"]
+          subject?: string
+          type?: Database["public"]["Enums"]["crm_ticket_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_tickets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_tickets_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       edge_audit: {
         Row: {
           action: string
@@ -6680,6 +7609,7 @@ export type Database = {
       }
       waitlist_leads: {
         Row: {
+          account_id: string | null
           created_at: string
           dedupe_key: string | null
           email: string
@@ -6699,6 +7629,7 @@ export type Database = {
           transaction_volume: string | null
         }
         Insert: {
+          account_id?: string | null
           created_at?: string
           dedupe_key?: string | null
           email: string
@@ -6718,6 +7649,7 @@ export type Database = {
           transaction_volume?: string | null
         }
         Update: {
+          account_id?: string | null
           created_at?: string
           dedupe_key?: string | null
           email?: string
@@ -6736,7 +7668,15 @@ export type Database = {
           tech_stack_bottlenecks?: string | null
           transaction_volume?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_leads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -6893,6 +7833,15 @@ export type Database = {
         Args: { _actual_tokens: number; _job_id: string; _result_meta?: Json }
         Returns: Json
       }
+      crm_convert_lead: {
+        Args: { _lead_id: string; _owner?: string }
+        Returns: Json
+      }
+      crm_pipeline_summary: { Args: never; Returns: Json }
+      crm_recompute_all_health: { Args: never; Returns: Json }
+      crm_recompute_health: { Args: { _account_id: string }; Returns: number }
+      crm_seed_onboarding: { Args: { _account_id: string }; Returns: Json }
+      crm_sweep: { Args: never; Returns: Json }
       entitlement_for_subscription: {
         Args: { _sub_id: string }
         Returns: {
@@ -7138,6 +8087,68 @@ export type Database = {
         | "completed"
         | "failed"
         | "canceled"
+      crm_activity_kind:
+        | "note"
+        | "call"
+        | "email"
+        | "meeting"
+        | "system"
+        | "status_change"
+        | "payment"
+        | "ticket"
+        | "feedback"
+        | "dispute"
+        | "churn"
+      crm_churn_reason:
+        | "price"
+        | "missing_capability"
+        | "switched_provider"
+        | "internal_build"
+        | "non_payment"
+        | "business_closed"
+        | "poor_experience"
+        | "other"
+      crm_deal_stage:
+        | "discovery"
+        | "demo"
+        | "proposal"
+        | "contract"
+        | "won"
+        | "lost"
+      crm_dispute_kind:
+        | "chargeback"
+        | "billing_disagreement"
+        | "service_credit"
+        | "contractual"
+        | "other"
+      crm_dispute_status:
+        | "open"
+        | "under_review"
+        | "evidence_submitted"
+        | "won"
+        | "lost"
+        | "withdrawn"
+        | "settled"
+      crm_lifecycle_stage:
+        | "lead"
+        | "opportunity"
+        | "onboarding"
+        | "active"
+        | "at_risk"
+        | "churned"
+      crm_offboarding_path:
+        | "ownership_transfer"
+        | "export_and_terminate"
+        | "terminate_only"
+      crm_task_status: "open" | "in_progress" | "done" | "canceled"
+      crm_ticket_severity: "low" | "normal" | "high" | "critical"
+      crm_ticket_status:
+        | "open"
+        | "in_progress"
+        | "waiting_client"
+        | "resolved"
+        | "closed"
+      crm_ticket_type: "support" | "bug" | "billing" | "feature" | "incident"
       drift_severity: "low" | "medium" | "high"
       handoff_path: "rebuild_twin" | "enterprise_transfer"
       handoff_state:
@@ -7200,6 +8211,10 @@ export type Database = {
         | "device_released"
         | "lead_captured"
         | "purchase_completed"
+        | "crm_sla_breach"
+        | "crm_renewal_due"
+        | "crm_retention_due"
+        | "crm_task_assigned"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -7409,6 +8424,76 @@ export const Constants = {
         "failed",
         "canceled",
       ],
+      crm_activity_kind: [
+        "note",
+        "call",
+        "email",
+        "meeting",
+        "system",
+        "status_change",
+        "payment",
+        "ticket",
+        "feedback",
+        "dispute",
+        "churn",
+      ],
+      crm_churn_reason: [
+        "price",
+        "missing_capability",
+        "switched_provider",
+        "internal_build",
+        "non_payment",
+        "business_closed",
+        "poor_experience",
+        "other",
+      ],
+      crm_deal_stage: [
+        "discovery",
+        "demo",
+        "proposal",
+        "contract",
+        "won",
+        "lost",
+      ],
+      crm_dispute_kind: [
+        "chargeback",
+        "billing_disagreement",
+        "service_credit",
+        "contractual",
+        "other",
+      ],
+      crm_dispute_status: [
+        "open",
+        "under_review",
+        "evidence_submitted",
+        "won",
+        "lost",
+        "withdrawn",
+        "settled",
+      ],
+      crm_lifecycle_stage: [
+        "lead",
+        "opportunity",
+        "onboarding",
+        "active",
+        "at_risk",
+        "churned",
+      ],
+      crm_offboarding_path: [
+        "ownership_transfer",
+        "export_and_terminate",
+        "terminate_only",
+      ],
+      crm_task_status: ["open", "in_progress", "done", "canceled"],
+      crm_ticket_severity: ["low", "normal", "high", "critical"],
+      crm_ticket_status: [
+        "open",
+        "in_progress",
+        "waiting_client",
+        "resolved",
+        "closed",
+      ],
+      crm_ticket_type: ["support", "bug", "billing", "feature", "incident"],
       drift_severity: ["low", "medium", "high"],
       handoff_path: ["rebuild_twin", "enterprise_transfer"],
       handoff_state: [
@@ -7474,6 +8559,10 @@ export const Constants = {
         "device_released",
         "lead_captured",
         "purchase_completed",
+        "crm_sla_breach",
+        "crm_renewal_due",
+        "crm_retention_due",
+        "crm_task_assigned",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],

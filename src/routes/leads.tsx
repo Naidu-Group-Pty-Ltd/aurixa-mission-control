@@ -39,12 +39,14 @@ import {
   Globe,
   CalendarClock,
   Sparkles,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "@/lib/format";
 import { EmptyState } from "@/components/empty-state";
 import { RefreshButton } from "@/components/refresh-button";
 import { toast } from "sonner";
+import { convertLead } from "@/lib/crm.functions";
 
 type Lead = Database["public"]["Tables"]["waitlist_leads"]["Row"];
 type LeadStatus = Database["public"]["Enums"]["lead_status"];
@@ -592,6 +594,7 @@ function LeadRow({
           <Badge variant="outline" className={cn("text-[10px] uppercase", statusTone(lead.status))}>
             {lead.status}
           </Badge>
+          <ConvertLeadButton lead={lead} />
           <Select value={lead.status} onValueChange={(v) => onStatusChange(v as LeadStatus)}>
             <SelectTrigger className="h-8 w-[130px] text-xs">
               <SelectValue />
@@ -605,6 +608,7 @@ function LeadRow({
             </SelectContent>
           </Select>
         </div>
+
       </div>
 
       {expanded && (
@@ -662,5 +666,46 @@ function DetailItem({
       </span>
       <span className="truncate text-foreground/90">{value}</span>
     </div>
+  );
+}
+
+/**
+ * Promotes a captured lead into the CRM: creates (or reuses) a client account
+ * plus its primary contact, marks the lead converted, and drops the operator
+ * straight into the new account hub. Idempotent — `crm_convert_lead` returns
+ * the existing account if this lead was already promoted.
+ */
+function ConvertLeadButton({ lead }: { lead: Lead }) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  if (lead.status === "disqualified") return null;
+
+  return (
+    <Button
+      variant={lead.status === "converted" ? "ghost" : "outline"}
+      size="sm"
+      className="h-8 text-xs"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await convertLead({ data: { leadId: lead.id } });
+          toast.success(
+            res?.already_converted ? "Opening existing client account" : "Lead converted to client",
+          );
+          navigate({ to: "/crm/accounts/$accountId", params: { accountId: res.account_id } });
+        } catch (err) {
+          toast.error("Conversion failed", {
+            description: err instanceof Error ? err.message : String(err),
+          });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <Briefcase className="mr-1 h-3 w-3" />
+      {lead.status === "converted" ? "Open client" : "Convert"}
+    </Button>
   );
 }

@@ -1,76 +1,89 @@
-# Codex Security Autonomous Control Plane — Implementation Plan
+# Aurixa CRM — Full Client Lifecycle Control Plane
 
-Goal: an always-on security control plane inside Mission Control that scans the Prime repo and every clone via OpenAI Codex Security, drafts remediation PRs, gates merges through the existing role hierarchy, and fans fixes across the fleet using the cascade engine.
+Extends the existing waitlist lead capture into an end-to-end system covering: lead → qualified opportunity → onboarded client → live account (payments, support, feedback, disputes) → renewal or exit (offboarding + data migration).
 
-## Guiding principles
+## Lifecycle model
 
-- **Durable queue over immortal process** — every scan is a row (`security_scan_jobs`) with status transitions; workers can die and resume.
-- **Reuse existing rails** — GitHub App for repo access, cascade engine for fleet rollout, `security_findings`/`security_assessments` for storage, role hierarchy for approvals, `pg_cron` + `/api/public/hooks/*` for scheduling.
-- **Codex Security = analysis; GitHub Actions = execution; Worker = orchestration.** No long-running work on Cloudflare.
-- **Provider-neutral intake** — a `SecurityIntakeAdapter` interface so Codex today, other scanners / ticketing tomorrow.
+```text
+LEAD            OPPORTUNITY        CLIENT (active)                 EXIT
+capture    →    qualify/quote  →   onboard → operate → renew   →   offboard
+waitlist        deal pipeline      account + contract              churn record
+_leads          stages/value       payments · tickets · feedback   data export
+                                   disputes · health score         migration pack
+```
 
-## Phase map (executed one at a time, each ends with a working slice)
+Everything hangs off a single spine: **`crm_accounts`** (the client organisation), linked to the existing `clones`, `tenants`, `purchases`, `invoices`, `feedback_submissions` and `handoffs` tables so the CRM reads real billing/product truth instead of duplicating it.
 
-### Phase 0 — Controlled Codex Security pilot (Prime repo only)
-- Add secrets: `CODEX_SECURITY_API_KEY`, `CODEX_SECURITY_WEBHOOK_SECRET`.
-- Migration: `security_scan_jobs`, `security_scan_events`, extend `security_findings` with `scan_job_id`, `codex_finding_id`, `remediation_pr_url`, `auto_fix_confidence`.
-- Server: `src/lib/codex-security.functions.ts` (`enqueueScan`, `getScanStatus`, `listScanFindings`), `src/server/codex-security-client.server.ts`.
-- Route: `POST /api/public/hooks/codex-security` (HMAC verified) → writes findings, transitions job.
-- UI: `/security/scans` (operator+) — list, trigger manual scan on Prime, view findings.
-- Nightly `pg_cron` → `enqueueScan(prime)`.
+## Phase 1 — CRM spine and lead promotion
 
-### Phase 1 — Remediation PR workflow
-- GitHub Actions workflow `codex-remediate.yml` (checked into Prime) invoked via `workflow_dispatch` from Mission Control with `finding_id`.
-- Server fn `requestRemediation(findingId)` (admin only) → dispatches workflow with a signed payload; Codex opens a draft PR against a `codex/fix/<id>` branch.
-- Webhook `/api/public/hooks/github-pr` updates `security_findings.remediation_pr_url`, `pr_state`.
-- UI: finding drawer with "Draft fix", PR link, reviewer checklist.
+New tables (all with GRANTs + RLS scoped to operator/admin roles via `is_operator`/`is_admin`):
 
-### Phase 2 — Human review + merge gate
-- Extend role hierarchy: `security_reviewer` capability (admin/super_admin auto-grant).
-- Approval table `security_remediation_approvals` — two-key merge for `high` severity (reviewer + admin).
-- Merge button calls GitHub API; on merge, mark finding `fix_merged`, kick revalidation scan scoped to touched paths.
+- `crm_accounts` — organisation record: name, classification, lifecycle_stage (`lead`, `opportunity`, `onboarding`, `active`, `at_risk`, `churned`), owner (assigned operator), source, links to `clone_id` / `tenant_id`, health score, ARR, tags.
+- `crm_contacts` — people at an account: name, email, phone, role, is_primary, marketing consent.
+- `crm_activities` — universal timeline: calls, emails, notes, meetings, system events. Every other module writes here so one account page shows the whole story.
+- `crm_tasks` — follow-ups with due date, assignee, status, reminder → notifications.
 
-### Phase 3 — Fleet cascade for security fixes
-- New cascade template kind `security_patch` reusing `cascade_events`/`cascade_results`.
-- After Prime merge → auto-create cascade targeting clones whose `clone_modules` intersect changed paths (path→module map already exists).
-- Support deletions + migration-carrying patches (extend cascade executor to run `supabase migrations` before code push).
-- UI: cascade row shows originating finding.
+Lead promotion: a "Convert lead" action on `/leads` creates the account + primary contact, copies the lead payload, links `waitlist_leads.account_id`, and stamps `converted` status. Airtable-mirrored historical leads promote the same way.
 
-### Phase 4 — Perpetual scanning + scheduling
-- Job kinds: `pr_open` (webhook from GitHub PR), `nightly_full`, `targeted_path`, `post_merge_revalidate`.
-- Concurrency caps per repo (reuse GitHub concurrency pattern from Sprint 3).
-- Backoff + dead-letter (`security_scan_jobs.failure_count`, `next_attempt_at`).
-- Ops dashboard `/security/ops` — queue depth, success rate, MTTR.
+## Phase 2 — Deal pipeline (pre-contract)
 
-### Phase 5 — Clone fleet scanning
-- Extend enqueue to iterate `clones where isolated_tenant=false or handoff_state in (draft, dry_run_ready)`.
-- Per-clone GitHub token resolution via existing GitHub App installation records.
-- Findings tagged with `clone_id`; RLS: operators see Prime + assigned clones, admins see all.
+- `crm_deals` — opportunity per account: stage (`discovery`, `demo`, `proposal`, `contract`, `won`, `lost`), tier being sold (Launch/Growth/Scale), add-on modules, seat count, expected MRR, close date, lost reason.
+- `crm_deal_line_items` — resolved from the live pricing catalog (`seat_plans`, `addon_modules`, `setup_packages`) so quotes always match Stripe prices.
+- Quote → checkout: a "Send pricing link" action mints a storefront access grant scoped to the deal, and the resulting Stripe purchase auto-advances the deal to `won` via the existing webhook, creating the contract.
+- Kanban board UI with drag-between-stages, weighted forecast, and stage-age warnings.
 
-### Phase 6 — Security Partner Portal integration
-- Surface Codex findings in existing `/security/partners` portal so EC-Council reviewers can triage.
-- Map Codex severity → `security_findings.severity`; allow partner to add comments (`security_assessment_comments`).
-- Export signed report bundle to `security-reports` bucket on partner sign-off.
+## Phase 3 — Contracts, onboarding, payments
 
-### Phase 7 — Provider-neutral intake + ticketing hooks ✅
-- `SecurityIntakeAdapter` interface (`ingestFinding`, `updateStatus`, `linkExternalTicket`) in `src/server/security-intake/adapters.ts`.
-- Concrete adapters: `CodexAdapter`, `ManualAdapter`, `GenericAdapter`, stub `TicketingAdapter`.
-- Public API `POST /api/public/security/intake` with per-source HMAC (`x-intake-source` + `x-intake-signature`).
-- Tables: `security_intake_sources` (rotatable HMAC secrets, admin-only) + `security_external_tickets` (linked to `codex_findings`, unique per source/provider/external_id).
-- Admin server fns in `src/lib/security-intake.functions.ts`; management UI at `/security/intake`.
+- `crm_contracts` — term start/end, billing cadence, tier, committed seats, auto-renew flag, notice period, cancellation terms version (reuses `handoff_terms_versions`), signed-by/at.
+- `crm_onboarding_tasks` — templated checklist auto-created when a deal is won (backend provisioned, domain mapped, brand cascade applied, seats issued, training done). Ties directly to existing clone provisioning status so items tick themselves.
+- **Payments view** per account, read from live data — no duplication: Stripe purchases, invoices, payment methods, token ledger and seat entitlements aggregated into one panel with outstanding balance, failed-payment flags and dunning state.
+- Payment failure / card expiry raises an activity + task + notification and can flip the account to `at_risk`.
 
-## Cross-cutting technical details
+## Phase 4 — Support, issues and disputes
 
-- **DB safety** — every new `public.*` table gets `GRANT` block + RLS scoped via `has_role`/`is_admin`; migrations idempotent.
-- **Secrets** — Codex + webhook secrets via `add_secret`; never in code.
-- **Worker constraints** — no child_process, no sharp. All heavy Git/scan work runs in Codex or Actions.
-- **Observability** — every state transition writes `security_scan_events` (append-only) + `audit_log`.
-- **Rollback** — feature flag `security.codex.enabled` in `prime_config`; disables enqueue + hides UI.
+- `crm_tickets` — issue tracking: type (`support`, `bug`, `billing`, `feature`), severity, status (`open`, `in_progress`, `waiting_client`, `resolved`, `closed`), SLA due-at, assignee, resolution notes. Links optionally to a `codex_findings` or `route_errors` record so platform incidents attach to affected clients.
+- `crm_ticket_messages` — threaded correspondence with internal-note flag.
+- `crm_disputes` — formal escalations: chargebacks (auto-created from Stripe `charge.dispute.created`), service credits, contractual disagreements. Fields: amount, opened/closed dates, outcome, evidence links, resolution owner. Dispute open → account flagged and blocked from auto-renew until resolved.
+- SLA breach sweep on the existing cron hook raises notifications.
 
-## Deliverables per phase
+## Phase 5 — Feedback, health and retention
 
-Each phase ends with: migration applied, server code + tests, UI slice, docs entry under `docs/codex-security/phase-N.md`, and a smoke run against Prime.
+- Surfaces existing `feedback_submissions` (NPS, module ratings) on the account timeline, and adds `crm_feedback_requests` for operator-triggered survey sends with response tracking.
+- **Health score** (materialised nightly): usage/token burn trend, seat utilisation, ticket volume and severity, payment reliability, NPS, days since last contact. Drives an `at_risk` watchlist.
+- Renewal engine: contracts approaching term end generate renewal tasks, notice-period alerts, and a renewal deal in the pipeline.
 
-## Order of execution
+## Phase 6 — Exit, offboarding and data migration
 
-Phase 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7. I begin Phase 0 as soon as you approve this plan.
+- `crm_churn_events` — cancellation request date, effective date, reason taxonomy (price, missing capability, switched provider, internal build, non-payment), competitor named, save-attempt outcome, refund/credit issued, final invoice link.
+- `crm_offboarding_runs` — a governed wind-down checklist per exit: notice acknowledged, final invoice settled, seats revoked, API keys revoked, subscription cancelled in Stripe, access grants expired.
+- **Data migration / portability**: reuses the existing handoff machinery. Two paths:
+  - *Ownership transfer* — the client keeps the deployment; run the existing Supabase backend handoff (contracts, parity report, secret rotation, storage replication, audit shipper).
+  - *Export and terminate* — generate a portable data pack (per-tenant DB export manifest, storage assets, brand config, report archive), record checksums and delivery, then schedule destruction after a retention window.
+- Retention & deletion clock: `data_retention_until` on the churn record, with a cron sweep that prompts before purge, and a full audit trail of who exported/deleted what.
+- Re-activation: churned accounts stay queryable and can be reopened into a new deal, preserving history.
+
+## UI surface
+
+New `/crm` section in the sidebar:
+- `/crm` — pipeline overview: funnel, forecast, at-risk list, overdue tasks, SLA breaches.
+- `/crm/accounts` — filterable list with lifecycle, owner, ARR, health.
+- `/crm/accounts/$accountId` — the hub: header with health/ARR/stage, tabs for Timeline, Contacts, Deals, Contract, Payments, Tickets, Disputes, Feedback, Offboarding.
+- `/crm/deals` — kanban board.
+- `/crm/tickets` — queue with SLA countdown.
+- `/leads` — gains a "Convert to account" action and shows already-converted links.
+
+## Technical notes
+
+- All schema lands as migrations with explicit `GRANT`s, RLS gated by the existing role hierarchy (operator read/write, admin full, `high_king` unrestricted), and `updated_at` triggers.
+- Server logic via `createServerFn` in `src/lib/crm*.functions.ts` with `requireSupabaseAuth`; heavy/privileged work behind role checks in `src/server/crm/*.server.ts`.
+- No duplication of billing state: payments, invoices, tokens and seats are read from existing tables; the CRM stores only relationship data.
+- Automation hooks piggyback on existing crons (`hooks.*`) for SLA sweeps, health scoring, renewal alerts and retention purges.
+- Stripe webhook gains handlers for `charge.dispute.*` and `customer.subscription.deleted` to feed disputes and churn automatically.
+- Existing notification + realtime pipeline reused so assignments, SLA breaches and churn signals reach operators live.
+
+## Suggested build order
+
+1. Phase 1 spine + lead promotion + account hub shell (immediately useful).
+2. Phase 2 pipeline + Phase 3 contracts/onboarding/payments view.
+3. Phase 4 tickets/disputes.
+4. Phase 5 health/renewals, Phase 6 exit and migration.

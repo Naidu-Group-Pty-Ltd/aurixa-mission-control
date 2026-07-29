@@ -15,7 +15,11 @@ import {
   Bell,
   Boxes,
   Bot,
+  Briefcase,
+  Building2,
   CalendarClock,
+  LifeBuoy,
+
   CheckCircle2,
   Cloud,
   Crown,
@@ -181,13 +185,39 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    heading: "Clients",
+    items: [
+      {
+        to: "/crm",
+        label: "CRM Overview",
+        icon: Briefcase,
+        shortcut: "k",
+        keywords: "clients accounts lifecycle mrr health churn",
+      },
+      {
+        to: "/crm/accounts",
+        label: "Accounts",
+        icon: Building2,
+        keywords: "clients organisations companies",
+      },
+      { to: "/crm/deals", label: "Deals", icon: Target, keywords: "pipeline opportunities forecast" },
+      {
+        to: "/crm/tickets",
+        label: "Tickets & Disputes",
+        icon: LifeBuoy,
+        keywords: "support issues sla chargeback refund",
+      },
+      { to: "/leads", label: "Leads", icon: UserPlus, keywords: "waitlist inbound capture" },
+    ],
+  },
+  {
     heading: "Growth",
     items: [
-      { to: "/leads", label: "Leads", icon: UserPlus, keywords: "waitlist crm contacts" },
       { to: "/handoffs", label: "Handoffs", icon: ArrowRightLeft, keywords: "client transfer" },
       { to: "/partner-portal", label: "Partner Portal", icon: Handshake, keywords: "resellers" },
     ],
   },
+
   {
     heading: "Billing",
     items: [

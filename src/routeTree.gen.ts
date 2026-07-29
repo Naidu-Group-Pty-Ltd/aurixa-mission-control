@@ -38,6 +38,7 @@ import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SecurityIndexRouteImport } from './routes/security.index'
+import { Route as CrmIndexRouteImport } from './routes/crm.index'
 import { Route as SettingsRolesRouteImport } from './routes/settings.roles'
 import { Route as SettingsRoleAuditRouteImport } from './routes/settings.role-audit'
 import { Route as SettingsProvisioningPreviewRouteImport } from './routes/settings.provisioning-preview'
@@ -68,6 +69,7 @@ import { Route as HooksExpireReservationsRouteImport } from './routes/hooks.expi
 import { Route as HooksEdgeDriftRouteImport } from './routes/hooks.edge-drift'
 import { Route as HooksEdgeDrainRouteImport } from './routes/hooks.edge-drain'
 import { Route as HooksDriftRefreshRouteImport } from './routes/hooks.drift-refresh'
+import { Route as HooksCrmSweepRouteImport } from './routes/hooks.crm-sweep'
 import { Route as HooksCodexSweepRouteImport } from './routes/hooks.codex-sweep'
 import { Route as HooksCodexNightlyRouteImport } from './routes/hooks.codex-nightly'
 import { Route as HooksCascadeDrainRouteImport } from './routes/hooks.cascade-drain'
@@ -77,6 +79,8 @@ import { Route as HooksAirtableSyncRouteImport } from './routes/hooks.airtable-s
 import { Route as HandoffsNewRouteImport } from './routes/handoffs.new'
 import { Route as HandoffsHandoffIdRouteImport } from './routes/handoffs.$handoffId'
 import { Route as FleetEdgeRouteImport } from './routes/fleet.edge'
+import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
+import { Route as CrmDealsRouteImport } from './routes/crm.deals'
 import { Route as ClonesNewRouteImport } from './routes/clones.new'
 import { Route as ClonesCloneIdRouteImport } from './routes/clones.$cloneId'
 import { Route as CascadesEventIdRouteImport } from './routes/cascades.$eventId'
@@ -88,6 +92,8 @@ import { Route as BillingInvoicesRouteImport } from './routes/billing.invoices'
 import { Route as BillingCatalogRouteImport } from './routes/billing.catalog'
 import { Route as BillingCancelRouteImport } from './routes/billing.cancel'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
+import { Route as CrmAccountsIndexRouteImport } from './routes/crm.accounts.index'
+import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.$accountId'
 import { Route as ClonesCloneIdSecretsRouteImport } from './routes/clones.$cloneId.secrets'
 import { Route as ClientsHandoffTokenRouteImport } from './routes/clients.handoff.$token'
 import { Route as ApiPublicPurchasesRouteImport } from './routes/api.public.purchases'
@@ -278,6 +284,11 @@ const SecurityIndexRoute = SecurityIndexRouteImport.update({
   path: '/security/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrmIndexRoute = CrmIndexRouteImport.update({
+  id: '/crm/',
+  path: '/crm/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRolesRoute = SettingsRolesRouteImport.update({
   id: '/roles',
   path: '/roles',
@@ -432,6 +443,11 @@ const HooksDriftRefreshRoute = HooksDriftRefreshRouteImport.update({
   path: '/hooks/drift-refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HooksCrmSweepRoute = HooksCrmSweepRouteImport.update({
+  id: '/hooks/crm-sweep',
+  path: '/hooks/crm-sweep',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HooksCodexSweepRoute = HooksCodexSweepRouteImport.update({
   id: '/hooks/codex-sweep',
   path: '/hooks/codex-sweep',
@@ -476,6 +492,16 @@ const HandoffsHandoffIdRoute = HandoffsHandoffIdRouteImport.update({
 const FleetEdgeRoute = FleetEdgeRouteImport.update({
   id: '/fleet/edge',
   path: '/fleet/edge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmTicketsRoute = CrmTicketsRouteImport.update({
+  id: '/crm/tickets',
+  path: '/crm/tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmDealsRoute = CrmDealsRouteImport.update({
+  id: '/crm/deals',
+  path: '/crm/deals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClonesNewRoute = ClonesNewRouteImport.update({
@@ -531,6 +557,16 @@ const BillingCancelRoute = BillingCancelRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmAccountsIndexRoute = CrmAccountsIndexRouteImport.update({
+  id: '/crm/accounts/',
+  path: '/crm/accounts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmAccountsAccountIdRoute = CrmAccountsAccountIdRouteImport.update({
+  id: '/crm/accounts/$accountId',
+  path: '/crm/accounts/$accountId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClonesCloneIdSecretsRoute = ClonesCloneIdSecretsRouteImport.update({
@@ -818,6 +854,8 @@ export interface FileRoutesByFullPath {
   '/cascades/$eventId': typeof CascadesEventIdRoute
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
+  '/crm/deals': typeof CrmDealsRoute
+  '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -827,6 +865,7 @@ export interface FileRoutesByFullPath {
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
+  '/hooks/crm-sweep': typeof HooksCrmSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -857,11 +896,14 @@ export interface FileRoutesByFullPath {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
   '/clones/$cloneId/secrets': typeof ClonesCloneIdSecretsRoute
+  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/accounts/': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
   '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
@@ -942,6 +984,8 @@ export interface FileRoutesByTo {
   '/cascades/$eventId': typeof CascadesEventIdRoute
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
+  '/crm/deals': typeof CrmDealsRoute
+  '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -951,6 +995,7 @@ export interface FileRoutesByTo {
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
+  '/hooks/crm-sweep': typeof HooksCrmSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -981,11 +1026,14 @@ export interface FileRoutesByTo {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/crm': typeof CrmIndexRoute
   '/security': typeof SecurityIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
   '/clones/$cloneId/secrets': typeof ClonesCloneIdSecretsRoute
+  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/accounts': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
   '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
@@ -1068,6 +1116,8 @@ export interface FileRoutesById {
   '/cascades/$eventId': typeof CascadesEventIdRoute
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
+  '/crm/deals': typeof CrmDealsRoute
+  '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -1077,6 +1127,7 @@ export interface FileRoutesById {
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
+  '/hooks/crm-sweep': typeof HooksCrmSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1107,11 +1158,14 @@ export interface FileRoutesById {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/purchases': typeof ApiPublicPurchasesRoute
   '/clients/handoff/$token': typeof ClientsHandoffTokenRoute
   '/clones/$cloneId/secrets': typeof ClonesCloneIdSecretsRoute
+  '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
+  '/crm/accounts/': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
   '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
@@ -1195,6 +1249,8 @@ export interface FileRouteTypes {
     | '/cascades/$eventId'
     | '/clones/$cloneId'
     | '/clones/new'
+    | '/crm/deals'
+    | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1204,6 +1260,7 @@ export interface FileRouteTypes {
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
+    | '/hooks/crm-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1234,11 +1291,14 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/crm/'
     | '/security/'
     | '/settings/'
     | '/api/public/purchases'
     | '/clients/handoff/$token'
     | '/clones/$cloneId/secrets'
+    | '/crm/accounts/$accountId'
+    | '/crm/accounts/'
     | '/api/public/billing/handoff'
     | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
@@ -1319,6 +1379,8 @@ export interface FileRouteTypes {
     | '/cascades/$eventId'
     | '/clones/$cloneId'
     | '/clones/new'
+    | '/crm/deals'
+    | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1328,6 +1390,7 @@ export interface FileRouteTypes {
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
+    | '/hooks/crm-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1358,11 +1421,14 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/crm'
     | '/security'
     | '/settings'
     | '/api/public/purchases'
     | '/clients/handoff/$token'
     | '/clones/$cloneId/secrets'
+    | '/crm/accounts/$accountId'
+    | '/crm/accounts'
     | '/api/public/billing/handoff'
     | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
@@ -1444,6 +1510,8 @@ export interface FileRouteTypes {
     | '/cascades/$eventId'
     | '/clones/$cloneId'
     | '/clones/new'
+    | '/crm/deals'
+    | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1453,6 +1521,7 @@ export interface FileRouteTypes {
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
+    | '/hooks/crm-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1483,11 +1552,14 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/crm/'
     | '/security/'
     | '/settings/'
     | '/api/public/purchases'
     | '/clients/handoff/$token'
     | '/clones/$cloneId/secrets'
+    | '/crm/accounts/$accountId'
+    | '/crm/accounts/'
     | '/api/public/billing/handoff'
     | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
@@ -1569,6 +1641,8 @@ export interface RootRouteChildren {
   BillingTopupRoute: typeof BillingTopupRoute
   ClonesCloneIdRoute: typeof ClonesCloneIdRouteWithChildren
   ClonesNewRoute: typeof ClonesNewRoute
+  CrmDealsRoute: typeof CrmDealsRoute
+  CrmTicketsRoute: typeof CrmTicketsRoute
   FleetEdgeRoute: typeof FleetEdgeRoute
   HooksAirtableSyncRoute: typeof HooksAirtableSyncRoute
   HooksBackendProvisioningDrainRoute: typeof HooksBackendProvisioningDrainRoute
@@ -1576,6 +1650,7 @@ export interface RootRouteChildren {
   HooksCascadeDrainRoute: typeof HooksCascadeDrainRoute
   HooksCodexNightlyRoute: typeof HooksCodexNightlyRoute
   HooksCodexSweepRoute: typeof HooksCodexSweepRoute
+  HooksCrmSweepRoute: typeof HooksCrmSweepRoute
   HooksDriftRefreshRoute: typeof HooksDriftRefreshRoute
   HooksEdgeDrainRoute: typeof HooksEdgeDrainRoute
   HooksEdgeDriftRoute: typeof HooksEdgeDriftRoute
@@ -1590,9 +1665,12 @@ export interface RootRouteChildren {
   JoinTokenRoute: typeof JoinTokenRoute
   SecurityIntakeRoute: typeof SecurityIntakeRoute
   SecurityScansRoute: typeof SecurityScansRoute
+  CrmIndexRoute: typeof CrmIndexRoute
   SecurityIndexRoute: typeof SecurityIndexRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
   ClientsHandoffTokenRoute: typeof ClientsHandoffTokenRoute
+  CrmAccountsAccountIdRoute: typeof CrmAccountsAccountIdRoute
+  CrmAccountsIndexRoute: typeof CrmAccountsIndexRoute
   ApiPublicBillingHandoffRoute: typeof ApiPublicBillingHandoffRoute
   ApiPublicBillingInvoicesRoute: typeof ApiPublicBillingInvoicesRoute
   ApiPublicBillingPaymentMethodsRoute: typeof ApiPublicBillingPaymentMethodsRoute
@@ -1840,6 +1918,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SecurityIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/crm/': {
+      id: '/crm/'
+      path: '/crm'
+      fullPath: '/crm/'
+      preLoaderRoute: typeof CrmIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/roles': {
       id: '/settings/roles'
       path: '/roles'
@@ -2050,6 +2135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HooksDriftRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hooks/crm-sweep': {
+      id: '/hooks/crm-sweep'
+      path: '/hooks/crm-sweep'
+      fullPath: '/hooks/crm-sweep'
+      preLoaderRoute: typeof HooksCrmSweepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hooks/codex-sweep': {
       id: '/hooks/codex-sweep'
       path: '/hooks/codex-sweep'
@@ -2111,6 +2203,20 @@ declare module '@tanstack/react-router' {
       path: '/fleet/edge'
       fullPath: '/fleet/edge'
       preLoaderRoute: typeof FleetEdgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm/tickets': {
+      id: '/crm/tickets'
+      path: '/crm/tickets'
+      fullPath: '/crm/tickets'
+      preLoaderRoute: typeof CrmTicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm/deals': {
+      id: '/crm/deals'
+      path: '/crm/deals'
+      fullPath: '/crm/deals'
+      preLoaderRoute: typeof CrmDealsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clones/new': {
@@ -2188,6 +2294,20 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm/accounts/': {
+      id: '/crm/accounts/'
+      path: '/crm/accounts'
+      fullPath: '/crm/accounts/'
+      preLoaderRoute: typeof CrmAccountsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm/accounts/$accountId': {
+      id: '/crm/accounts/$accountId'
+      path: '/crm/accounts/$accountId'
+      fullPath: '/crm/accounts/$accountId'
+      preLoaderRoute: typeof CrmAccountsAccountIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clones/$cloneId/secrets': {
@@ -2644,6 +2764,8 @@ const rootRouteChildren: RootRouteChildren = {
   BillingTopupRoute: BillingTopupRoute,
   ClonesCloneIdRoute: ClonesCloneIdRouteWithChildren,
   ClonesNewRoute: ClonesNewRoute,
+  CrmDealsRoute: CrmDealsRoute,
+  CrmTicketsRoute: CrmTicketsRoute,
   FleetEdgeRoute: FleetEdgeRoute,
   HooksAirtableSyncRoute: HooksAirtableSyncRoute,
   HooksBackendProvisioningDrainRoute: HooksBackendProvisioningDrainRoute,
@@ -2651,6 +2773,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksCascadeDrainRoute: HooksCascadeDrainRoute,
   HooksCodexNightlyRoute: HooksCodexNightlyRoute,
   HooksCodexSweepRoute: HooksCodexSweepRoute,
+  HooksCrmSweepRoute: HooksCrmSweepRoute,
   HooksDriftRefreshRoute: HooksDriftRefreshRoute,
   HooksEdgeDrainRoute: HooksEdgeDrainRoute,
   HooksEdgeDriftRoute: HooksEdgeDriftRoute,
@@ -2665,9 +2788,12 @@ const rootRouteChildren: RootRouteChildren = {
   JoinTokenRoute: JoinTokenRoute,
   SecurityIntakeRoute: SecurityIntakeRoute,
   SecurityScansRoute: SecurityScansRoute,
+  CrmIndexRoute: CrmIndexRoute,
   SecurityIndexRoute: SecurityIndexRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
   ClientsHandoffTokenRoute: ClientsHandoffTokenRoute,
+  CrmAccountsAccountIdRoute: CrmAccountsAccountIdRoute,
+  CrmAccountsIndexRoute: CrmAccountsIndexRoute,
   ApiPublicBillingHandoffRoute: ApiPublicBillingHandoffRoute,
   ApiPublicBillingInvoicesRoute: ApiPublicBillingInvoicesRoute,
   ApiPublicBillingPaymentMethodsRoute: ApiPublicBillingPaymentMethodsRoute,
@@ -2712,12 +2838,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
