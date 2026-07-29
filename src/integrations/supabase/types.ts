@@ -2795,6 +2795,149 @@ export type Database = {
           },
         ]
       }
+      feedback_submissions: {
+        Row: {
+          additional_comments: string | null
+          biggest_frustration: string | null
+          campaign_key: string
+          clone_id: string | null
+          created_at: string
+          feature_request: string | null
+          forward_attempts: number
+          forward_error: string | null
+          forwarded_at: string | null
+          id: string
+          module_ratings: Json
+          most_valuable: string | null
+          origin_source: string | null
+          origin_user_id: string | null
+          origin_username: string | null
+          overall_rating: number | null
+          plan_name: string | null
+          plan_slug: string | null
+          recommend_score: number | null
+          tenant_id: string
+        }
+        Insert: {
+          additional_comments?: string | null
+          biggest_frustration?: string | null
+          campaign_key: string
+          clone_id?: string | null
+          created_at?: string
+          feature_request?: string | null
+          forward_attempts?: number
+          forward_error?: string | null
+          forwarded_at?: string | null
+          id?: string
+          module_ratings?: Json
+          most_valuable?: string | null
+          origin_source?: string | null
+          origin_user_id?: string | null
+          origin_username?: string | null
+          overall_rating?: number | null
+          plan_name?: string | null
+          plan_slug?: string | null
+          recommend_score?: number | null
+          tenant_id: string
+        }
+        Update: {
+          additional_comments?: string | null
+          biggest_frustration?: string | null
+          campaign_key?: string
+          clone_id?: string | null
+          created_at?: string
+          feature_request?: string | null
+          forward_attempts?: number
+          forward_error?: string | null
+          forwarded_at?: string | null
+          id?: string
+          module_ratings?: Json
+          most_valuable?: string | null
+          origin_source?: string | null
+          origin_user_id?: string | null
+          origin_username?: string | null
+          overall_rating?: number | null
+          plan_name?: string | null
+          plan_slug?: string | null
+          recommend_score?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_submissions_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_submissions_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "feedback_submissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_token_grants: {
+        Row: {
+          campaign_key: string
+          created_at: string
+          id: string
+          ledger_id: string | null
+          submission_id: string | null
+          tenant_id: string
+          tokens: number
+        }
+        Insert: {
+          campaign_key: string
+          created_at?: string
+          id?: string
+          ledger_id?: string | null
+          submission_id?: string | null
+          tenant_id: string
+          tokens: number
+        }
+        Update: {
+          campaign_key?: string
+          created_at?: string
+          id?: string
+          ledger_id?: string | null
+          submission_id?: string | null
+          tenant_id?: string
+          tokens?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_token_grants_ledger_id_fkey"
+            columns: ["ledger_id"]
+            isOneToOne: false
+            referencedRelation: "token_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_token_grants_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_token_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fleet_digests: {
         Row: {
           created_at: string
@@ -6761,6 +6904,11 @@ export type Database = {
       }
       expire_stale_reservations: { Args: never; Returns: Json }
       expire_stale_seat_reservations: { Args: never; Returns: Json }
+      feedback_campaign_key: {
+        Args: { _at?: string; _tenant_created_at: string }
+        Returns: string
+      }
+      feedback_prompt_due: { Args: { _tenant_id: string }; Returns: Json }
       grant_tokens: {
         Args: {
           _expires_at?: string
@@ -6789,6 +6937,10 @@ export type Database = {
       issue_plan_allowance: {
         Args: { _period_start?: string; _tenant_id: string }
         Returns: Json
+      }
+      mark_feedback_forwarded: {
+        Args: { _error?: string; _ok: boolean; _submission_id: string }
+        Returns: undefined
       }
       purge_log_tables: {
         Args: never
@@ -6880,6 +7032,10 @@ export type Database = {
       security_storage_assessment_id: {
         Args: { object_name: string }
         Returns: string
+      }
+      submit_feedback: {
+        Args: { _payload: Json; _tenant_id: string }
+        Returns: Json
       }
       tenant_usage_summary: { Args: { _tenant_id: string }; Returns: Json }
       token_expiry_days: { Args: never; Returns: number }
