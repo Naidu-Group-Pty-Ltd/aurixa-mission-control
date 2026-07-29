@@ -6908,7 +6908,10 @@ export type Database = {
         Args: { _at?: string; _tenant_created_at: string }
         Returns: string
       }
-      feedback_prompt_due: { Args: { _tenant_id: string }; Returns: Json }
+      feedback_prompt_due: {
+        Args: { _origin_user_id?: string; _tenant_id: string }
+        Returns: Json
+      }
       grant_tokens: {
         Args: {
           _expires_at?: string
