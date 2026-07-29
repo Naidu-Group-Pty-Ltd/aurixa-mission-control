@@ -592,6 +592,7 @@ function LeadRow({
           <Badge variant="outline" className={cn("text-[10px] uppercase", statusTone(lead.status))}>
             {lead.status}
           </Badge>
+          <ConvertLeadButton lead={lead} />
           <Select value={lead.status} onValueChange={(v) => onStatusChange(v as LeadStatus)}>
             <SelectTrigger className="h-8 w-[130px] text-xs">
               <SelectValue />
@@ -605,6 +606,7 @@ function LeadRow({
             </SelectContent>
           </Select>
         </div>
+
       </div>
 
       {expanded && (
