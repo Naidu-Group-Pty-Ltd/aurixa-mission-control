@@ -69,6 +69,7 @@ import { Route as HooksExpireReservationsRouteImport } from './routes/hooks.expi
 import { Route as HooksEdgeDriftRouteImport } from './routes/hooks.edge-drift'
 import { Route as HooksEdgeDrainRouteImport } from './routes/hooks.edge-drain'
 import { Route as HooksDriftRefreshRouteImport } from './routes/hooks.drift-refresh'
+import { Route as HooksCrmSweepRouteImport } from './routes/hooks.crm-sweep'
 import { Route as HooksCodexSweepRouteImport } from './routes/hooks.codex-sweep'
 import { Route as HooksCodexNightlyRouteImport } from './routes/hooks.codex-nightly'
 import { Route as HooksCascadeDrainRouteImport } from './routes/hooks.cascade-drain'
@@ -78,6 +79,8 @@ import { Route as HooksAirtableSyncRouteImport } from './routes/hooks.airtable-s
 import { Route as HandoffsNewRouteImport } from './routes/handoffs.new'
 import { Route as HandoffsHandoffIdRouteImport } from './routes/handoffs.$handoffId'
 import { Route as FleetEdgeRouteImport } from './routes/fleet.edge'
+import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
+import { Route as CrmDealsRouteImport } from './routes/crm.deals'
 import { Route as ClonesNewRouteImport } from './routes/clones.new'
 import { Route as ClonesCloneIdRouteImport } from './routes/clones.$cloneId'
 import { Route as CascadesEventIdRouteImport } from './routes/cascades.$eventId'
@@ -440,6 +443,11 @@ const HooksDriftRefreshRoute = HooksDriftRefreshRouteImport.update({
   path: '/hooks/drift-refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HooksCrmSweepRoute = HooksCrmSweepRouteImport.update({
+  id: '/hooks/crm-sweep',
+  path: '/hooks/crm-sweep',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HooksCodexSweepRoute = HooksCodexSweepRouteImport.update({
   id: '/hooks/codex-sweep',
   path: '/hooks/codex-sweep',
@@ -484,6 +492,16 @@ const HandoffsHandoffIdRoute = HandoffsHandoffIdRouteImport.update({
 const FleetEdgeRoute = FleetEdgeRouteImport.update({
   id: '/fleet/edge',
   path: '/fleet/edge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmTicketsRoute = CrmTicketsRouteImport.update({
+  id: '/crm/tickets',
+  path: '/crm/tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrmDealsRoute = CrmDealsRouteImport.update({
+  id: '/crm/deals',
+  path: '/crm/deals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClonesNewRoute = ClonesNewRouteImport.update({
@@ -836,6 +854,8 @@ export interface FileRoutesByFullPath {
   '/cascades/$eventId': typeof CascadesEventIdRoute
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
+  '/crm/deals': typeof CrmDealsRoute
+  '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -845,6 +865,7 @@ export interface FileRoutesByFullPath {
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
+  '/hooks/crm-sweep': typeof HooksCrmSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -963,6 +984,8 @@ export interface FileRoutesByTo {
   '/cascades/$eventId': typeof CascadesEventIdRoute
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
+  '/crm/deals': typeof CrmDealsRoute
+  '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -972,6 +995,7 @@ export interface FileRoutesByTo {
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
+  '/hooks/crm-sweep': typeof HooksCrmSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1092,6 +1116,8 @@ export interface FileRoutesById {
   '/cascades/$eventId': typeof CascadesEventIdRoute
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
+  '/crm/deals': typeof CrmDealsRoute
+  '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -1101,6 +1127,7 @@ export interface FileRoutesById {
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
+  '/hooks/crm-sweep': typeof HooksCrmSweepRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1222,6 +1249,8 @@ export interface FileRouteTypes {
     | '/cascades/$eventId'
     | '/clones/$cloneId'
     | '/clones/new'
+    | '/crm/deals'
+    | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1231,6 +1260,7 @@ export interface FileRouteTypes {
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
+    | '/hooks/crm-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1349,6 +1379,8 @@ export interface FileRouteTypes {
     | '/cascades/$eventId'
     | '/clones/$cloneId'
     | '/clones/new'
+    | '/crm/deals'
+    | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1358,6 +1390,7 @@ export interface FileRouteTypes {
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
+    | '/hooks/crm-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1477,6 +1510,8 @@ export interface FileRouteTypes {
     | '/cascades/$eventId'
     | '/clones/$cloneId'
     | '/clones/new'
+    | '/crm/deals'
+    | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1486,6 +1521,7 @@ export interface FileRouteTypes {
     | '/hooks/cascade-drain'
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
+    | '/hooks/crm-sweep'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1605,6 +1641,8 @@ export interface RootRouteChildren {
   BillingTopupRoute: typeof BillingTopupRoute
   ClonesCloneIdRoute: typeof ClonesCloneIdRouteWithChildren
   ClonesNewRoute: typeof ClonesNewRoute
+  CrmDealsRoute: typeof CrmDealsRoute
+  CrmTicketsRoute: typeof CrmTicketsRoute
   FleetEdgeRoute: typeof FleetEdgeRoute
   HooksAirtableSyncRoute: typeof HooksAirtableSyncRoute
   HooksBackendProvisioningDrainRoute: typeof HooksBackendProvisioningDrainRoute
@@ -1612,6 +1650,7 @@ export interface RootRouteChildren {
   HooksCascadeDrainRoute: typeof HooksCascadeDrainRoute
   HooksCodexNightlyRoute: typeof HooksCodexNightlyRoute
   HooksCodexSweepRoute: typeof HooksCodexSweepRoute
+  HooksCrmSweepRoute: typeof HooksCrmSweepRoute
   HooksDriftRefreshRoute: typeof HooksDriftRefreshRoute
   HooksEdgeDrainRoute: typeof HooksEdgeDrainRoute
   HooksEdgeDriftRoute: typeof HooksEdgeDriftRoute
@@ -2096,6 +2135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HooksDriftRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hooks/crm-sweep': {
+      id: '/hooks/crm-sweep'
+      path: '/hooks/crm-sweep'
+      fullPath: '/hooks/crm-sweep'
+      preLoaderRoute: typeof HooksCrmSweepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hooks/codex-sweep': {
       id: '/hooks/codex-sweep'
       path: '/hooks/codex-sweep'
@@ -2157,6 +2203,20 @@ declare module '@tanstack/react-router' {
       path: '/fleet/edge'
       fullPath: '/fleet/edge'
       preLoaderRoute: typeof FleetEdgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm/tickets': {
+      id: '/crm/tickets'
+      path: '/crm/tickets'
+      fullPath: '/crm/tickets'
+      preLoaderRoute: typeof CrmTicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm/deals': {
+      id: '/crm/deals'
+      path: '/crm/deals'
+      fullPath: '/crm/deals'
+      preLoaderRoute: typeof CrmDealsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clones/new': {
@@ -2704,6 +2764,8 @@ const rootRouteChildren: RootRouteChildren = {
   BillingTopupRoute: BillingTopupRoute,
   ClonesCloneIdRoute: ClonesCloneIdRouteWithChildren,
   ClonesNewRoute: ClonesNewRoute,
+  CrmDealsRoute: CrmDealsRoute,
+  CrmTicketsRoute: CrmTicketsRoute,
   FleetEdgeRoute: FleetEdgeRoute,
   HooksAirtableSyncRoute: HooksAirtableSyncRoute,
   HooksBackendProvisioningDrainRoute: HooksBackendProvisioningDrainRoute,
@@ -2711,6 +2773,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksCascadeDrainRoute: HooksCascadeDrainRoute,
   HooksCodexNightlyRoute: HooksCodexNightlyRoute,
   HooksCodexSweepRoute: HooksCodexSweepRoute,
+  HooksCrmSweepRoute: HooksCrmSweepRoute,
   HooksDriftRefreshRoute: HooksDriftRefreshRoute,
   HooksEdgeDrainRoute: HooksEdgeDrainRoute,
   HooksEdgeDriftRoute: HooksEdgeDriftRoute,

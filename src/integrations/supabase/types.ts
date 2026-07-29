@@ -8211,6 +8211,10 @@ export type Database = {
         | "device_released"
         | "lead_captured"
         | "purchase_completed"
+        | "crm_sla_breach"
+        | "crm_renewal_due"
+        | "crm_retention_due"
+        | "crm_task_assigned"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -8555,6 +8559,10 @@ export const Constants = {
         "device_released",
         "lead_captured",
         "purchase_completed",
+        "crm_sla_breach",
+        "crm_renewal_due",
+        "crm_retention_due",
+        "crm_task_assigned",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
