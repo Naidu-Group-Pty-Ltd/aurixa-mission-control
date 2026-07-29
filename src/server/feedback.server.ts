@@ -24,7 +24,15 @@ const adminAny = supabaseAdmin as any;
 export const FEEDBACK_REWARD_TOKENS = 100;
 
 export type PromptState = {
+  /** Whether to ASK. Workspace-level, so a team is not nagged repeatedly. */
   due: boolean;
+  /**
+   * Whether THIS PERSON has already had their say. What the form gates on —
+   * `due` is the wrong question there, because many people may answer and only
+   * the reward is once.
+   */
+  youAnswered: boolean;
+  workspaceAnswered: boolean;
   campaignKey: string;
   reason: "onboarding" | "quarterly";
   /** False once someone in this workspace has already claimed the credits. */
@@ -39,12 +47,20 @@ export type PromptState = {
  * inherits the same cadence — first 30 days, then quarterly — without the rule
  * being copied into code that ships separately and drifts.
  */
-export async function promptState(tenantId: string): Promise<PromptState | null> {
-  const { data, error } = await adminAny.rpc("feedback_prompt_due", { _tenant_id: tenantId });
+export async function promptState(
+  tenantId: string,
+  originUserId?: string | null,
+): Promise<PromptState | null> {
+  const { data, error } = await adminAny.rpc("feedback_prompt_due", {
+    _tenant_id: tenantId,
+    _origin_user_id: originUserId ?? null,
+  });
   if (error || !data || (data as { ok?: boolean }).ok === false) return null;
   const r = data as Record<string, unknown>;
   return {
     due: r.due === true,
+    youAnswered: r.you_answered === true,
+    workspaceAnswered: r.workspace_answered === true,
     campaignKey: String(r.campaign_key ?? ""),
     reason: r.reason === "onboarding" ? "onboarding" : "quarterly",
     rewardAvailable: r.reward_available === true,

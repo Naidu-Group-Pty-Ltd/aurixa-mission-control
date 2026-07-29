@@ -54,13 +54,21 @@ export const Route = createFileRoute("/api/public/tokens/feedback-prompt")({
         );
         if (!tenant.ok) return jsonResponse(tenant, 500);
 
-        const state = await promptState(tenant.tenantId);
+        // `force` is for testing the form on demand. It changes only whether a
+        // LINK is minted — never whether credits are granted, which the unique
+        // constraint on feedback_token_grants decides and nothing here can
+        // reach. Minting handoffs is already something a clone can do through
+        // the top-up endpoint, so this grants no capability it did not have.
+        const force = url.searchParams.get("force") === "1";
+
+        const state = await promptState(tenant.tenantId, url.searchParams.get("origin_user_id"));
         // A prompt is the least important thing on a dashboard. If the lookup
         // fails, say "not due" rather than an error — the workspace will be
-        // asked on the next load.
-        if (!state) return jsonResponse({ ok: true, due: false });
+        // asked on the next load. Unless forced, in which case a caller is
+        // deliberately testing and should still get a usable link.
+        if (!state && !force) return jsonResponse({ ok: true, due: false });
 
-        if (!state.due) {
+        if (state && !state.due && !force) {
           return jsonResponse({
             ok: true,
             due: false,
@@ -93,10 +101,11 @@ export const Route = createFileRoute("/api/public/tokens/feedback-prompt")({
         return jsonResponse({
           ok: true,
           due: true,
-          campaign_key: state.campaignKey,
-          reason: state.reason,
-          reward_available: state.rewardAvailable,
-          reward_tokens: state.rewardTokens,
+          forced: force && !state?.due,
+          campaign_key: state?.campaignKey ?? null,
+          reason: state?.reason ?? "quarterly",
+          reward_available: state?.rewardAvailable ?? true,
+          reward_tokens: state?.rewardTokens ?? 100,
           feedback_url: feedbackUrl,
         });
       },

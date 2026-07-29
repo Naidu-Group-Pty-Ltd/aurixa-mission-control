@@ -96,7 +96,7 @@ export const Route = createFileRoute("/api/public/storefront/feedback")({
 
         const [form, prompt, tenant] = await Promise.all([
           formForTenant(caller.tenantId),
-          promptState(caller.tenantId),
+          promptState(caller.tenantId, caller.originUserId),
           adminAny
             .from("tenants")
             .select("display_name, external_ref")
