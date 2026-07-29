@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ReportCostIndexCard } from "@/components/billing/report-cost-index-card";
 import { CatalogSyncCard } from "@/components/billing/catalog-sync-card";
 import { PackSyncCard } from "@/components/billing/pack-sync-card";
+import { FeedbackCard } from "@/components/billing/feedback-card";
 import { StorefrontAccessCard } from "@/components/billing/storefront-access-card";
 
 const SearchSchema = z.object({ tenant: z.string().uuid().optional() });
@@ -294,6 +295,7 @@ function CatalogPage() {
             <CatalogSyncCard />
             <PackSyncCard />
             <StorefrontAccessCard />
+            <FeedbackCard />
             <ReportCostIndexCard />
           </section>
         </>
