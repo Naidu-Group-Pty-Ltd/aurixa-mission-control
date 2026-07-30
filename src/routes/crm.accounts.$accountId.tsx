@@ -50,6 +50,75 @@ import {
   FileDown,
   CheckCircle2,
 } from "lucide-react";
+import { FitReport } from "@/components/fit-report";
+import { getFitHistory, runFitAnalysis } from "@/lib/fit-analysis.functions";
+import { useServerAction } from "@/lib/use-server-action";
+
+/** Fit tab — latest AI compatibility report plus the version history. */
+function AccountFitTab({ accountId }: { accountId: string }) {
+  const qc = useQueryClient();
+  const fit = useQuery({
+    queryKey: ["account-fit", accountId],
+    queryFn: () => getFitHistory({ data: { accountId } }),
+  });
+  const run = useServerAction(runFitAnalysis, {
+    successMessage: (r: any) =>
+      r?.ok ? `Fit analysis complete — ${r.grade} (${Number(r.score).toFixed(0)}/100)` : "Analysis finished",
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["account-fit", accountId] }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium">Client fit analysis</h3>
+          <p className="text-xs text-muted-foreground">
+            Cross-examines this client against the live Aurixa capability catalog.
+          </p>
+        </div>
+        <Button size="sm" disabled={run.isPending} onClick={() => run.execute({ data: { accountId } })}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          {run.isPending ? "Analysing…" : fit.data?.latest ? "Re-run analysis" : "Run analysis"}
+        </Button>
+      </div>
+
+      {fit.isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : fit.data?.latest ? (
+        <>
+          <FitReport analysis={fit.data.latest} dimensions={fit.data.dimensions} />
+          {fit.data.history.length > 1 ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Previous versions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {fit.data.history.slice(1).map((h: any) => (
+                  <div key={h.id} className="flex items-center justify-between text-sm">
+                    <span>
+                      v{h.version} · {h.grade ?? "—"} · {Number(h.score ?? 0).toFixed(0)}/100
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {formatDistanceToNow(h.created_at)}
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+        </>
+      ) : (
+        <Card>
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            No fit analysis has been run for this client yet. Run one before advancing the deal to
+            contract or SLA.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 
 export const Route = createFileRoute("/crm/accounts/$accountId")({
   component: () => (
