@@ -305,7 +305,18 @@ export const convertLead = createServerFn({ method: "POST" })
       _owner: context.userId,
     });
     if (error) throw error;
+    // Carry any pre-conversion fit analyses onto the new account so the
+    // deal-stage gate and the account Fit tab can see them.
+    const accountId = (result as any)?.account_id;
+    if (accountId) {
+      await context.supabase
+        .from("crm_fit_analyses")
+        .update({ account_id: accountId })
+        .eq("lead_id", data.lead_id)
+        .is("account_id", null);
+    }
     return result as { ok: boolean; account_id?: string; error?: string };
+
   });
 
 export const recomputeHealth = createServerFn({ method: "POST" })

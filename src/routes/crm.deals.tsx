@@ -42,14 +42,29 @@ function DealsBoard() {
   const q = useQuery({ queryKey: ["crm", "deals"], queryFn: () => listDeals() });
   const deals = q.data ?? [];
 
+  const FIT_GATE_MESSAGES: Record<string, string> = {
+    fit_gate_no_analysis:
+      "Blocked: run a client fit analysis on this account before moving to contract.",
+    fit_gate_stale_analysis: "Blocked: the client fit analysis is over 90 days old — re-run it.",
+    fit_gate_failed_verdict:
+      "Blocked: the client fit analysis verdict does not clear this deal for contract.",
+  };
+
   async function move(deal: any, dir: -1 | 1) {
     const idx = DEAL_STAGES.indexOf(deal.stage);
     const next = DEAL_STAGES[Math.min(DEAL_STAGES.length - 1, Math.max(0, idx + dir))];
     if (next === deal.stage) return;
-    await setDealStage({ data: { id: deal.id, stage: next } });
+    try {
+      await setDealStage({ data: { id: deal.id, stage: next } });
+    } catch (err) {
+      const key = err instanceof Error ? err.message : "";
+      toast.error(FIT_GATE_MESSAGES[key] ?? key ?? "Could not move deal");
+      return;
+    }
     toast.success(`${deal.name} → ${next}`);
     qc.invalidateQueries({ queryKey: ["crm"] });
   }
+
 
   return (
     <div className="space-y-6 p-6">

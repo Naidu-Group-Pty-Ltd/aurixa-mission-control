@@ -24,7 +24,9 @@ import {
   Cloud,
   Crown,
   Coins,
+  Gauge,
   GitFork,
+
   Handshake,
   LayoutDashboard,
   Newspaper,
@@ -201,6 +203,13 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "clients organisations companies",
       },
       { to: "/crm/deals", label: "Deals", icon: Target, keywords: "pipeline opportunities forecast" },
+      {
+        to: "/crm/fit",
+        label: "Fit Analysis",
+        icon: Gauge,
+        keywords: "compatibility score grade ai qualification client fit",
+      },
+
       {
         to: "/crm/tickets",
         label: "Tickets & Disputes",

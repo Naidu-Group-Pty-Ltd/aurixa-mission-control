@@ -50,14 +50,51 @@ export const upsertDeal = createServerFn({ method: "POST" })
     return row;
   });
 
+/** Stages that may not be entered without a fresh, passing client fit analysis. */
+const FIT_GATED_STAGES = ["contract", "won"] as const;
+const FIT_PASSING_VERDICTS = ["strong_fit", "fit", "conditional"];
+const FIT_STALE_DAYS = 90;
+
 export const setDealStage = createServerFn({ method: "POST" })
   .middleware([requireOperator])
   .inputValidator((input) =>
     z
-      .object({ id: uuid, stage: z.enum(DEAL_STAGES), lost_reason: z.string().max(500).optional() })
+      .object({
+        id: uuid,
+        stage: z.enum(DEAL_STAGES),
+        lost_reason: z.string().max(500).optional(),
+        /** Admin escape hatch — recorded on the timeline. */
+        overrideFitGate: z.boolean().optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    // ---- Client fit gate: no SLA/contract without a current passing analysis.
+    if (FIT_GATED_STAGES.includes(data.stage as any) && !data.overrideFitGate) {
+      const { data: current } = await context.supabase
+        .from("crm_deals")
+        .select("account_id")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (current?.account_id) {
+        const { data: fitRows } = await context.supabase
+          .from("crm_fit_analyses")
+          .select("verdict, override_verdict, completed_at")
+          .eq("account_id", current.account_id)
+          .eq("status", "complete")
+          .order("version", { ascending: false })
+          .limit(1);
+        const latest = fitRows?.[0];
+        const effective = latest?.override_verdict ?? latest?.verdict;
+        const ageDays = latest?.completed_at
+          ? (Date.now() - new Date(latest.completed_at).getTime()) / 86_400_000
+          : Infinity;
+        if (!latest) throw new Error("fit_gate_no_analysis");
+        if (ageDays > FIT_STALE_DAYS) throw new Error("fit_gate_stale_analysis");
+        if (!FIT_PASSING_VERDICTS.includes(effective)) throw new Error("fit_gate_failed_verdict");
+      }
+    }
+
     const { data: deal, error } = await context.supabase
       .from("crm_deals")
       .update({ stage: data.stage, ...(data.lost_reason ? { lost_reason: data.lost_reason } : {}) })
@@ -65,6 +102,7 @@ export const setDealStage = createServerFn({ method: "POST" })
       .select("*, crm_deal_line_items(*)")
       .single();
     if (error) throw error;
+
 
     await context.supabase.from("crm_activities").insert({
       account_id: deal.account_id,
