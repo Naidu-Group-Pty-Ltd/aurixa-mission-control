@@ -192,6 +192,7 @@ function AccountHub() {
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="deals">Deals</TabsTrigger>
+          <TabsTrigger value="fit">Fit</TabsTrigger>
           <TabsTrigger value="contract">Contract</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
@@ -201,7 +202,13 @@ function AccountHub() {
           <TabsTrigger value="exit">Exit</TabsTrigger>
         </TabsList>
 
+        {/* ------------------------------- FIT ------------------------------ */}
+        <TabsContent value="fit" className="space-y-4">
+          <AccountFitTab accountId={a.id} />
+        </TabsContent>
+
         {/* ---------------------------- TIMELINE ---------------------------- */}
+
         <TabsContent value="timeline" className="space-y-4">
           <LogActivityCard accountId={a.id} onDone={refresh} />
           <Card>

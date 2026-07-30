@@ -80,6 +80,7 @@ import { Route as HandoffsNewRouteImport } from './routes/handoffs.new'
 import { Route as HandoffsHandoffIdRouteImport } from './routes/handoffs.$handoffId'
 import { Route as FleetEdgeRouteImport } from './routes/fleet.edge'
 import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
+import { Route as CrmFitRouteImport } from './routes/crm.fit'
 import { Route as CrmDealsRouteImport } from './routes/crm.deals'
 import { Route as ClonesNewRouteImport } from './routes/clones.new'
 import { Route as ClonesCloneIdRouteImport } from './routes/clones.$cloneId'
@@ -499,6 +500,11 @@ const CrmTicketsRoute = CrmTicketsRouteImport.update({
   path: '/crm/tickets',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrmFitRoute = CrmFitRouteImport.update({
+  id: '/crm/fit',
+  path: '/crm/fit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CrmDealsRoute = CrmDealsRouteImport.update({
   id: '/crm/deals',
   path: '/crm/deals',
@@ -855,6 +861,7 @@ export interface FileRoutesByFullPath {
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
   '/crm/deals': typeof CrmDealsRoute
+  '/crm/fit': typeof CrmFitRoute
   '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
@@ -985,6 +992,7 @@ export interface FileRoutesByTo {
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
   '/crm/deals': typeof CrmDealsRoute
+  '/crm/fit': typeof CrmFitRoute
   '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
@@ -1117,6 +1125,7 @@ export interface FileRoutesById {
   '/clones/$cloneId': typeof ClonesCloneIdRouteWithChildren
   '/clones/new': typeof ClonesNewRoute
   '/crm/deals': typeof CrmDealsRoute
+  '/crm/fit': typeof CrmFitRoute
   '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
@@ -1250,6 +1259,7 @@ export interface FileRouteTypes {
     | '/clones/$cloneId'
     | '/clones/new'
     | '/crm/deals'
+    | '/crm/fit'
     | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
@@ -1380,6 +1390,7 @@ export interface FileRouteTypes {
     | '/clones/$cloneId'
     | '/clones/new'
     | '/crm/deals'
+    | '/crm/fit'
     | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
@@ -1511,6 +1522,7 @@ export interface FileRouteTypes {
     | '/clones/$cloneId'
     | '/clones/new'
     | '/crm/deals'
+    | '/crm/fit'
     | '/crm/tickets'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
@@ -1642,6 +1654,7 @@ export interface RootRouteChildren {
   ClonesCloneIdRoute: typeof ClonesCloneIdRouteWithChildren
   ClonesNewRoute: typeof ClonesNewRoute
   CrmDealsRoute: typeof CrmDealsRoute
+  CrmFitRoute: typeof CrmFitRoute
   CrmTicketsRoute: typeof CrmTicketsRoute
   FleetEdgeRoute: typeof FleetEdgeRoute
   HooksAirtableSyncRoute: typeof HooksAirtableSyncRoute
@@ -2212,6 +2225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmTicketsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/crm/fit': {
+      id: '/crm/fit'
+      path: '/crm/fit'
+      fullPath: '/crm/fit'
+      preLoaderRoute: typeof CrmFitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/crm/deals': {
       id: '/crm/deals'
       path: '/crm/deals'
@@ -2765,6 +2785,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClonesCloneIdRoute: ClonesCloneIdRouteWithChildren,
   ClonesNewRoute: ClonesNewRoute,
   CrmDealsRoute: CrmDealsRoute,
+  CrmFitRoute: CrmFitRoute,
   CrmTicketsRoute: CrmTicketsRoute,
   FleetEdgeRoute: FleetEdgeRoute,
   HooksAirtableSyncRoute: HooksAirtableSyncRoute,
@@ -2838,12 +2859,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

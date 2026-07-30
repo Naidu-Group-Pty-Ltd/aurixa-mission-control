@@ -3150,6 +3150,221 @@ export type Database = {
           },
         ]
       }
+      crm_fit_analyses: {
+        Row: {
+          account_id: string | null
+          completed_at: string | null
+          confidence: number | null
+          correlation_map: Json
+          created_at: string
+          error: string | null
+          grade: string | null
+          headline: string | null
+          id: string
+          input_snapshot: Json
+          lead_id: string | null
+          model: string | null
+          open_questions: Json
+          override_at: string | null
+          override_by: string | null
+          override_reason: string | null
+          override_verdict:
+            | Database["public"]["Enums"]["crm_fit_verdict"]
+            | null
+          raw_response: Json | null
+          recommended_plan: Json
+          requested_by: string | null
+          research_summary: string | null
+          risks: Json
+          score: number | null
+          status: Database["public"]["Enums"]["crm_fit_status"]
+          subject_email: string | null
+          subject_name: string
+          subject_website: string | null
+          tokens_used: number | null
+          updated_at: string
+          validation: Json
+          verdict: Database["public"]["Enums"]["crm_fit_verdict"] | null
+          version: number
+        }
+        Insert: {
+          account_id?: string | null
+          completed_at?: string | null
+          confidence?: number | null
+          correlation_map?: Json
+          created_at?: string
+          error?: string | null
+          grade?: string | null
+          headline?: string | null
+          id?: string
+          input_snapshot?: Json
+          lead_id?: string | null
+          model?: string | null
+          open_questions?: Json
+          override_at?: string | null
+          override_by?: string | null
+          override_reason?: string | null
+          override_verdict?:
+            | Database["public"]["Enums"]["crm_fit_verdict"]
+            | null
+          raw_response?: Json | null
+          recommended_plan?: Json
+          requested_by?: string | null
+          research_summary?: string | null
+          risks?: Json
+          score?: number | null
+          status?: Database["public"]["Enums"]["crm_fit_status"]
+          subject_email?: string | null
+          subject_name?: string
+          subject_website?: string | null
+          tokens_used?: number | null
+          updated_at?: string
+          validation?: Json
+          verdict?: Database["public"]["Enums"]["crm_fit_verdict"] | null
+          version?: number
+        }
+        Update: {
+          account_id?: string | null
+          completed_at?: string | null
+          confidence?: number | null
+          correlation_map?: Json
+          created_at?: string
+          error?: string | null
+          grade?: string | null
+          headline?: string | null
+          id?: string
+          input_snapshot?: Json
+          lead_id?: string | null
+          model?: string | null
+          open_questions?: Json
+          override_at?: string | null
+          override_by?: string | null
+          override_reason?: string | null
+          override_verdict?:
+            | Database["public"]["Enums"]["crm_fit_verdict"]
+            | null
+          raw_response?: Json | null
+          recommended_plan?: Json
+          requested_by?: string | null
+          research_summary?: string | null
+          risks?: Json
+          score?: number | null
+          status?: Database["public"]["Enums"]["crm_fit_status"]
+          subject_email?: string | null
+          subject_name?: string
+          subject_website?: string | null
+          tokens_used?: number | null
+          updated_at?: string
+          validation?: Json
+          verdict?: Database["public"]["Enums"]["crm_fit_verdict"] | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_fit_analyses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_fit_analyses_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "waitlist_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_fit_dimension_scores: {
+        Row: {
+          analysis_id: string
+          created_at: string
+          dimension: string
+          evidence: Json
+          id: string
+          label: string
+          rationale: string | null
+          raw_score: number
+          sort_order: number
+          verified: boolean
+          weight: number
+          weighted_score: number
+        }
+        Insert: {
+          analysis_id: string
+          created_at?: string
+          dimension: string
+          evidence?: Json
+          id?: string
+          label: string
+          rationale?: string | null
+          raw_score?: number
+          sort_order?: number
+          verified?: boolean
+          weight?: number
+          weighted_score?: number
+        }
+        Update: {
+          analysis_id?: string
+          created_at?: string
+          dimension?: string
+          evidence?: Json
+          id?: string
+          label?: string
+          rationale?: string | null
+          raw_score?: number
+          sort_order?: number
+          verified?: boolean
+          weight?: number
+          weighted_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_fit_dimension_scores_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "crm_fit_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_fit_rubric: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          dimension: string
+          id: string
+          label: string
+          sort_order: number
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          dimension: string
+          id?: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          dimension?: string
+          id?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: []
+      }
       crm_offboarding_runs: {
         Row: {
           account_id: string
@@ -8129,6 +8344,13 @@ export type Database = {
         | "lost"
         | "withdrawn"
         | "settled"
+      crm_fit_status: "queued" | "running" | "complete" | "failed"
+      crm_fit_verdict:
+        | "strong_fit"
+        | "fit"
+        | "conditional"
+        | "poor_fit"
+        | "decline"
       crm_lifecycle_stage:
         | "lead"
         | "opportunity"
@@ -8470,6 +8692,14 @@ export const Constants = {
         "lost",
         "withdrawn",
         "settled",
+      ],
+      crm_fit_status: ["queued", "running", "complete", "failed"],
+      crm_fit_verdict: [
+        "strong_fit",
+        "fit",
+        "conditional",
+        "poor_fit",
+        "decline",
       ],
       crm_lifecycle_stage: [
         "lead",
