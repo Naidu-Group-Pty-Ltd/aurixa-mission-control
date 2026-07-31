@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { FitReport, gradeTone } from "@/components/fit-report";
+import { FitKnowledgePanel } from "@/components/fit-knowledge-panel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,12 +85,76 @@ function VerdictBadge({ row }: { row: any }) {
   );
 }
 
+/**
+ * The caveats that belong next to a score rather than buried in the report.
+ *
+ * A 92 computed over half the rubric is not the same claim as a 92 over all of
+ * it, and neither is a 92 the samples disagreed wildly about. Showing these in
+ * the list means an operator never acts on a number without its qualifiers.
+ */
+function QualityHints({ row }: { row: any }) {
+  if (row.status !== "complete") return null;
+  const hints: { label: string; tone: string; title: string }[] = [];
+
+  const coverage = Number(row.coverage ?? 100);
+  if (coverage < 100) {
+    hints.push({
+      label: `${coverage.toFixed(0)}% covered`,
+      tone:
+        coverage < 70
+          ? "border-destructive/40 text-destructive"
+          : "border-amber-500/40 text-amber-500",
+      title:
+        "Share of the rubric the model actually assessed. The score is computed over this much of it.",
+    });
+  }
+
+  const agreement = Number(row.agreement ?? 100);
+  if (row.samples > 1 && agreement < 75) {
+    hints.push({
+      label: `${agreement.toFixed(0)}% agreement`,
+      tone:
+        agreement < 50
+          ? "border-destructive/40 text-destructive"
+          : "border-amber-500/40 text-amber-500",
+      title: `Independent samples disagreed. ${row.samples} passes were run and their scores spread widely.`,
+    });
+  }
+
+  const invented = (row.integrity?.hallucinated_slugs ?? []).length;
+  if (invented > 0) {
+    hints.push({
+      label: `${invented} stripped`,
+      tone: "border-amber-500/40 text-amber-500",
+      title:
+        "Capabilities the model recommended that Aurixa does not sell. They were removed from the report.",
+    });
+  }
+
+  if (!hints.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {hints.map((h) => (
+        <Badge
+          key={h.label}
+          variant="outline"
+          className={cn("text-[10px]", h.tone)}
+          title={h.title}
+        >
+          {h.label}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
 function FitPage() {
   const qc = useQueryClient();
   const [openId, setOpenId] = useState<string | null>(null);
   const [runFor, setRunFor] = useState<any | null>(null);
   const [website, setWebsite] = useState("");
   const [notes, setNotes] = useState("");
+  const [samples, setSamples] = useState(3);
   const [overrideVerdict, setOverrideVerdict] = useState("conditional");
   const [overrideReason, setOverrideReason] = useState("");
 
@@ -103,7 +168,9 @@ function FitPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("waitlist_leads")
-        .select("id, first_name, last_name, email, entity_name, entity_classification, status, created_at")
+        .select(
+          "id, first_name, last_name, email, entity_name, entity_classification, status, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
@@ -119,13 +186,13 @@ function FitPage() {
     enabled: Boolean(openId),
   });
 
-  const analysedLeadIds = new Set(
-    (analyses.data ?? []).map((a: any) => a.lead_id).filter(Boolean),
-  );
+  const analysedLeadIds = new Set((analyses.data ?? []).map((a: any) => a.lead_id).filter(Boolean));
 
   const run = useServerAction(runFitAnalysis, {
     successMessage: (r: any) =>
-      r?.ok ? `Fit analysis complete — ${r.grade} (${Number(r.score).toFixed(0)}/100)` : "Analysis finished",
+      r?.ok
+        ? `Fit analysis complete — ${r.grade} (${Number(r.score).toFixed(0)}/100)`
+        : "Analysis finished",
     onSuccess: () => {
       setRunFor(null);
       setWebsite("");
@@ -177,6 +244,7 @@ function FitPage() {
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="rubric">Rubric</TabsTrigger>
+          <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
         </TabsList>
 
         <TabsContent value="queue" className="mt-4">
@@ -240,13 +308,15 @@ function FitPage() {
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
-                        {row.subject_name} <span className="text-muted-foreground">v{row.version}</span>
+                        {row.subject_name}{" "}
+                        <span className="text-muted-foreground">v{row.version}</span>
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
                         {row.headline ?? row.subject_email ?? "—"}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
+                      <QualityHints row={row} />
                       <VerdictBadge row={row} />
                       <span className="font-mono text-xs text-muted-foreground">
                         {formatDistanceToNow(row.created_at)}
@@ -280,9 +350,7 @@ function FitPage() {
                     max={100}
                     className="w-24"
                     value={weightFor(r)}
-                    onChange={(e) =>
-                      setWeights((w) => ({ ...w, [r.id]: Number(e.target.value) }))
-                    }
+                    onChange={(e) => setWeights((w) => ({ ...w, [r.id]: Number(e.target.value) }))}
                   />
                 </div>
               ))}
@@ -303,6 +371,53 @@ function FitPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <Card className="mt-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Vetoes and evidence ceilings</CardTitle>
+              <CardDescription>
+                A veto dimension can decline a prospect on its own, whatever the weighted score. The
+                ceiling is the highest a dimension may score when the model cited no evidence for
+                it.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(rubric.data ?? []).map((r: any) => (
+                <div
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2.5 text-sm"
+                >
+                  <span className="font-medium">{r.label}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.is_veto ? (
+                      <Badge variant="outline" className="border-destructive/40 text-destructive">
+                        Vetoes at or below {Number(r.veto_below ?? 0)}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        Scored only
+                      </Badge>
+                    )}
+                    <Badge variant="secondary">
+                      {r.evidence_required === false
+                        ? "Evidence optional"
+                        : `Unevidenced ceiling ${Number(r.unevidenced_ceiling ?? 55)}`}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+              {!(rubric.data ?? []).some((r: any) => r.is_veto) && (
+                <p className="text-xs text-destructive">
+                  No dimension is marked as a veto, so nothing can decline a prospect on risk alone
+                  — only the weighted score applies.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="knowledge" className="mt-4">
+          <FitKnowledgePanel />
         </TabsContent>
       </Tabs>
 
@@ -341,6 +456,24 @@ function FitPage() {
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fit-samples">Scoring passes</Label>
+              <Select value={String(samples)} onValueChange={(v) => setSamples(Number(v))}>
+                <SelectTrigger id="fit-samples">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 — single pass, cheapest</SelectItem>
+                  <SelectItem value="3">3 — recommended</SelectItem>
+                  <SelectItem value="5">5 — for a decision worth the spend</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Each pass is a separate model call, scored independently and reconciled by median.
+                More passes cost proportionally more and buy a steadier number — and how far they
+                disagreed is reported with the result.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setRunFor(null)}>
@@ -354,6 +487,7 @@ function FitPage() {
                     leadId: runFor.id,
                     websiteOverride: website || undefined,
                     notes: notes || undefined,
+                    samples,
                   },
                 })
               }
