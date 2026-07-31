@@ -1,9 +1,15 @@
-// Route-first module detection engine.
-// 1. Fetch real GitHub tree + file contents
-// 2. Identify route files (src/routes/*.tsx)
-// 3. For each route, recursively trace imports to build the full dependency tree
-// 4. Each route = one module. Shared files (used by 2+ routes) = "shared" module.
-// 5. Persist results with resolved file lists
+// Module detection engine.
+//
+// 1. Fetch the real GitHub tree + file contents
+// 2. Identify route files (src/routes, src/pages, app/routes)
+// 3. Trace each route's imports to build the dependency graph
+// 4. Turn that graph into modules, per `config.strategy`:
+//      feature-first / hybrid — partition the repo into disjoint product
+//        domains, every file owned exactly once (see feature-detection.server)
+//      route-first / layer-first — one module per route, closures may overlap
+// 5. Resolve each module's backend surface: edge functions, tables, secrets,
+//    migrations (see backend-detection.server)
+// 6. Persist modules, backend artifacts, import edges and drift alerts
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -27,6 +33,7 @@ import {
   type BackendInventory,
   type ModuleBackendManifest,
 } from "./backend-detection.server";
+import { buildFeatureModules, type PartitionStats } from "./feature-detection.server";
 import crypto from "crypto";
 
 type Supabase = SupabaseClient<Database>;
@@ -58,7 +65,7 @@ export type DetectionRunConfig = {
 };
 
 export const DEFAULT_CONFIG: DetectionRunConfig = {
-  strategy: "route-first",
+  strategy: "feature-first",
   maxModules: 30,
   minModules: 1,
   sampleFileContent: true,
@@ -171,6 +178,13 @@ const ROOT_DOT_NOISE =
 
 /** A real env file — as opposed to a committed `.env.example` template. */
 const REAL_ENV_FILE = /(^|\/)\.env(\.local|\.development|\.production|\.test)?$/;
+
+/**
+ * Upper bound on backend-only modules. These are grouped one per edge-function
+ * slug prefix, so the real count is small; the cap only exists to stop a
+ * pathological repo emitting hundreds of modules.
+ */
+const BACKEND_MODULE_CAP = 80;
 
 // Fetch content of specific files
 async function fetchFileContents(
@@ -673,11 +687,18 @@ export async function runDetection(args: {
     }
 
     // ── Phase 3: Trace imports for each route ──
+    // Runs under every strategy: it is what pulls file contents into the cache,
+    // which both the feature partition and the backend pass read from.
     progress("import_tracing", "Tracing import trees for each route…", 30);
     const contentCache = new Map<string, string>();
     const allEdges: ImportEdge[] = [];
     const routeModules: RouteModule[] = [];
     const fileOwnership = new Map<string, string[]>(); // file → [slug, slug, ...]
+
+    // Route-first emits one module per route. Feature-first partitions the repo
+    // into disjoint product domains instead — on a large prime, one-module-per
+    // -route overlaps ~4x and no module describes a coherent feature.
+    const useRouteFirst = config.strategy === "route-first" || config.strategy === "layer-first";
 
     for (let i = 0; i < routeFiles.length; i++) {
       const rf = routeFiles[i];
@@ -703,6 +724,8 @@ export async function runDetection(args: {
         fileOwnership.set(f, owners);
       }
 
+      if (!useRouteFirst) continue;
+
       const moduleFiles = new Set(resolvedFiles);
       const { cohesion, coupling } = calculateMetrics(moduleFiles, edges);
 
@@ -727,10 +750,79 @@ export async function runDetection(args: {
       });
     }
 
+    // ── Phase 3b: Feature partition ──
+    let partitionStats: PartitionStats | null = null;
+    if (!useRouteFirst) {
+      progress("feature_partition", "Partitioning repository into feature domains…", 72);
+
+      // Import edges resolved against the cache the trace just filled — no
+      // further network reads.
+      const importsOf = (file: string): string[] => {
+        const content = contentCache.get(file);
+        if (!content) return [];
+        const out: string[] = [];
+        for (const spec of extractImports(file, content)) {
+          const target = findActualFile(spec, allFilesSet);
+          if (target) out.push(target);
+        }
+        return out;
+      };
+
+      const edgeSlugs = files
+        .map((f) => classifyBackendPath(f))
+        .filter((i) => i?.kind === "edge_function")
+        .map((i) => i!.identifier);
+
+      const { modules: featureModules, stats } = buildFeatureModules({
+        files,
+        routeFiles,
+        edgeFunctionSlugs: [...new Set(edgeSlugs)],
+        importsOf,
+        routePathOf: routeFileToPath,
+      });
+      partitionStats = stats;
+
+      for (const fm of featureModules) {
+        const owned = new Set(fm.resolvedFiles);
+        const { cohesion, coupling } = calculateMetrics(owned, allEdges);
+        routeModules.push({
+          name: fm.name,
+          slug: fm.slug,
+          description: fm.description,
+          route_path: fm.routePaths[0] ?? "",
+          entry_file: fm.entryFile,
+          resolved_files: fm.resolvedFiles,
+          file_globs: fm.fileGlobs,
+          routes: fm.routePaths,
+          shared_by_modules: [],
+          cohesion_score: Math.round(cohesion * 100) / 100,
+          coupling_score: Math.round(coupling * 100) / 100,
+          ai_confidence: 1,
+          ai_reasoning:
+            `Feature-first detection: ${fm.slug} owns ${fm.resolvedFiles.length} file(s) ` +
+            `across ${fm.routes.length} route(s), expressed as ${fm.fileGlobs.length} glob(s). ` +
+            `Every file has exactly one owning module.`,
+          requires: [],
+          incompatible_with: [],
+          layer: fm.layer,
+          backend: { ...EMPTY_MANIFEST },
+        });
+      }
+
+      progress(
+        "feature_partition",
+        `Partitioned ${stats.filesPartitioned} files into ${routeModules.length} modules ` +
+          `(overlap ${stats.overlapFactor}x)`,
+        75,
+      );
+    }
+
     // ── Phase 4: Identify shared files ──
+    // Route-first only. Feature-first already emits `platform-core` for files
+    // more than one domain reaches, so a second shared module would double-claim.
     progress("shared_detection", "Identifying shared files across modules…", 75);
     const sharedFiles: string[] = [];
-    for (const [file, owners] of fileOwnership) {
+    for (const [file, owners] of useRouteFirst ? fileOwnership : new Map<string, string[]>()) {
       if (owners.length > 1) {
         sharedFiles.push(file);
         // Tag each module that uses this shared file
@@ -956,12 +1048,36 @@ export async function runDetection(args: {
         for (const m of routeModules) {
           for (const slug of m.backend.edgeFunctions) claimed.add(slug);
         }
+        // `maxModules` bounds *feature* modules. Backend-only modules are one
+        // per slug prefix and are the only route by which cron workers and
+        // webhook receivers ever reach a clone — capping them at the feature
+        // budget would silently strip deployable surface, so give them their
+        // own generous bound and report anything still dropped.
         const synthesized = synthesizeBackendModules({
           inventory,
           claimedFunctions: claimed,
-          maxModules: Math.max(0, config.maxModules),
+          maxModules: BACKEND_MODULE_CAP,
         });
         backendModuleCount = synthesized.length;
+
+        const covered = new Set([...claimed, ...synthesized.flatMap((s) => s.functions)]);
+        const uncovered = [...inventory.edgeFunctions.keys()].filter((s) => !covered.has(s));
+        if (uncovered.length > 0) {
+          console.warn(
+            `[detection] ${uncovered.length} edge function(s) belong to no module — ` +
+              `backend module cap (${BACKEND_MODULE_CAP}) reached: ${uncovered.slice(0, 10).join(", ")}`,
+          );
+          await supabase.from("module_drift_alerts").insert(
+            uncovered.slice(0, 50).map((slug) => ({
+              detection_run_id: runId,
+              alert_type: "unclaimed_edge_function",
+              file_path:
+                inventory?.edgeFunctions.get(slug)?.entryFile ?? `supabase/functions/${slug}`,
+              reasoning: `Edge function "${slug}" is not owned by any module, so no module install will deploy it`,
+              severity: "warning",
+            })),
+          );
+        }
 
         for (const s of synthesized) {
           routeModules.push({
@@ -1270,7 +1386,12 @@ export async function runDetection(args: {
         model: "deterministic",
         duration_ms: 0,
         modules_proposed: routeModules.length,
-        summary: `Traced ${routeModules.length} route modules from ${routeFiles.length} route files, ${sharedFiles.length} shared files, ${orphanFiles.length} orphans`,
+        summary: partitionStats
+          ? `Feature-first: partitioned ${partitionStats.filesPartitioned} files into ` +
+            `${routeModules.length} disjoint modules (overlap ${partitionStats.overlapFactor}x, ` +
+            `${partitionStats.platformCoreFiles} shared into platform-core, ` +
+            `${partitionStats.pathCount} paths compacted to ${partitionStats.globCount} globs)`
+          : `Traced ${routeModules.length} route modules from ${routeFiles.length} route files, ${sharedFiles.length} shared files, ${orphanFiles.length} orphans`,
       },
     ];
 
