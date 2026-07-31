@@ -7,6 +7,7 @@
 // constraint on (tenant, campaign) is what stops the second person earning it
 // again. Doing that check in TypeScript would be a read-then-write, and two
 // colleagues pressing submit together would both read "not yet granted".
+import crypto from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { planForTenant } from "@/server/current-plan.server";
 import {
@@ -179,13 +180,35 @@ export async function forwardToMake(
     return { ok: false, error: "make_webhook_not_configured" };
   }
 
+  // A Make webhook URL is a bearer credential in a query string: it travels
+  // through browsers' address bars, scenario exports and support threads, and
+  // it never expires. Anyone holding one can post whatever they like into
+  // Airtable. Signing the body means the scenario can tell our submissions
+  // apart from someone else's, and the same mechanism and header name as
+  // token-webhooks.server.ts so there is one thing to learn, not two.
+  const serialised = JSON.stringify(body);
+  const secret = process.env.FEEDBACK_MAKE_WEBHOOK_SECRET;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    // Constant across every retry of the same submission, so the scenario can
+    // drop a duplicate without inferring a key from the payload.
+    "x-mc-idempotency-key": submissionId,
+    "x-mc-event": "feedback.submitted",
+  };
+  if (secret) {
+    headers["x-mc-signature"] = crypto
+      .createHmac("sha256", secret)
+      .update(serialised)
+      .digest("hex");
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers,
+      body: serialised,
       signal: controller.signal,
     });
     if (!res.ok) {
@@ -227,6 +250,101 @@ async function mark(submissionId: string, ok: boolean, error?: string): Promise<
  * asking Make to build that string means the formatting lives in a scenario
  * nobody can review.
  */
+/**
+ * Build and send one submission's payload to Make.
+ *
+ * The single place delivery happens. Both the live POST and the retry sweep
+ * call this, so a replayed row is byte-identical to its first attempt — which
+ * is the entire promise of a replay, and the easiest thing to lose by having
+ * the sweep assemble its own version.
+ */
+export async function deliverSubmission(
+  submissionId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { data: row } = await adminAny
+    .from("feedback_submissions")
+    .select(
+      "id, campaign_key, tenant_id, clone_id, origin_user_id, origin_username, origin_source, plan_slug, plan_name, overall_rating, recommend_score, module_ratings, most_valuable, biggest_frustration, feature_request, additional_comments, created_at, forward_attempts",
+    )
+    .eq("id", submissionId)
+    .maybeSingle();
+  if (!row) return { ok: false, error: "submission_not_found" };
+
+  const [{ data: tenant }, form, { data: grant }] = await Promise.all([
+    adminAny
+      .from("tenants")
+      .select("display_name, external_ref")
+      .eq("id", row.tenant_id)
+      .maybeSingle(),
+    formForTenant(row.tenant_id),
+    // Read rather than passed in: on a retry hours later the caller has no
+    // idea what was granted, and guessing zero would tell Airtable this
+    // response earned nothing when it may have earned the hundred.
+    adminAny
+      .from("feedback_token_grants")
+      .select("tokens")
+      .eq("submission_id", submissionId)
+      .maybeSingle(),
+  ]);
+
+  const labels = Object.fromEntries(form.questions.map((q) => [q.key, q.label]));
+
+  return forwardToMake(
+    row.id,
+    makePayload({
+      submissionId: row.id,
+      campaignKey: row.campaign_key,
+      tenantId: row.tenant_id,
+      tenantRef: tenant?.external_ref ?? null,
+      workspaceName: tenant?.display_name ?? null,
+      cloneId: row.clone_id,
+      originUserId: row.origin_user_id,
+      originUsername: row.origin_username,
+      originSource: row.origin_source,
+      planSlug: row.plan_slug,
+      planName: row.plan_name,
+      overallRating: row.overall_rating,
+      recommendScore: row.recommend_score,
+      moduleRatings: row.module_ratings ?? {},
+      labels,
+      mostValuable: row.most_valuable,
+      biggestFrustration: row.biggest_frustration,
+      featureRequest: row.feature_request,
+      additionalComments: row.additional_comments,
+      creditsGranted: Number(grant?.tokens ?? 0),
+      submittedAt: row.created_at,
+      attempt: Number(row.forward_attempts ?? 0) + 1,
+    }),
+  );
+}
+
+/**
+ * Deliver everything the database says is due.
+ *
+ * Called by the cron hook. Sequential rather than parallel on purpose: this is
+ * a backlog being drained after an outage, and firing twenty-five concurrent
+ * requests at a service that has just come back up is how a recovery becomes a
+ * second outage.
+ */
+export async function retryPendingForwards(
+  limit = 25,
+): Promise<{ attempted: number; delivered: number; failed: number }> {
+  const { data, error } = await adminAny.rpc("feedback_pending_forward", { _limit: limit });
+  if (error || !Array.isArray(data)) return { attempted: 0, delivered: 0, failed: 0 };
+
+  let delivered = 0;
+  for (const r of data as Array<{ submission_id: string }>) {
+    const result = await deliverSubmission(r.submission_id).catch(() => ({ ok: false }));
+    if (result.ok) delivered += 1;
+  }
+  return { attempted: data.length, delivered, failed: data.length - delivered };
+}
+
+/**
+ * The shape Make.com receives — flat, stable, and named for people rather than
+ * for our schema, because the other end of this is an Airtable column that a
+ * human reads.
+ */
 export function makePayload(args: {
   submissionId: string;
   campaignKey: string;
@@ -249,15 +367,38 @@ export function makePayload(args: {
   additionalComments: string | null;
   creditsGranted: number;
   submittedAt: string;
+  /** 1 on the first try. Lets the scenario tell a replay from a new answer. */
+  attempt?: number;
 }): Record<string, unknown> {
   const summary = Object.entries(args.moduleRatings)
     .map(([key, score]) => `${args.labels[key] ?? key}: ${score}/5`)
     .sort()
     .join(" · ");
 
+  // Module ratings keyed by the words a person would use rather than by our
+  // slugs. The LLM stage in Make reads this: given `{"deal-pipeline": 2}` it
+  // has to guess what that product is, and it guesses confidently and wrongly.
+  // Given `{"Deal Pipeline": 2}` it does not have to guess at all.
+  const labelled: Record<string, number> = {};
+  for (const [key, score] of Object.entries(args.moduleRatings)) {
+    labelled[args.labels[key] ?? key] = score;
+  }
+
+  const scores = Object.values(args.moduleRatings);
+  const freeText = [
+    args.mostValuable,
+    args.biggestFrustration,
+    args.featureRequest,
+    args.additionalComments,
+  ].filter((t): t is string => typeof t === "string" && t.trim().length > 0);
+
   return {
+    // Pinned so the scenario can branch if this shape ever changes, instead of
+    // silently mapping absent fields to empty Airtable cells.
+    schema_version: 2,
     submission_id: args.submissionId,
     submitted_at: args.submittedAt,
+    attempt: args.attempt ?? 1,
     campaign: args.campaignKey,
     workspace_id: args.tenantId,
     workspace_ref: args.tenantRef,
@@ -271,11 +412,25 @@ export function makePayload(args: {
     overall_rating: args.overallRating,
     recommend_score: args.recommendScore,
     module_ratings: args.moduleRatings,
+    module_ratings_labelled: labelled,
     module_ratings_summary: summary,
+    modules_rated: scores.length,
+    // Rounded to one decimal: the difference between 3.67 and 3.7 is not
+    // information, and an Airtable column full of 3.6666666666666665 is worse
+    // than useless to read.
+    module_ratings_average:
+      scores.length > 0
+        ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+        : null,
     most_valuable: args.mostValuable,
     biggest_frustration: args.biggestFrustration,
     feature_request: args.featureRequest,
     additional_comments: args.additionalComments,
+    // So the scenario can skip the LLM call outright when there is nothing to
+    // read. A ratings-only submission is common, and paying for a model to
+    // summarise four nulls is money spent to learn nothing.
+    has_free_text: freeText.length > 0,
+    free_text_chars: freeText.join(" ").length,
     credits_granted: args.creditsGranted,
   };
 }

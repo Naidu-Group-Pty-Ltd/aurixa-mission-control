@@ -16,9 +16,8 @@ import { loadValidHandoff } from "@/server/purchases.server";
 import { tenantIdForBillingUserId } from "@/server/current-plan.server";
 import {
   FEEDBACK_REWARD_TOKENS,
-  forwardToMake,
+  deliverSubmission,
   formForTenant,
-  makePayload,
   promptState,
   submitFeedback,
 } from "@/server/feedback.server";
@@ -160,56 +159,14 @@ export const Route = createFileRoute("/api/public/storefront/feedback")({
         // Everything below is reporting. The customer has already given
         // feedback and already earned their credits; a Make.com outage must
         // not turn that into a failed submission.
-        void (async () => {
-          try {
-            const { data: row } = await adminAny
-              .from("feedback_submissions")
-              .select(
-                "id, campaign_key, tenant_id, clone_id, origin_user_id, origin_username, origin_source, plan_slug, plan_name, overall_rating, recommend_score, module_ratings, most_valuable, biggest_frustration, feature_request, additional_comments, created_at",
-              )
-              .eq("id", result.submissionId)
-              .maybeSingle();
-            if (!row) return;
-
-            const { data: tenant } = await adminAny
-              .from("tenants")
-              .select("display_name, external_ref")
-              .eq("id", row.tenant_id)
-              .maybeSingle();
-
-            const form = await formForTenant(row.tenant_id);
-            const labels = Object.fromEntries(form.questions.map((q) => [q.key, q.label]));
-
-            await forwardToMake(
-              row.id,
-              makePayload({
-                submissionId: row.id,
-                campaignKey: row.campaign_key,
-                tenantId: row.tenant_id,
-                tenantRef: tenant?.external_ref ?? null,
-                workspaceName: tenant?.display_name ?? null,
-                cloneId: row.clone_id,
-                originUserId: row.origin_user_id,
-                originUsername: row.origin_username,
-                originSource: row.origin_source,
-                planSlug: row.plan_slug,
-                planName: row.plan_name,
-                overallRating: row.overall_rating,
-                recommendScore: row.recommend_score,
-                moduleRatings: row.module_ratings ?? {},
-                labels,
-                mostValuable: row.most_valuable,
-                biggestFrustration: row.biggest_frustration,
-                featureRequest: row.feature_request,
-                additionalComments: row.additional_comments,
-                creditsGranted: result.creditsGranted ?? 0,
-                submittedAt: row.created_at,
-              }),
-            );
-          } catch (err) {
-            console.error("[feedback] forward failed", err);
-          }
-        })();
+        //
+        // Not awaited, and it does not need to be: if this attempt fails — or
+        // the process dies before it finishes — the row stays due in
+        // feedback_submissions and the retry sweep collects it. That is what
+        // makes firing and forgetting honest here rather than lossy.
+        void deliverSubmission(result.submissionId).catch((err) => {
+          console.error("[feedback] forward failed", err);
+        });
 
         return storefrontJson({
           ok: true,
