@@ -8496,6 +8496,7 @@ export type Database = {
         Args: { _error?: string; _ok: boolean; _submission_id: string }
         Returns: undefined
       }
+      prune_repo_blob_analysis: { Args: never; Returns: number }
       purge_log_tables: {
         Args: never
         Returns: {
