@@ -14,6 +14,7 @@ import { formatDistanceToNow } from "@/lib/format";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { bulkSyncModuleFn } from "@/server/module-sync.functions";
+import { ModuleBackendCard } from "@/components/module-backend-card";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -183,6 +184,8 @@ function ModuleDetail() {
   }
 
   const globCount = (module.file_globs ?? []).length;
+  const edgeFnCount = (module.edge_functions ?? []).length;
+  const secretCount = (module.required_secrets ?? []).length;
   const behind = clones.filter((c) => c.sync_status === "behind").length;
   const failed = clones.filter((c) => c.sync_status === "failed").length;
   const inSync = clones.filter((c) => c.sync_status === "in_sync").length;
@@ -210,6 +213,16 @@ function ModuleDetail() {
             <span className="font-mono">
               · {globCount} glob{globCount === 1 ? "" : "s"}
             </span>
+            {edgeFnCount > 0 && (
+              <span className="font-mono">
+                · {edgeFnCount} edge fn{edgeFnCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {secretCount > 0 && (
+              <span className="font-mono text-warning">
+                · {secretCount} secret{secretCount === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
         </div>
         <Button onClick={syncAll} disabled={syncing || clones.length === 0 || globCount === 0}>
@@ -343,6 +356,8 @@ function ModuleDetail() {
           </div>
         </CardContent>
       </Card>
+
+      <ModuleBackendCard module={module} />
     </div>
   );
 }

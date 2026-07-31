@@ -38,6 +38,10 @@ import {
   ShieldCheck,
   ShieldX,
   Clock,
+  Cloud,
+  Database,
+  KeyRound,
+  TriangleAlert,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -118,6 +122,9 @@ type DetectionConfig = {
   sampleFileContent: boolean;
   analyzeImports: boolean;
   deltaMode: boolean;
+  detectBackend: boolean;
+  includeBackendGlobs: boolean;
+  synthesizeBackendModules: boolean;
 };
 
 function ModulesPage() {
@@ -141,6 +148,9 @@ function ModulesPage() {
     sampleFileContent: true,
     analyzeImports: true,
     deltaMode: false,
+    detectBackend: true,
+    includeBackendGlobs: true,
+    synthesizeBackendModules: true,
   });
 
   const detectFn = useServerFn(detectModules);
@@ -531,6 +541,47 @@ function DetectionConfigPanel({
                 Delta mode (skip if unchanged)
               </label>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3 border-t border-border pt-4">
+          <div>
+            <label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              Backend architecture
+            </label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Scans <code className="font-mono">supabase/functions</code> and{" "}
+              <code className="font-mono">supabase/migrations</code>, then links edge functions,
+              tables, secrets and migrations to each module. Without this, a cascade pushes UI with
+              no backend behind it.
+            </p>
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox
+                checked={config.detectBackend}
+                onCheckedChange={(v) => onChange({ ...config, detectBackend: Boolean(v) })}
+              />
+              Detect backend architecture
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox
+                checked={config.includeBackendGlobs}
+                disabled={!config.detectBackend}
+                onCheckedChange={(v) => onChange({ ...config, includeBackendGlobs: Boolean(v) })}
+              />
+              Cascade backend files to clones
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox
+                checked={config.synthesizeBackendModules}
+                disabled={!config.detectBackend}
+                onCheckedChange={(v) =>
+                  onChange({ ...config, synthesizeBackendModules: Boolean(v) })
+                }
+              />
+              Modules for backend-only functions
+            </label>
           </div>
         </div>
       </CardContent>
@@ -1097,6 +1148,15 @@ function ModuleRow({
   const coupling = Number(m.coupling_score) || 0;
   const reasoning = (m as Record<string, unknown>).ai_reasoning as string | null;
 
+  const row = m as Record<string, unknown>;
+  const edgeFnCount = ((row.edge_functions as string[] | null) ?? []).length;
+  const tableCount = ((row.database_tables as string[] | null) ?? []).length;
+  const secretCount = ((row.required_secrets as string[] | null) ?? []).length;
+  const layer = (row.layer as string | null) ?? "fullstack";
+  // Edge functions with no globs to carry them means the cascade ships UI only.
+  const backendGlobsMissing =
+    edgeFnCount > 0 && ((row.backend_file_globs as string[] | null) ?? []).length === 0;
+
   return (
     <Card
       className={cn(
@@ -1116,10 +1176,52 @@ function ModuleRow({
               </Link>
             )}
             <CardDescription className="mt-1 font-mono text-[11px]">{m.slug}</CardDescription>
+            {/* Backend surface — what has to ship alongside the UI for this
+                module to actually work on a clone. */}
+            {(edgeFnCount > 0 || tableCount > 0 || secretCount > 0) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {edgeFnCount > 0 && (
+                  <Badge variant="secondary" className="gap-1 font-mono text-[9px]">
+                    <Cloud className="h-2.5 w-2.5" />
+                    {edgeFnCount} fn
+                  </Badge>
+                )}
+                {tableCount > 0 && (
+                  <Badge variant="secondary" className="gap-1 font-mono text-[9px]">
+                    <Database className="h-2.5 w-2.5" />
+                    {tableCount} tbl
+                  </Badge>
+                )}
+                {secretCount > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-warning/50 font-mono text-[9px] text-warning"
+                  >
+                    <KeyRound className="h-2.5 w-2.5" />
+                    {secretCount} secret{secretCount === 1 ? "" : "s"}
+                  </Badge>
+                )}
+                {backendGlobsMissing && (
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-destructive/50 font-mono text-[9px] text-destructive"
+                    title="Edge functions detected but no backend globs — a cascade would push UI without its backend."
+                  >
+                    <TriangleAlert className="h-2.5 w-2.5" />
+                    no backend globs
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-1.5">
+            {layer === "backend" && (
+              <Badge variant="outline" className="font-mono text-[10px] uppercase">
+                backend
+              </Badge>
+            )}
             <Badge variant="outline" className={`text-[10px] uppercase ${tone}`}>
               {m.status}
             </Badge>
