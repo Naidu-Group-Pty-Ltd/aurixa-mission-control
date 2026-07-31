@@ -21,6 +21,10 @@ export const detectModules = createServerFn({ method: "POST" })
       sampleFileContent?: boolean;
       analyzeImports?: boolean;
       deltaMode?: boolean;
+      detectBackend?: boolean;
+      includeBackendGlobs?: boolean;
+      synthesizeBackendModules?: boolean;
+      maxBackendBlobs?: number;
     }) => data ?? {},
   )
   .handler(async ({ data, context }) => {
@@ -31,6 +35,11 @@ export const detectModules = createServerFn({ method: "POST" })
       sampleFileContent: data.sampleFileContent ?? DEFAULT_CONFIG.sampleFileContent,
       analyzeImports: data.analyzeImports ?? DEFAULT_CONFIG.analyzeImports,
       deltaMode: data.deltaMode ?? DEFAULT_CONFIG.deltaMode,
+      detectBackend: data.detectBackend ?? DEFAULT_CONFIG.detectBackend,
+      includeBackendGlobs: data.includeBackendGlobs ?? DEFAULT_CONFIG.includeBackendGlobs,
+      synthesizeBackendModules:
+        data.synthesizeBackendModules ?? DEFAULT_CONFIG.synthesizeBackendModules,
+      maxBackendBlobs: data.maxBackendBlobs ?? DEFAULT_CONFIG.maxBackendBlobs,
     };
 
     return runDetection({
@@ -347,6 +356,149 @@ export const getModuleIntelligence = createServerFn({ method: "POST" })
     }
   });
 
+// ─── Backend Architecture ───────────────────────────────────────────
+
+/**
+ * Everything a module needs on the backend: edge functions, tables, RPCs,
+ * secrets, migrations, buckets and cron jobs, plus the trace of how each was
+ * linked. Drives the module detail view and the pre-cascade readiness check.
+ */
+export const getModuleBackend = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { moduleId?: string; slug?: string }) => {
+    if (!data?.moduleId && !data?.slug) throw new Error("moduleId or slug required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    let query = context.supabase
+      .from("modules")
+      .select(
+        "id, name, slug, layer, edge_functions, database_tables, database_rpcs, storage_buckets, " +
+          "cron_jobs, required_secrets, required_migrations, backend_file_globs, external_hosts, " +
+          "backend_manifest, file_globs",
+      );
+    query = data.moduleId ? query.eq("id", data.moduleId) : query.eq("slug", data.slug!);
+
+    const { data: module, error } = await query.maybeSingle();
+    if (error) return { ok: false as const, error: error.message, module: null, artifacts: [] };
+    if (!module)
+      return { ok: false as const, error: "Module not found", module: null, artifacts: [] };
+
+    const { data: artifacts } = await context.supabase
+      .from("module_backend_artifacts")
+      .select("*")
+      .eq("module_id", module.id)
+      .order("artifact_kind", { ascending: true })
+      .order("identifier", { ascending: true })
+      .limit(2000);
+
+    return { ok: true as const, module, artifacts: artifacts ?? [] };
+  });
+
+/**
+ * Reverse lookup: which modules claim a given backend artifact. Answers
+ * "if I uninstall this module, does anything else still need this table?"
+ */
+export const getArtifactConsumers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { artifactKind: string; identifier: string }) => {
+    if (!data?.artifactKind || !data?.identifier)
+      throw new Error("artifactKind and identifier required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("module_backend_artifacts")
+      .select("module_id, module_slug, link_reason, confidence, detection_run_id")
+      .eq("artifact_kind", data.artifactKind)
+      .eq("identifier", data.identifier)
+      .limit(500);
+    if (error) return { ok: false as const, error: error.message, consumers: [] };
+
+    // Collapse to one row per module — a module can be linked by several runs.
+    const bySlug = new Map<string, (typeof rows)[number]>();
+    for (const r of rows ?? []) {
+      if (!bySlug.has(r.module_slug)) bySlug.set(r.module_slug, r);
+    }
+    return { ok: true as const, consumers: [...bySlug.values()] };
+  });
+
+/**
+ * Repo-wide backend inventory summary for a detection run — the counts the
+ * detection history panel shows alongside the frontend module counts.
+ */
+export const getBackendSummary = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data?: { runId?: string }) => data ?? {})
+  .handler(async ({ data, context }) => {
+    const base = context.supabase
+      .from("module_detection_runs")
+      .select(
+        "id, created_at, completed_at, status, edge_function_count, migration_count, " +
+          "database_object_count, secret_count, backend_module_count, backend_summary",
+      );
+
+    const query = data.runId
+      ? base.eq("id", data.runId)
+      : base.order("created_at", { ascending: false }).limit(1);
+
+    const { data: run, error } = await query.maybeSingle();
+    if (error) return { ok: false as const, error: error.message, run: null };
+    return { ok: true as const, run };
+  });
+
+/**
+ * Backend coverage across all modules: how much of the repo's backend surface
+ * is actually claimed by a module. Unclaimed edge functions are surface that
+ * would never reach a clone through a module install.
+ */
+export const getBackendCoverage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [modulesRes, runRes] = await Promise.all([
+      context.supabase
+        .from("modules")
+        .select("slug, name, status, layer, edge_functions, database_tables, required_secrets")
+        .neq("status", "archived"),
+      context.supabase
+        .from("module_detection_runs")
+        .select("backend_summary, edge_function_count, completed_at")
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    const modules = modulesRes.data ?? [];
+    const claimedFns = new Set<string>();
+    const claimedTables = new Set<string>();
+    const claimedSecrets = new Set<string>();
+    for (const m of modules) {
+      for (const f of (m.edge_functions ?? []) as string[]) claimedFns.add(f);
+      for (const t of (m.database_tables ?? []) as string[]) claimedTables.add(t);
+      for (const s of (m.required_secrets ?? []) as string[]) claimedSecrets.add(s);
+    }
+
+    const totalFns = runRes.data?.edge_function_count ?? 0;
+
+    return {
+      ok: true as const,
+      totals: {
+        edge_functions_in_repo: totalFns,
+        edge_functions_claimed: claimedFns.size,
+        edge_functions_unclaimed: Math.max(0, totalFns - claimedFns.size),
+        tables_claimed: claimedTables.size,
+        secrets_required: claimedSecrets.size,
+        modules_with_backend: modules.filter(
+          (m) => ((m.edge_functions ?? []) as string[]).length > 0,
+        ).length,
+        modules_total: modules.length,
+        backend_only_modules: modules.filter((m) => m.layer === "backend").length,
+      },
+      lastRunAt: runRes.data?.completed_at ?? null,
+    };
+  });
+
 // ─── Module Library ─────────────────────────────────────────────────
 
 // Publish approved modules to the library
@@ -384,15 +536,24 @@ export const publishToLibrary = createServerFn({ method: "POST" })
         .limit(1);
       const nextVersion = ((prevVersions?.[0]?.version as number) ?? 0) + 1;
 
+      // A clone that pins a library version has its globs *replaced* by this
+      // entry's file_paths at cascade time. Publishing frontend paths alone
+      // would silently strip the module's edge functions and migrations from
+      // every pinned clone, so the backend globs must travel with the entry.
+      const frontendPaths = ((m.resolved_files as string[]) ?? []).length
+        ? (m.resolved_files as string[])
+        : ((m.file_globs as string[]) ?? []);
+      const backendGlobs = (m.backend_file_globs as string[]) ?? [];
+      const filePaths = [...new Set([...frontendPaths, ...backendGlobs])];
+
       const { error: insertErr } = await context.supabase.from("module_library").insert({
         name: m.name,
         slug: m.slug,
         description: m.description,
         route_path: (m.routes as string[])?.[0] ?? null,
         entry_file: m.route_entry_file ?? m.slug,
-        file_paths: m.resolved_files ?? m.file_globs ?? [],
-        file_count:
-          (m.resolved_files as string[])?.length ?? (m.file_globs as string[])?.length ?? 0,
+        file_paths: filePaths,
+        file_count: filePaths.length,
         version: nextVersion,
         source_detection_run_id: m.detection_run_id,
         source_module_id: m.id,
@@ -405,6 +566,14 @@ export const publishToLibrary = createServerFn({ method: "POST" })
           ai_confidence: m.ai_confidence,
           ai_reasoning: m.ai_reasoning,
           shared_by_modules: m.shared_by_modules,
+          // Pinned installs need the same backend contract as a live install.
+          layer: m.layer,
+          edge_functions: m.edge_functions ?? [],
+          database_tables: m.database_tables ?? [],
+          required_secrets: m.required_secrets ?? [],
+          required_migrations: m.required_migrations ?? [],
+          storage_buckets: m.storage_buckets ?? [],
+          cron_jobs: m.cron_jobs ?? [],
         },
       });
       if (!insertErr) published++;

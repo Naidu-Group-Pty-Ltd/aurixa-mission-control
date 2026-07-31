@@ -10,6 +10,23 @@ import type { Database } from "@/integrations/supabase/types";
 import { getAppOctokit, type RepoRef } from "./github-app.server";
 import type { Octokit } from "@octokit/rest";
 import { validateModuleGlobs } from "@/lib/module-globs";
+import { parseFunctionConfig } from "./prime-backend.server";
+import {
+  classifyBackendPath,
+  parseMigrationObjects,
+  parseEdgeFunctionRefs,
+  parseFrontendBackendRefs,
+  buildBackendInventoryFromAnalysis,
+  linkBackendToModules,
+  synthesizeBackendModules,
+  computeMigrationSharing,
+  EMPTY_MANIFEST,
+  type DbObject,
+  type EdgeFunctionRefs,
+  type FrontendBackendRefs,
+  type BackendInventory,
+  type ModuleBackendManifest,
+} from "./backend-detection.server";
 import crypto from "crypto";
 
 type Supabase = SupabaseClient<Database>;
@@ -23,6 +40,21 @@ export type DetectionRunConfig = {
   sampleFileContent: boolean;
   analyzeImports: boolean;
   deltaMode: boolean;
+  /**
+   * Scan `supabase/functions`, `supabase/migrations` and infra config, and
+   * attach the resolved backend surface to each module. Off = the legacy
+   * frontend-only behaviour.
+   */
+  detectBackend: boolean;
+  /**
+   * Merge each module's backend globs into `file_globs`, so the cascade
+   * engine actually pushes edge functions and migrations to clone repos.
+   */
+  includeBackendGlobs: boolean;
+  /** Emit modules for edge functions no route reaches (cron/webhook workers). */
+  synthesizeBackendModules: boolean;
+  /** Upper bound on blobs read per run; cache hits don't count against it. */
+  maxBackendBlobs: number;
 };
 
 export const DEFAULT_CONFIG: DetectionRunConfig = {
@@ -32,12 +64,21 @@ export const DEFAULT_CONFIG: DetectionRunConfig = {
   sampleFileContent: true,
   analyzeImports: true,
   deltaMode: false,
+  detectBackend: true,
+  includeBackendGlobs: true,
+  synthesizeBackendModules: true,
+  maxBackendBlobs: 4000,
 };
 
 type ImportEdge = {
   source_file: string;
   target_file: string;
-  import_type: "static" | "dynamic" | "re-export";
+  /**
+   * `edge_invoke*` are frontend→backend crossings, not ES imports — the edges
+   * the old import-graph walk could never represent because the target of
+   * `functions.invoke("slug")` is a deployed function, not a file on disk.
+   */
+  import_type: "static" | "dynamic" | "re-export" | "edge_invoke" | "edge_invoke_indirect";
 };
 
 type RouteModule = {
@@ -56,6 +97,9 @@ type RouteModule = {
   ai_reasoning: string;
   requires: string[];
   incompatible_with: string[];
+  /** "frontend" until the backend pass resolves it. */
+  layer: "frontend" | "backend" | "fullstack" | "shared";
+  backend: ModuleBackendManifest;
 };
 
 type PassResult = {
@@ -79,7 +123,7 @@ export type DetectionProgress = {
 async function fetchRepoTree(
   octokit: Octokit,
   ref: RepoRef,
-): Promise<{ files: string[]; treeHash: string }> {
+): Promise<{ files: string[]; treeHash: string; shaByPath: Map<string, string> }> {
   const { data: branch } = await octokit.repos.getBranch({
     owner: ref.owner,
     repo: ref.repo,
@@ -93,19 +137,40 @@ async function fetchRepoTree(
     recursive: "true",
   });
 
-  const files = (tree.tree ?? [])
-    .filter((n) => n.type === "blob" && typeof n.path === "string")
+  const blobs = (tree.tree ?? []).filter(
+    (n) => n.type === "blob" && typeof n.path === "string" && typeof n.sha === "string",
+  );
+
+  // Backend artifacts live under dot-directories too (.github/workflows,
+  // .env.example), so the old blanket "drop anything starting with ." filter
+  // would have hidden them. Keep those, drop only VCS/tooling noise.
+  const files = blobs
     .map((n) => n.path as string)
-    .filter((p) => !p.startsWith(".") && !p.includes("node_modules/"));
+    .filter((p) => !p.includes("node_modules/"))
+    .filter((p) => !p.startsWith(".git/"))
+    .filter((p) => !ROOT_DOT_NOISE.test(p))
+    // Never surface a real env file. Only `.env.example` / `.template` /
+    // `.sample` are ever read, and only for secret *names*.
+    .filter((p) => !REAL_ENV_FILE.test(p));
+
+  const shaByPath = new Map<string, string>();
+  for (const n of blobs) shaByPath.set(n.path as string, n.sha as string);
 
   const treeHash = crypto
     .createHash("sha256")
-    .update(files.sort().join("\n"))
+    .update([...files].sort().join("\n"))
     .digest("hex")
     .slice(0, 16);
 
-  return { files, treeHash };
+  return { files, treeHash, shaByPath };
 }
+
+/** Dot-paths that are never part of the deployable surface. */
+const ROOT_DOT_NOISE =
+  /^\.(vscode|idea|husky|cursor|claude|lovable|DS_Store|prettier|eslint|editorconfig|nvmrc|npmrc|gitignore|gitattributes)/;
+
+/** A real env file — as opposed to a committed `.env.example` template. */
+const REAL_ENV_FILE = /(^|\/)\.env(\.local|\.development|\.production|\.test)?$/;
 
 // Fetch content of specific files
 async function fetchFileContents(
@@ -145,6 +210,134 @@ async function fetchFileContents(
   }
 
   return contents;
+}
+
+// ─── Cached blob reading ────────────────────────────────────────────
+
+/**
+ * Read many blobs with bounded concurrency, memoised on git blob SHA.
+ *
+ * A full backend scan of the prime touches ~1,400 files (756 migrations plus
+ * 619 edge-function sources). Blobs are content-addressed, so a parse result
+ * keyed on SHA is valid forever: after the first run only files that actually
+ * changed cost an API call. Without this, every detection run would burn most
+ * of the GitHub App's hourly budget.
+ */
+async function readBlobsCached<T>(args: {
+  octokit: Octokit;
+  ref: RepoRef;
+  supabase: Supabase;
+  /** path → blob sha */
+  targets: Array<{ path: string; sha: string }>;
+  kind: string;
+  parse: (content: string, path: string) => T;
+  concurrency?: number;
+  maxBlobs?: number;
+  onProgress?: (done: number, total: number) => void;
+}): Promise<{ results: Map<string, T>; fetched: number; cached: number; skipped: number }> {
+  const {
+    octokit,
+    ref,
+    supabase,
+    targets,
+    kind,
+    parse,
+    concurrency = 8,
+    maxBlobs = 4000,
+    onProgress,
+  } = args;
+
+  const results = new Map<string, T>();
+  const capped = targets.slice(0, maxBlobs);
+  const skipped = targets.length - capped.length;
+  if (capped.length === 0) return { results, fetched: 0, cached: 0, skipped };
+
+  // ── Cache lookup (chunked; `in` has a practical URL length limit) ──
+  const cacheHits = new Map<string, T>();
+  const shas = capped.map((t) => t.sha);
+  for (let i = 0; i < shas.length; i += 200) {
+    const chunk = shas.slice(i, i + 200);
+    const { data } = await supabase
+      .from("repo_blob_analysis")
+      .select("blob_sha, analysis")
+      .in("blob_sha", chunk);
+    for (const row of (data ?? []) as Array<{ blob_sha: string; analysis: unknown }>) {
+      cacheHits.set(row.blob_sha, row.analysis as T);
+    }
+  }
+
+  const misses: Array<{ path: string; sha: string }> = [];
+  for (const t of capped) {
+    const hit = cacheHits.get(t.sha);
+    if (hit !== undefined) results.set(t.path, hit);
+    else misses.push(t);
+  }
+
+  // ── Fetch + parse the misses ──
+  const toCache: Array<{
+    blob_sha: string;
+    path: string;
+    kind: string;
+    analysis: T;
+    byte_size: number;
+  }> = [];
+  let done = 0;
+  let cursor = 0;
+
+  const worker = async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= misses.length) return;
+      const { path, sha } = misses[i];
+      try {
+        const { data } = await octokit.git.getBlob({
+          owner: ref.owner,
+          repo: ref.repo,
+          file_sha: sha,
+        });
+        const content = Buffer.from((data.content ?? "").replace(/\n/g, ""), "base64").toString(
+          "utf8",
+        );
+        const analysis = parse(content, path);
+        results.set(path, analysis);
+        toCache.push({
+          blob_sha: sha,
+          path,
+          kind,
+          analysis,
+          byte_size: content.length,
+        });
+      } catch {
+        // A single unreadable blob must not sink the run — the module it
+        // belongs to simply resolves with less backend detail.
+      }
+      done++;
+      if (done % 50 === 0) onProgress?.(done, misses.length);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, misses.length) }, worker));
+
+  // ── Persist new analyses ──
+  for (let i = 0; i < toCache.length; i += 100) {
+    const chunk = toCache.slice(i, i + 100).map((r) => ({
+      ...r,
+      analysis: JSON.parse(JSON.stringify(r.analysis)),
+      last_seen_at: new Date().toISOString(),
+    }));
+    await supabase.from("repo_blob_analysis").upsert(chunk, { onConflict: "blob_sha" });
+  }
+
+  // Refresh last_seen_at on cache hits so the pruner keeps live blobs.
+  const hitShas = capped.filter((t) => cacheHits.has(t.sha)).map((t) => t.sha);
+  for (let i = 0; i < hitShas.length; i += 200) {
+    await supabase
+      .from("repo_blob_analysis")
+      .update({ last_seen_at: new Date().toISOString() })
+      .in("blob_sha", hitShas.slice(i, i + 200));
+  }
+
+  return { results, fetched: misses.length, cached: cacheHits.size, skipped };
 }
 
 // ─── Import Resolution ──────────────────────────────────────────────
@@ -424,7 +617,7 @@ export async function runDetection(args: {
       repo: prime.github_repo,
       branch: prime.default_branch,
     };
-    const { files, treeHash } = await fetchRepoTree(octokit, ref);
+    const { files, treeHash, shaByPath } = await fetchRepoTree(octokit, ref);
 
     // Delta check
     if (config.deltaMode && previousTreeHash === treeHash) {
@@ -529,6 +722,8 @@ export async function runDetection(args: {
         ai_reasoning: `Route-first detection: traced ${resolvedFiles.length} files from ${rf} via import graph.`,
         requires: [],
         incompatible_with: [],
+        layer: "frontend",
+        backend: { ...EMPTY_MANIFEST },
       });
     }
 
@@ -571,10 +766,265 @@ export async function runDetection(args: {
         ai_reasoning: `${sharedFiles.length} files are imported by 2 or more route modules. These form the shared infrastructure layer.`,
         requires: [],
         incompatible_with: [],
+        layer: "shared",
+        backend: { ...EMPTY_MANIFEST },
       });
     }
 
-    // ── Phase 5: Find orphan files ──
+    // ── Phase 5: Backend architecture ──
+    // Everything above this line is frontend-only. This pass reads the
+    // repo's backend surface and joins it to the modules, so a module
+    // finally describes what it needs to *run*, not just what it renders.
+    let inventory: BackendInventory | null = null;
+    let backendSummary: Record<string, unknown> = {};
+    const backendEdges: ImportEdge[] = [];
+    let backendModuleCount = 0;
+
+    if (config.detectBackend) {
+      progress("backend_scan", "Scanning backend architecture…", 76);
+
+      const backendPaths = files
+        .map((p) => ({ path: p, info: classifyBackendPath(p) }))
+        .filter((x): x is { path: string; info: NonNullable<typeof x.info> } => x.info !== null);
+
+      const analysable = (p: string) =>
+        /\.(ts|tsx|js|mjs|cjs|sql|toml)$/.test(p) || p.includes(".env.");
+
+      const migrationTargets = backendPaths
+        .filter((x) => x.info.kind === "migration")
+        .map((x) => ({ path: x.path, sha: shaByPath.get(x.path) ?? "" }))
+        .filter((t) => t.sha);
+
+      const fnTargets = backendPaths
+        .filter((x) => x.info.kind === "edge_function" || x.info.kind === "edge_shared")
+        .filter((x) => analysable(x.path))
+        .map((x) => ({ path: x.path, sha: shaByPath.get(x.path) ?? "" }))
+        .filter((t) => t.sha);
+
+      // Migration SQL → declared database objects.
+      progress(
+        "backend_scan",
+        `Parsing ${migrationTargets.length} migration(s) for schema objects…`,
+        78,
+      );
+      const migrationAnalysis = await readBlobsCached<{ objects: DbObject[] }>({
+        octokit,
+        ref,
+        supabase,
+        targets: migrationTargets,
+        kind: "migration",
+        maxBlobs: config.maxBackendBlobs,
+        parse: (content) => ({ objects: parseMigrationObjects(content) }),
+        onProgress: (d, t) =>
+          progress("backend_scan", `Parsed ${d}/${t} migration(s)…`, 78 + Math.round((d / t) * 4)),
+      });
+
+      // Edge function sources → secrets, tables, rpcs, shared imports, invokes.
+      progress("backend_scan", `Parsing ${fnTargets.length} edge function file(s)…`, 82);
+      const fnAnalysis = await readBlobsCached<EdgeFunctionRefs>({
+        octokit,
+        ref,
+        supabase,
+        targets: fnTargets,
+        kind: "edge_function",
+        maxBlobs: config.maxBackendBlobs,
+        parse: (content) => parseEdgeFunctionRefs(content),
+        onProgress: (d, t) =>
+          progress(
+            "backend_scan",
+            `Parsed ${d}/${t} edge function file(s)…`,
+            82 + Math.round((d / t) * 4),
+          ),
+      });
+
+      // config.toml drives per-function verify_jwt.
+      let functionConfig = new Map<string, { verifyJwt: boolean }>();
+      const configSha = shaByPath.get("supabase/config.toml");
+      if (configSha) {
+        try {
+          const { data } = await octokit.git.getBlob({
+            owner: ref.owner,
+            repo: ref.repo,
+            file_sha: configSha,
+          });
+          const toml = Buffer.from((data.content ?? "").replace(/\n/g, ""), "base64").toString(
+            "utf8",
+          );
+          functionConfig = parseFunctionConfig(toml);
+        } catch {
+          // verify_jwt defaults to true per function — matches the CLI default.
+        }
+      }
+
+      // `.env.example` contributes secret names (never values).
+      const envTargets = backendPaths.filter((x) => x.info.kind === "env_template");
+      const envContents = new Map<string, string>();
+      for (const t of envTargets) {
+        const sha = shaByPath.get(t.path);
+        if (!sha) continue;
+        try {
+          const { data } = await octokit.git.getBlob({
+            owner: ref.owner,
+            repo: ref.repo,
+            file_sha: sha,
+          });
+          envContents.set(
+            t.path,
+            Buffer.from((data.content ?? "").replace(/\n/g, ""), "base64").toString("utf8"),
+          );
+        } catch {
+          // Optional input — absence just means fewer known secret names.
+        }
+      }
+
+      // buildBackendInventory works on raw text; feed it the parse results by
+      // re-projecting them through a content shim so we never refetch a blob.
+      inventory = buildBackendInventoryFromAnalysis({
+        files,
+        migrationObjects: migrationAnalysis.results,
+        functionRefs: fnAnalysis.results,
+        functionConfig,
+        envContents,
+      });
+
+      progress(
+        "backend_linking",
+        `Linking ${inventory.edgeFunctions.size} edge function(s) to modules…`,
+        87,
+      );
+
+      // Frontend → backend crossing points. Contents are already in the cache
+      // from import tracing, so this costs no extra API calls.
+      const knownSlugs = new Set(inventory.edgeFunctions.keys());
+      const frontendRefs = new Map<string, FrontendBackendRefs>();
+      for (const [file, content] of contentCache) {
+        const refs = parseFrontendBackendRefs(content, knownSlugs);
+        if (
+          refs.edgeFunctions.length ||
+          refs.indirectEdgeFunctions.length ||
+          refs.tables.length ||
+          refs.rpcs.length ||
+          refs.buckets.length ||
+          refs.envVars.length
+        ) {
+          frontendRefs.set(file, refs);
+        }
+      }
+
+      const manifests = linkBackendToModules({
+        modules: routeModules.map((m) => ({ slug: m.slug, resolvedFiles: m.resolved_files })),
+        frontendRefs,
+        inventory,
+      });
+
+      for (const m of routeModules) {
+        const manifest = manifests.get(m.slug);
+        if (!manifest) continue;
+        m.backend = manifest;
+        const hasBackend = manifest.edgeFunctions.length > 0 || manifest.tables.length > 0;
+        if (m.layer !== "shared") m.layer = hasBackend ? "fullstack" : "frontend";
+        if (config.includeBackendGlobs && manifest.backendGlobs.length > 0) {
+          m.file_globs = [...new Set([...m.file_globs, ...manifest.backendGlobs])];
+        }
+        if (hasBackend) {
+          m.ai_reasoning +=
+            ` Backend: ${manifest.edgeFunctions.length} edge function(s), ` +
+            `${manifest.tables.length} table(s), ${manifest.secrets.length} secret(s), ` +
+            `${manifest.migrations.length} migration(s).`;
+        }
+        // Record the frontend→edge-function crossings as graph edges so the
+        // dependency view shows the full path, not just ES imports.
+        for (const link of manifest.links) {
+          const fn = inventory.edgeFunctions.get(link.identifier);
+          if (!fn?.entryFile) continue;
+          const source = link.via.includes(" ") ? m.entry_file : link.via;
+          backendEdges.push({
+            source_file: source,
+            target_file: fn.entryFile,
+            import_type:
+              link.kind === "edge_function_indirect" ? "edge_invoke_indirect" : "edge_invoke",
+          });
+        }
+      }
+
+      // ── Backend-only modules ──
+      // Edge functions no route reaches are still deployable surface: cron
+      // workers, webhook receivers, provider callbacks. The old detector filed
+      // every one of them under "orphan file" noise.
+      if (config.synthesizeBackendModules) {
+        const claimed = new Set<string>();
+        for (const m of routeModules) {
+          for (const slug of m.backend.edgeFunctions) claimed.add(slug);
+        }
+        const synthesized = synthesizeBackendModules({
+          inventory,
+          claimedFunctions: claimed,
+          maxModules: Math.max(0, config.maxModules),
+        });
+        backendModuleCount = synthesized.length;
+
+        for (const s of synthesized) {
+          routeModules.push({
+            name: s.name,
+            slug: s.slug,
+            description: s.description,
+            route_path: "",
+            entry_file:
+              inventory.edgeFunctions.get(s.functions[0])?.entryFile ?? "supabase/functions/",
+            resolved_files: s.functions.flatMap(
+              (fn) => inventory?.edgeFunctions.get(fn)?.files ?? [],
+            ),
+            file_globs: config.includeBackendGlobs ? s.manifest.backendGlobs : [],
+            routes: [],
+            shared_by_modules: [],
+            cohesion_score: 1,
+            coupling_score: 0,
+            ai_confidence: 0.9,
+            ai_reasoning:
+              `Backend-only detection: ${s.functions.length} edge function(s) not referenced ` +
+              `by any route. Needs ${s.manifest.tables.length} table(s) and ` +
+              `${s.manifest.secrets.length} secret(s).`,
+            requires: [],
+            incompatible_with: [],
+            layer: "backend",
+            backend: s.manifest,
+          });
+        }
+      }
+
+      const totalObjects = inventory.migrations.reduce((n, m) => n + m.objects.length, 0);
+      backendSummary = {
+        edge_functions: inventory.edgeFunctions.size,
+        migrations: inventory.migrations.length,
+        database_objects: totalObjects,
+        tables_indexed: inventory.tableToMigrations.size,
+        rpcs_indexed: inventory.rpcToMigrations.size,
+        storage_buckets: inventory.storageBuckets,
+        cron_jobs: inventory.cronJobs.length,
+        extensions: inventory.extensions,
+        shared_edge_files: inventory.sharedFiles.length,
+        sidecar_services: [...inventory.sidecarServices.keys()],
+        workflows: inventory.workflows.length,
+        env_template_names: inventory.envTemplateNames.length,
+        blob_reads: {
+          migrations_fetched: migrationAnalysis.fetched,
+          migrations_cached: migrationAnalysis.cached,
+          migrations_skipped: migrationAnalysis.skipped,
+          functions_fetched: fnAnalysis.fetched,
+          functions_cached: fnAnalysis.cached,
+          functions_skipped: fnAnalysis.skipped,
+        },
+      };
+
+      if (migrationAnalysis.skipped > 0 || fnAnalysis.skipped > 0) {
+        console.warn(
+          `[detection] backend scan capped at ${config.maxBackendBlobs} blobs — ` +
+            `${migrationAnalysis.skipped} migration(s) and ${fnAnalysis.skipped} function file(s) unread`,
+        );
+      }
+    }
+
+    // ── Phase 6: Find orphan files ──
     const coveredFiles = new Set<string>();
     for (const mod of routeModules) {
       for (const f of mod.resolved_files) coveredFiles.add(f);
@@ -582,28 +1032,44 @@ export async function runDetection(args: {
     const orphanFiles = files
       .filter((f) => !coveredFiles.has(f))
       .filter((f) => /\.(ts|tsx|js|jsx)$/.test(f))
-      .filter((f) => !f.includes("routeTree.gen") && !f.includes("__root"));
+      .filter((f) => !f.includes("routeTree.gen") && !f.includes("__root"))
+      // Backend files are classified, owned and reported by the backend pass.
+      // Leaving them in would bury genuine frontend orphans under hundreds of
+      // edge-function alerts (the alert list is capped at 100).
+      .filter((f) => classifyBackendPath(f) === null);
 
-    // Store import edges
-    if (allEdges.length > 0) {
+    // Store import edges. Backend crossings go in first: they are the edges
+    // that were missing entirely, and the 1000-row cap must not drop them in
+    // favour of yet more intra-frontend imports.
+    const combinedEdges = [...backendEdges, ...allEdges];
+    if (combinedEdges.length > 0) {
       const uniqueEdges = new Map<string, ImportEdge>();
-      for (const e of allEdges) {
+      for (const e of combinedEdges) {
         uniqueEdges.set(`${e.source_file}→${e.target_file}`, e);
       }
-      const edgeRows = [...uniqueEdges.values()].slice(0, 1000).map((e) => ({
+      const edgeRows = [...uniqueEdges.values()].slice(0, 2000).map((e) => ({
         detection_run_id: runId,
         source_file: e.source_file,
         target_file: e.target_file,
         import_type: e.import_type,
       }));
-      await supabase.from("module_import_edges").insert(edgeRows);
+      for (let i = 0; i < edgeRows.length; i += 500) {
+        await supabase.from("module_import_edges").insert(edgeRows.slice(i, i + 500));
+      }
     }
+
+    // Which modules claim each migration — repo-wide infrastructure migrations
+    // get claimed by nearly everything, and must not read as exclusively owned.
+    const migrationSharing = computeMigrationSharing(
+      new Map(routeModules.map((m) => [m.slug, m.backend])),
+    );
 
     // ── Persist modules ──
     progress("persisting", "Saving detection results…", 85);
     let inserted = 0;
     let updated = 0;
     const globRejections: Array<{ slug: string; reason: string; glob: string }> = [];
+    const moduleIdBySlug = new Map<string, string>();
 
     for (const m of routeModules) {
       // Sanitise file_globs before hitting the DB: a bad glob here poisons
@@ -625,6 +1091,41 @@ export async function runDetection(args: {
         .eq("slug", m.slug)
         .maybeSingle();
 
+      // Backend surface resolved for this module. Written on every run so an
+      // existing module picks up backend detail the first time it is rescanned.
+      const backendFields = {
+        edge_functions: m.backend.edgeFunctions,
+        database_tables: m.backend.tables,
+        database_rpcs: m.backend.rpcs,
+        storage_buckets: m.backend.buckets,
+        cron_jobs: m.backend.cronJobs,
+        required_secrets: m.backend.secrets,
+        required_migrations: m.backend.migrations,
+        backend_file_globs: m.backend.backendGlobs,
+        external_hosts: m.backend.externalHosts,
+        layer: m.layer,
+        backend_manifest: JSON.parse(
+          JSON.stringify({
+            links: m.backend.links.slice(0, 200),
+            counts: {
+              edge_functions: m.backend.edgeFunctions.length,
+              tables: m.backend.tables.length,
+              rpcs: m.backend.rpcs.length,
+              buckets: m.backend.buckets.length,
+              secrets: m.backend.secrets.length,
+              migrations: m.backend.migrations.length,
+              cron_jobs: m.backend.cronJobs.length,
+            },
+            // Migrations this module shares with others — high counts mean
+            // repo-wide infrastructure, not module-private schema.
+            shared_migrations: m.backend.migrations
+              .map((p) => ({ path: p, claimed_by: migrationSharing.get(p)?.length ?? 1 }))
+              .filter((x) => x.claimed_by > 1)
+              .slice(0, 100),
+          }),
+        ),
+      };
+
       if (existing) {
         if (existing.status === "proposed" || existing.status === "rejected") {
           await supabase
@@ -645,32 +1146,103 @@ export async function runDetection(args: {
               incompatible_with: m.incompatible_with,
               detection_run_id: runId,
               tree_snapshot_hash: treeHash,
+              ...backendFields,
             })
             .eq("id", existing.id);
           updated++;
+          moduleIdBySlug.set(m.slug, existing.id);
+        } else if (config.detectBackend) {
+          // An approved/archived module keeps its curated shape, but stale or
+          // absent backend metadata is worse than none: it drives cascades and
+          // secret provisioning. Refresh only the detected backend fields.
+          await supabase.from("modules").update(backendFields).eq("id", existing.id);
+          moduleIdBySlug.set(m.slug, existing.id);
         }
       } else {
-        const { error } = await supabase.from("modules").insert({
-          name: m.name,
-          slug: m.slug,
-          description: m.description,
-          file_globs: m.file_globs,
-          routes: m.routes,
-          route_entry_file: m.entry_file,
-          resolved_files: m.resolved_files,
-          shared_by_modules: m.shared_by_modules,
-          ai_confidence: m.ai_confidence,
-          ai_reasoning: m.ai_reasoning,
-          cohesion_score: m.cohesion_score,
-          coupling_score: m.coupling_score,
-          requires: m.requires,
-          incompatible_with: m.incompatible_with,
-          status: "proposed",
-          detected_by_ai: false,
-          detection_run_id: runId,
-          tree_snapshot_hash: treeHash,
-        });
-        if (!error) inserted++;
+        const { data: created, error } = await supabase
+          .from("modules")
+          .insert({
+            name: m.name,
+            slug: m.slug,
+            description: m.description,
+            file_globs: m.file_globs,
+            routes: m.routes,
+            route_entry_file: m.entry_file,
+            resolved_files: m.resolved_files,
+            shared_by_modules: m.shared_by_modules,
+            ai_confidence: m.ai_confidence,
+            ai_reasoning: m.ai_reasoning,
+            cohesion_score: m.cohesion_score,
+            coupling_score: m.coupling_score,
+            requires: m.requires,
+            incompatible_with: m.incompatible_with,
+            status: "proposed",
+            detected_by_ai: false,
+            detection_run_id: runId,
+            tree_snapshot_hash: treeHash,
+            ...backendFields,
+          })
+          .select("id")
+          .single();
+        if (!error) {
+          inserted++;
+          if (created?.id) moduleIdBySlug.set(m.slug, created.id);
+        }
+      }
+    }
+
+    // ── Per-artifact linkage rows ──
+    // One row per (module, backend artifact) so the UI can answer both
+    // "what does this module need?" and "who else claims this table?".
+    if (config.detectBackend) {
+      type ArtifactRow = Database["public"]["Tables"]["module_backend_artifacts"]["Insert"];
+      const artifactRows: ArtifactRow[] = [];
+      for (const m of routeModules) {
+        const moduleId = moduleIdBySlug.get(m.slug) ?? null;
+        const indirect = new Set(
+          m.backend.links
+            .filter((l) => l.kind === "edge_function_indirect")
+            .map((l) => l.identifier),
+        );
+        const viaBySlug = new Map(m.backend.links.map((l) => [l.identifier, l.via]));
+
+        const add = (
+          kind: string,
+          ids: string[],
+          reason: string,
+          confidence: (id: string) => string = () => "direct",
+        ) => {
+          for (const id of ids) {
+            artifactRows.push({
+              detection_run_id: runId,
+              module_id: moduleId,
+              module_slug: m.slug,
+              artifact_kind: kind,
+              identifier: id,
+              file_path: kind === "migration" ? id : null,
+              link_reason: viaBySlug.get(id) ?? reason,
+              confidence: confidence(id),
+              shared_with_modules:
+                kind === "migration"
+                  ? (migrationSharing.get(id) ?? []).filter((s) => s !== m.slug).slice(0, 50)
+                  : [],
+            });
+          }
+        };
+
+        add("edge_function", m.backend.edgeFunctions, "linked from module source", (id) =>
+          indirect.has(id) ? "indirect" : "direct",
+        );
+        add("table", m.backend.tables, "queried by module or its edge functions");
+        add("rpc", m.backend.rpcs, "called via .rpc()");
+        add("secret", m.backend.secrets, "required by module's edge functions");
+        add("migration", m.backend.migrations, "declares a table/function this module uses");
+        add("storage_bucket", m.backend.buckets, "read or written by module");
+        add("cron_job", m.backend.cronJobs, "scheduled by module's migrations");
+      }
+
+      for (let i = 0; i < artifactRows.length; i += 500) {
+        await supabase.from("module_backend_artifacts").insert(artifactRows.slice(i, i + 500));
       }
     }
 
@@ -702,6 +1274,24 @@ export async function runDetection(args: {
       },
     ];
 
+    if (inventory) {
+      const totalObjects = inventory.migrations.reduce((n, mm) => n + mm.objects.length, 0);
+      const linkedFns = new Set(routeModules.flatMap((m) => m.backend.edgeFunctions));
+      passes.push({
+        pass: 2,
+        name: "Backend architecture linking",
+        model: "deterministic",
+        duration_ms: 0,
+        modules_proposed: backendModuleCount,
+        summary:
+          `Indexed ${inventory.edgeFunctions.size} edge functions, ${inventory.migrations.length} migrations ` +
+          `(${totalObjects} schema objects); linked ${linkedFns.size} function(s) to modules and ` +
+          `synthesized ${backendModuleCount} backend-only module(s)`,
+      });
+    }
+
+    const totalSecrets = new Set(routeModules.flatMap((m) => m.backend.secrets)).size;
+
     await supabase
       .from("module_detection_runs")
       .update({
@@ -709,13 +1299,21 @@ export async function runDetection(args: {
         tree_hash: treeHash,
         file_count: files.length,
         sampled_file_count: contentCache.size,
-        dependency_count: allEdges.length,
+        dependency_count: allEdges.length + backendEdges.length,
         pass_count: passes.length,
         passes: JSON.parse(JSON.stringify(passes)),
         proposed_modules: routeModules.length,
         inserted_modules: inserted,
         updated_modules: updated,
         orphan_files_found: orphanAlerts,
+        edge_function_count: inventory?.edgeFunctions.size ?? 0,
+        migration_count: inventory?.migrations.length ?? 0,
+        database_object_count: inventory
+          ? inventory.migrations.reduce((n, mm) => n + mm.objects.length, 0)
+          : 0,
+        secret_count: totalSecrets,
+        backend_module_count: backendModuleCount,
+        backend_summary: JSON.parse(JSON.stringify(backendSummary)),
         completed_at: new Date().toISOString(),
       })
       .eq("id", runId);
@@ -736,6 +1334,9 @@ export async function runDetection(args: {
         updated,
         rejected_globs: globRejections.slice(0, 50),
         rejected_glob_count: globRejections.length,
+        backend_detected: config.detectBackend,
+        backend_summary: JSON.parse(JSON.stringify(backendSummary)),
+        backend_modules: backendModuleCount,
       },
     });
 

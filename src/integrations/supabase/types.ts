@@ -5238,6 +5238,66 @@ export type Database = {
           },
         ]
       }
+      module_backend_artifacts: {
+        Row: {
+          artifact_kind: string
+          confidence: string
+          created_at: string
+          detection_run_id: string | null
+          file_path: string | null
+          id: string
+          identifier: string
+          link_reason: string | null
+          metadata: Json
+          module_id: string | null
+          module_slug: string
+          shared_with_modules: string[]
+        }
+        Insert: {
+          artifact_kind: string
+          confidence?: string
+          created_at?: string
+          detection_run_id?: string | null
+          file_path?: string | null
+          id?: string
+          identifier: string
+          link_reason?: string | null
+          metadata?: Json
+          module_id?: string | null
+          module_slug: string
+          shared_with_modules?: string[]
+        }
+        Update: {
+          artifact_kind?: string
+          confidence?: string
+          created_at?: string
+          detection_run_id?: string | null
+          file_path?: string | null
+          id?: string
+          identifier?: string
+          link_reason?: string | null
+          metadata?: Json
+          module_id?: string | null
+          module_slug?: string
+          shared_with_modules?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_backend_artifacts_detection_run_id_fkey"
+            columns: ["detection_run_id"]
+            isOneToOne: false
+            referencedRelation: "module_detection_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_backend_artifacts_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_cascade_jobs: {
         Row: {
           cascade_event_id: string | null
@@ -5312,15 +5372,20 @@ export type Database = {
       }
       module_detection_runs: {
         Row: {
+          backend_module_count: number
+          backend_summary: Json
           completed_at: string | null
           created_at: string
+          database_object_count: number
           delta_mode: boolean | null
           dependency_count: number | null
+          edge_function_count: number
           error_message: string | null
           file_count: number | null
           id: string
           initiated_by: string | null
           inserted_modules: number | null
+          migration_count: number
           orphan_files_found: number | null
           parameters: Json | null
           pass_count: number | null
@@ -5328,6 +5393,7 @@ export type Database = {
           previous_run_id: string | null
           proposed_modules: number | null
           sampled_file_count: number | null
+          secret_count: number
           started_at: string | null
           status: string
           strategy: string
@@ -5336,15 +5402,20 @@ export type Database = {
           updated_modules: number | null
         }
         Insert: {
+          backend_module_count?: number
+          backend_summary?: Json
           completed_at?: string | null
           created_at?: string
+          database_object_count?: number
           delta_mode?: boolean | null
           dependency_count?: number | null
+          edge_function_count?: number
           error_message?: string | null
           file_count?: number | null
           id?: string
           initiated_by?: string | null
           inserted_modules?: number | null
+          migration_count?: number
           orphan_files_found?: number | null
           parameters?: Json | null
           pass_count?: number | null
@@ -5352,6 +5423,7 @@ export type Database = {
           previous_run_id?: string | null
           proposed_modules?: number | null
           sampled_file_count?: number | null
+          secret_count?: number
           started_at?: string | null
           status?: string
           strategy?: string
@@ -5360,15 +5432,20 @@ export type Database = {
           updated_modules?: number | null
         }
         Update: {
+          backend_module_count?: number
+          backend_summary?: Json
           completed_at?: string | null
           created_at?: string
+          database_object_count?: number
           delta_mode?: boolean | null
           dependency_count?: number | null
+          edge_function_count?: number
           error_message?: string | null
           file_count?: number | null
           id?: string
           initiated_by?: string | null
           inserted_modules?: number | null
+          migration_count?: number
           orphan_files_found?: number | null
           parameters?: Json | null
           pass_count?: number | null
@@ -5376,6 +5453,7 @@ export type Database = {
           previous_run_id?: string | null
           proposed_modules?: number | null
           sampled_file_count?: number | null
+          secret_count?: number
           started_at?: string | null
           status?: string
           strategy?: string
@@ -5579,20 +5657,30 @@ export type Database = {
           apply_on_install: boolean
           approved_at: string | null
           approved_by: string | null
+          backend_file_globs: string[]
+          backend_manifest: Json
           clone_migration_sql: string | null
           cohesion_score: number | null
           coupling_score: number | null
           created_at: string
+          cron_jobs: string[]
+          database_rpcs: string[]
+          database_tables: string[]
           dependencies: string[]
           description: string | null
           detected_by_ai: boolean
           detection_run_id: string | null
+          edge_functions: string[]
+          external_hosts: string[]
           file_globs: string[]
           id: string
           incompatible_with: string[]
+          layer: string
           name: string
           orphan_file_count: number | null
           rejection_reason: string | null
+          required_migrations: string[]
+          required_secrets: string[]
           requires: string[]
           resolved_files: string[]
           route_entry_file: string | null
@@ -5600,6 +5688,7 @@ export type Database = {
           shared_by_modules: string[]
           slug: string
           status: Database["public"]["Enums"]["module_status"]
+          storage_buckets: string[]
           tree_snapshot_hash: string | null
           updated_at: string
         }
@@ -5609,20 +5698,30 @@ export type Database = {
           apply_on_install?: boolean
           approved_at?: string | null
           approved_by?: string | null
+          backend_file_globs?: string[]
+          backend_manifest?: Json
           clone_migration_sql?: string | null
           cohesion_score?: number | null
           coupling_score?: number | null
           created_at?: string
+          cron_jobs?: string[]
+          database_rpcs?: string[]
+          database_tables?: string[]
           dependencies?: string[]
           description?: string | null
           detected_by_ai?: boolean
           detection_run_id?: string | null
+          edge_functions?: string[]
+          external_hosts?: string[]
           file_globs?: string[]
           id?: string
           incompatible_with?: string[]
+          layer?: string
           name: string
           orphan_file_count?: number | null
           rejection_reason?: string | null
+          required_migrations?: string[]
+          required_secrets?: string[]
           requires?: string[]
           resolved_files?: string[]
           route_entry_file?: string | null
@@ -5630,6 +5729,7 @@ export type Database = {
           shared_by_modules?: string[]
           slug: string
           status?: Database["public"]["Enums"]["module_status"]
+          storage_buckets?: string[]
           tree_snapshot_hash?: string | null
           updated_at?: string
         }
@@ -5639,20 +5739,30 @@ export type Database = {
           apply_on_install?: boolean
           approved_at?: string | null
           approved_by?: string | null
+          backend_file_globs?: string[]
+          backend_manifest?: Json
           clone_migration_sql?: string | null
           cohesion_score?: number | null
           coupling_score?: number | null
           created_at?: string
+          cron_jobs?: string[]
+          database_rpcs?: string[]
+          database_tables?: string[]
           dependencies?: string[]
           description?: string | null
           detected_by_ai?: boolean
           detection_run_id?: string | null
+          edge_functions?: string[]
+          external_hosts?: string[]
           file_globs?: string[]
           id?: string
           incompatible_with?: string[]
+          layer?: string
           name?: string
           orphan_file_count?: number | null
           rejection_reason?: string | null
+          required_migrations?: string[]
+          required_secrets?: string[]
           requires?: string[]
           resolved_files?: string[]
           route_entry_file?: string | null
@@ -5660,6 +5770,7 @@ export type Database = {
           shared_by_modules?: string[]
           slug?: string
           status?: Database["public"]["Enums"]["module_status"]
+          storage_buckets?: string[]
           tree_snapshot_hash?: string | null
           updated_at?: string
         }
@@ -6297,6 +6408,36 @@ export type Database = {
           p256dh?: string
           user_agent?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      repo_blob_analysis: {
+        Row: {
+          analysis: Json
+          blob_sha: string
+          byte_size: number | null
+          created_at: string
+          kind: string
+          last_seen_at: string
+          path: string
+        }
+        Insert: {
+          analysis: Json
+          blob_sha: string
+          byte_size?: number | null
+          created_at?: string
+          kind: string
+          last_seen_at?: string
+          path: string
+        }
+        Update: {
+          analysis?: Json
+          blob_sha?: string
+          byte_size?: number | null
+          created_at?: string
+          kind?: string
+          last_seen_at?: string
+          path?: string
         }
         Relationships: []
       }
