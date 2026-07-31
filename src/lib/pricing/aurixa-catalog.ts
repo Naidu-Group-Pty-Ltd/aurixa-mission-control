@@ -231,7 +231,11 @@ export const MODULES: readonly PricedModule[] = [
     category: "Client & CRM",
     monthlyInclGstCents: 4900,
     includedIn: ["launch", "growth", "scale"],
-    note: "Enabled on every tier in the sheet; the price applies to standalone purchase.",
+    // Wording matches the catalog row. "In the sheet" is how this was
+    // originally phrased, and it reaches a customer invoice via the Stripe
+    // product description — internal provenance is not something to bill
+    // someone alongside.
+    note: "Enabled on every tier; the price applies to standalone purchase.",
   },
   {
     slug: "borrowing-capacity",
@@ -491,6 +495,21 @@ export function tierBaseCents(tier: Tier, period: BillingPeriod = "monthly"): nu
 
 export const moduleBySlug = (slug: string): PricedModule | undefined =>
   MODULES.find((m) => m.slug === slug);
+
+/**
+ * The modules that can actually be sold.
+ *
+ * `comingSoon` is the whole distinction. Those rows exist so the roadmap is
+ * visible on the pricing page, but they have no price anyone has agreed to
+ * pay — so they must never reach Stripe. Deriving the sellable set here rather
+ * than filtering at each call site means a module going on sale is one flag,
+ * not a hunt through the sync, the checkout and the storefront.
+ */
+export const PURCHASABLE_MODULES: readonly PricedModule[] = MODULES.filter((m) => !m.comingSoon);
+
+/** Whether a module is listed for the roadmap only, and must not be sold. */
+export const isModulePurchasable = (slug: string): boolean =>
+  PURCHASABLE_MODULES.some((m) => m.slug === slug);
 
 export const tierBySlug = (slug: string): Tier | undefined => TIERS.find((t) => t.slug === slug);
 
