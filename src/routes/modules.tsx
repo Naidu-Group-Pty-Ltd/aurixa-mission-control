@@ -43,6 +43,7 @@ import {
   KeyRound,
   TriangleAlert,
 } from "lucide-react";
+import { LibraryReingestDialog } from "@/components/library-reingest-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useMemo, useCallback, useEffect } from "react";
@@ -142,7 +143,7 @@ function ModulesPage() {
   const [activeTab, setActiveTab] = useState<"modules" | "library">("modules");
 
   const [config, setConfig] = useState<DetectionConfig>({
-    strategy: "route-first",
+    strategy: "feature-first",
     maxModules: 30,
     minModules: 1,
     sampleFileContent: true,
@@ -256,8 +257,8 @@ function ModulesPage() {
           </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">Modules</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Route-first detection: each page and its full import tree = one module. Shared files
-            grouped automatically.
+            Feature-first detection: the repo is partitioned into product domains, each owning its
+            files exactly once, plus the edge functions, schema and secrets behind them.
           </p>
           <div className="mt-3 flex gap-1">
             <Button
@@ -299,9 +300,10 @@ function ModulesPage() {
             <Settings2 className="mr-2 h-3.5 w-3.5" />
             Config
           </Button>
+          <LibraryReingestDialog onDone={refresh} />
           <Button onClick={runDetection} disabled={scanning} size="sm">
             <Brain className="mr-2 h-3.5 w-3.5" />
-            {scanning ? "Detecting…" : "Run AI Detection"}
+            {scanning ? "Detecting…" : "Run Detection"}
           </Button>
         </div>
       </header>
@@ -463,14 +465,19 @@ function DetectionConfigPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="hybrid">
-                  <span className="flex items-center gap-1.5">
-                    <Layers className="h-3 w-3" /> Hybrid (recommended)
-                  </span>
-                </SelectItem>
                 <SelectItem value="feature-first">
                   <span className="flex items-center gap-1.5">
-                    <Target className="h-3 w-3" /> Feature-first
+                    <Target className="h-3 w-3" /> Feature-first (recommended)
+                  </span>
+                </SelectItem>
+                <SelectItem value="hybrid">
+                  <span className="flex items-center gap-1.5">
+                    <Layers className="h-3 w-3" /> Hybrid
+                  </span>
+                </SelectItem>
+                <SelectItem value="route-first">
+                  <span className="flex items-center gap-1.5">
+                    <GitBranch className="h-3 w-3" /> Route-first (legacy)
                   </span>
                 </SelectItem>
                 <SelectItem value="layer-first">
@@ -481,11 +488,9 @@ function DetectionConfigPanel({
               </SelectContent>
             </Select>
             <p className="text-[10px] text-muted-foreground">
-              {config.strategy === "hybrid"
-                ? "Features as primary, shared infra as utility modules"
-                : config.strategy === "feature-first"
-                  ? "Group by user-facing features (vertical slices)"
-                  : "Group by architectural layers (horizontal slices)"}
+              {config.strategy === "feature-first" || config.strategy === "hybrid"
+                ? "One module per product domain; every file owned exactly once"
+                : "One module per route — closures overlap heavily on large repos"}
             </p>
           </div>
 

@@ -356,6 +356,44 @@ export const getModuleIntelligence = createServerFn({ method: "POST" })
     }
   });
 
+// ─── Library reset + re-ingest ──────────────────────────────────────
+
+/**
+ * Wipe the module catalogue and rebuild it from a fresh detection run.
+ *
+ * Destructive: pass `dryRun: true` first to see the plan, then repeat with
+ * `confirmation: "RESET LIBRARY"` to actually run it.
+ */
+export const resetAndReingest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data?: {
+      confirmation?: string;
+      dryRun?: boolean;
+      strategy?: DetectionStrategy;
+      preserveCloneInstalls?: boolean;
+      publishToLibrary?: boolean;
+      clearHistory?: boolean;
+    }) => data ?? {},
+  )
+  .handler(async ({ data, context }) => {
+    const { resetAndReingestLibrary } = await import(
+      /* @vite-ignore */ "./library-reingest.server"
+    );
+    return resetAndReingestLibrary({
+      supabase: context.supabase,
+      userId: context.userId,
+      options: {
+        confirmation: data.confirmation ?? "",
+        dryRun: data.dryRun ?? false,
+        preserveCloneInstalls: data.preserveCloneInstalls ?? true,
+        publishToLibrary: data.publishToLibrary ?? true,
+        clearHistory: data.clearHistory ?? false,
+        config: data.strategy ? { strategy: data.strategy } : undefined,
+      },
+    });
+  });
+
 // ─── Backend Architecture ───────────────────────────────────────────
 
 /**
