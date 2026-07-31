@@ -31,6 +31,94 @@ export const FIT_VERDICT_LABELS: Record<string, string> = {
   decline: "Decline",
 };
 
+/**
+ * What the analyst is told about a waitlist lead.
+ *
+ * The priority-access funnel collects this in three sittings, and only the
+ * first was reaching the engine. Stage 2 — the Business Readiness Questionnaire
+ * — is by some distance the most substantial qualification data the business
+ * holds: the systems they run, what they need integrated, how much data has to
+ * migrate, their security and procurement requirements, and the budget they
+ * have approved. Scoring commercial and technical fit without it was guesswork
+ * dressed as analysis.
+ *
+ * Claims are labelled by where they came from and how far the applicant got, so
+ * the analyst can weigh a considered Stage 2 answer differently from a
+ * sixty-second Stage 1 form.
+ */
+export function buildLeadSubject(
+  lead: Record<string, any>,
+  operatorNotes?: string | null,
+): Record<string, unknown> {
+  const stageReached = Number(lead.stage ?? 1);
+
+  const stageTwo =
+    lead.stage2_completed_at || lead.stage2_next_step || lead.stage2_summary
+      ? {
+          completed_at: lead.stage2_completed_at,
+          status: lead.stage2_status,
+          preferred_next_step: lead.stage2_next_step,
+          approved_investment_range: lead.stage2_investment,
+          implementation_timeline: lead.stage2_timeline,
+          // The applicant's own account of their operation, in their words.
+          summary: lead.stage2_summary,
+          answers:
+            lead.stage2_answers && Object.keys(lead.stage2_answers).length
+              ? lead.stage2_answers
+              : undefined,
+        }
+      : null;
+
+  const stageThree = lead.stage3_booked_at
+    ? {
+        booked_at: lead.stage3_booked_at,
+        status: lead.stage3_status,
+        session_start: lead.stage3_session_start,
+        applicant_time_zone: lead.stage3_time_zone,
+      }
+    : null;
+
+  return {
+    // ── Stage 1: the priority access application ──
+    application_id: lead.application_id,
+    entity_name: lead.entity_name,
+    entity_classification: lead.entity_classification,
+    contact_name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
+    contact_role: lead.role,
+    email: lead.email,
+    mobile_number: lead.mobile_number,
+    annual_transaction_volume: lead.transaction_volume,
+    current_tech_stack_bottlenecks: lead.tech_stack_bottlenecks,
+    priority_areas_to_improve: (lead.primary_areas ?? []).length ? lead.primary_areas : undefined,
+    applicant_additional_notes: lead.additional_notes,
+    form_version: lead.form_version,
+    submitted_at: lead.submitted_at,
+
+    // ── Stage 2 and 3: how far they have actually come ──
+    funnel_stage_reached: stageReached,
+    readiness_questionnaire: stageTwo,
+    strategic_review_booking: stageThree,
+
+    // ── Provenance ──
+    // How they found us is a genuine fit signal: a referral and a cold ad click
+    // are not the same prospect, and the analyst should be able to say so.
+    source: lead.source,
+    page: lead.page,
+    attribution: {
+      landing_page: lead.landing_page,
+      referrer: lead.referrer,
+      utm_source: lead.utm_source,
+      utm_medium: lead.utm_medium,
+      utm_campaign: lead.utm_campaign,
+    },
+    marketing_consent: lead.marketing_consent,
+
+    // ── Ours, not theirs ──
+    operator_notes: [lead.notes, operatorNotes].filter(Boolean).join("\n") || undefined,
+    airtable_status: lead.airtable_status,
+  };
+}
+
 /* -------------------------------- reading --------------------------------- */
 
 export const listFitAnalyses = createServerFn({ method: "POST" })
@@ -49,7 +137,7 @@ export const listFitAnalyses = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("crm_fit_analyses")
       .select(
-        "id, account_id, lead_id, subject_name, subject_email, subject_website, version, status, score, grade, verdict, override_verdict, confidence, headline, model, error, completed_at, created_at",
+        "id, account_id, lead_id, subject_name, subject_email, subject_website, version, status, score, grade, verdict, override_verdict, confidence, coverage, agreement, samples, verified_ratio, evidence_count, integrity, headline, model, error, completed_at, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(data.limit);
@@ -113,10 +201,7 @@ export const getFitHistory = createServerFn({ method: "POST" })
 export const getFitRubric = createServerFn({ method: "GET" })
   .middleware([requireOperator])
   .handler(async ({ context }) => {
-    const { data } = await context.supabase
-      .from("crm_fit_rubric")
-      .select("*")
-      .order("sort_order");
+    const { data } = await context.supabase.from("crm_fit_rubric").select("*").order("sort_order");
     return data ?? [];
   });
 
@@ -159,6 +244,11 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
         leadId: uuid.optional(),
         websiteOverride: z.string().max(300).optional(),
         notes: z.string().max(2000).optional(),
+        // Independent scoring passes. Each is a separate model call, so this is
+        // the accuracy/cost dial: 3 is the default because the median of three
+        // is materially steadier than one opinion, 1 is the cheap check, and 5
+        // is for a decision worth the spend.
+        samples: z.number().int().min(1).max(5).optional(),
       })
       .refine((v) => v.accountId || v.leadId, "subject_required")
       .parse(input),
@@ -187,6 +277,17 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
       subjectName = account.name;
       subjectEmail = primary?.email ?? null;
       websiteHint = account.website ?? null;
+      // An account converted from the waitlist still has the funnel behind it.
+      // Re-analysing without the questionnaire the client filled in would throw
+      // away the best evidence we hold about them.
+      const { data: originLead } = await sb
+        .from("waitlist_leads")
+        .select("*")
+        .eq("account_id", data.accountId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       subject = {
         entity_name: account.name,
         entity_classification: account.classification,
@@ -197,8 +298,13 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
         mrr_cents: account.mrr_cents,
         arr_cents: account.arr_cents,
         primary_contact: primary
-          ? { name: `${primary.first_name ?? ""} ${primary.last_name ?? ""}`.trim(), email: primary.email, phone: primary.phone }
+          ? {
+              name: `${primary.first_name ?? ""} ${primary.last_name ?? ""}`.trim(),
+              email: primary.email,
+              phone: primary.phone,
+            }
           : null,
+        ...(originLead ? { origin_application: buildLeadSubject(originLead) } : {}),
       };
     } else {
       const { data: lead, error } = await sb
@@ -210,19 +316,7 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
       if (!lead) throw new Error("lead_not_found");
       subjectName = lead.entity_name || `${lead.first_name} ${lead.last_name}`.trim();
       subjectEmail = lead.email;
-      subject = {
-        entity_name: lead.entity_name,
-        entity_classification: lead.entity_classification,
-        contact_name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
-        email: lead.email,
-        mobile_number: lead.mobile_number,
-        annual_transaction_volume: lead.transaction_volume,
-        current_tech_stack_bottlenecks: lead.tech_stack_bottlenecks,
-        source: lead.source,
-        page: lead.page,
-        submitted_at: lead.submitted_at,
-        notes: [lead.notes, data.notes].filter(Boolean).join("\n"),
-      };
+      subject = buildLeadSubject(lead, data.notes);
     }
 
     const website =
@@ -233,9 +327,7 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
         : null) ?? candidateWebsite({ website: websiteHint, email: subjectEmail });
 
     // Version = prior count + 1 for this subject.
-    const countQ = sb
-      .from("crm_fit_analyses")
-      .select("id", { count: "exact", head: true });
+    const countQ = sb.from("crm_fit_analyses").select("id", { count: "exact", head: true });
     const { count } = await (data.accountId
       ? countQ.eq("account_id", data.accountId)
       : countQ.eq("lead_id", data.leadId));
@@ -263,18 +355,31 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
       subject,
       website,
       userId: context.userId,
+      samples: data.samples,
     });
 
     if (data.accountId) {
-      await sb.from("crm_activities").insert({
+      // `crm_activities` has `title` (NOT NULL) and `actor_user_id`. This wrote
+      // `subject` and `created_by`, so every account analysis lost its timeline
+      // entry to a not-null violation nobody was checking for.
+      const { error: activityError } = await sb.from("crm_activities").insert({
         account_id: data.accountId,
-        kind: "note",
-        subject: `Client fit analysis v${created.version}`,
+        kind: "system",
+        title: `Client fit analysis v${created.version}`,
         body: result.ok
-          ? `Score ${result.score}/100 · Grade ${result.grade} · ${result.verdict}`
+          ? [
+              `Score ${result.score}/100 · Grade ${result.grade} · ${result.verdict}`,
+              `Confidence ${result.confidence}% · coverage ${result.coverage}% · sample agreement ${result.agreement}%`,
+            ].join("\n")
           : `Analysis failed: ${result.error}`,
-        created_by: context.userId,
+        actor_user_id: context.userId,
+        entity_type: "crm_fit_analysis",
+        entity_id: created.id,
+        metadata: { version: created.version, ok: result.ok },
       });
+      // The analysis itself is stored and returned either way — a missing
+      // timeline entry is worth logging, not worth failing the run over.
+      if (activityError) console.error("fit analysis activity insert failed", activityError);
     }
 
     return { id: created.id, version: created.version, ...result };

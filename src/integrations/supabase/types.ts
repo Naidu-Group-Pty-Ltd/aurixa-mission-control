@@ -3158,6 +3158,14 @@ export type Database = {
       }
       crm_fit_analyses: {
         Row: {
+          agreement: number | null
+          confidence_basis: Json
+          coverage: number | null
+          evidence_count: number | null
+          integrity: Json
+          knowledge_ids: string[]
+          samples: number
+          verified_ratio: number | null
           account_id: string | null
           completed_at: string | null
           confidence: number | null
@@ -3194,6 +3202,14 @@ export type Database = {
           version: number
         }
         Insert: {
+          agreement?: number | null
+          confidence_basis?: Json
+          coverage?: number | null
+          evidence_count?: number | null
+          integrity?: Json
+          knowledge_ids?: string[]
+          samples?: number
+          verified_ratio?: number | null
           account_id?: string | null
           completed_at?: string | null
           confidence?: number | null
@@ -3230,6 +3246,14 @@ export type Database = {
           version?: number
         }
         Update: {
+          agreement?: number | null
+          confidence_basis?: Json
+          coverage?: number | null
+          evidence_count?: number | null
+          integrity?: Json
+          knowledge_ids?: string[]
+          samples?: number
+          verified_ratio?: number | null
           account_id?: string | null
           completed_at?: string | null
           confidence?: number | null
@@ -3282,8 +3306,102 @@ export type Database = {
           },
         ]
       }
+      crm_fit_bands: {
+        Row: {
+          active: boolean
+          created_at: string
+          grade: string
+          id: string
+          label: string
+          min_score: number
+          sort_order: number
+          updated_at: string
+          verdict: Database["public"]["Enums"]["crm_fit_verdict"]
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          grade: string
+          id?: string
+          label: string
+          min_score: number
+          sort_order?: number
+          updated_at?: string
+          verdict: Database["public"]["Enums"]["crm_fit_verdict"]
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          grade?: string
+          id?: string
+          label?: string
+          min_score?: number
+          sort_order?: number
+          updated_at?: string
+          verdict?: Database["public"]["Enums"]["crm_fit_verdict"]
+        }
+        Relationships: []
+      }
+      crm_fit_knowledge: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          file_name: string | null
+          file_path: string | null
+          id: string
+          kind: Database["public"]["Enums"]["crm_fit_knowledge_kind"]
+          mime_type: string | null
+          pinned: boolean
+          size_bytes: number | null
+          summary: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_fit_knowledge_kind"]
+          mime_type?: string | null
+          pinned?: boolean
+          size_bytes?: number | null
+          summary?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_fit_knowledge_kind"]
+          mime_type?: string | null
+          pinned?: boolean
+          size_bytes?: number | null
+          summary?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       crm_fit_dimension_scores: {
         Row: {
+          answered: boolean
+          capped: boolean
+          is_veto: boolean
+          raw_spread: number | null
           analysis_id: string
           created_at: string
           dimension: string
@@ -3298,6 +3416,10 @@ export type Database = {
           weighted_score: number
         }
         Insert: {
+          answered?: boolean
+          capped?: boolean
+          is_veto?: boolean
+          raw_spread?: number | null
           analysis_id: string
           created_at?: string
           dimension: string
@@ -3312,6 +3434,10 @@ export type Database = {
           weighted_score?: number
         }
         Update: {
+          answered?: boolean
+          capped?: boolean
+          is_veto?: boolean
+          raw_spread?: number | null
           analysis_id?: string
           created_at?: string
           dimension?: string
@@ -3337,6 +3463,10 @@ export type Database = {
       }
       crm_fit_rubric: {
         Row: {
+          evidence_required: boolean
+          is_veto: boolean
+          unevidenced_ceiling: number
+          veto_below: number | null
           active: boolean
           created_at: string
           description: string | null
@@ -3348,6 +3478,10 @@ export type Database = {
           weight: number
         }
         Insert: {
+          evidence_required?: boolean
+          is_veto?: boolean
+          unevidenced_ceiling?: number
+          veto_below?: number | null
           active?: boolean
           created_at?: string
           description?: string | null
@@ -3359,6 +3493,10 @@ export type Database = {
           weight?: number
         }
         Update: {
+          evidence_required?: boolean
+          is_veto?: boolean
+          unevidenced_ceiling?: number
+          veto_below?: number | null
           active?: boolean
           created_at?: string
           description?: string | null
@@ -7830,6 +7968,8 @@ export type Database = {
       }
       waitlist_leads: {
         Row: {
+          stage2_answers: Json
+          stage2_summary: string | null
           additional_notes: string | null
           airtable_record_id: string | null
           airtable_status: string | null
@@ -7882,6 +8022,8 @@ export type Database = {
           transaction_volume: string | null
         }
         Insert: {
+          stage2_answers?: Json
+          stage2_summary?: string | null
           additional_notes?: string | null
           airtable_record_id?: string | null
           airtable_status?: string | null
@@ -7934,6 +8076,8 @@ export type Database = {
           transaction_volume?: string | null
         }
         Update: {
+          stage2_answers?: Json
+          stage2_summary?: string | null
           additional_notes?: string | null
           airtable_record_id?: string | null
           airtable_status?: string | null
@@ -8446,6 +8590,15 @@ export type Database = {
         | "lost"
         | "withdrawn"
         | "settled"
+      crm_fit_knowledge_kind:
+        | "icp"
+        | "case_study"
+        | "positioning"
+        | "disqualification"
+        | "pricing"
+        | "objection"
+        | "process"
+        | "other"
       crm_fit_status: "queued" | "running" | "complete" | "failed"
       crm_fit_verdict:
         | "strong_fit"

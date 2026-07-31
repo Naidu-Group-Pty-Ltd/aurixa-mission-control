@@ -20,6 +20,12 @@ export const LEAD_MAX_TEXT_LENGTH = 4000;
 /** Stage 1 caps "Primary Areas to Improve" at three selections. */
 const MAX_PRIMARY_AREAS = 3;
 
+/**
+ * The Stage 2 questionnaire summary is a full narrative of the applicant's
+ * operation, so it gets far more room than an ordinary field.
+ */
+const STAGE_SUMMARY_MAX_LENGTH = 20_000;
+
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 /** The canonical application reference form, shared with the website. */
@@ -311,6 +317,12 @@ export function parseStageUpdate(
     columns.stage2_next_step ??= cleanLeadText(pick(f, "nextStep")) || null;
     columns.stage2_investment ??= cleanLeadText(pick(f, "investmentRange")) || null;
     columns.stage2_timeline ??= cleanLeadText(pick(f, "timing")) || null;
+    // Keep the whole answer set. It is the most substantial account a prospect
+    // ever gives of their own operation — systems, integrations, migration
+    // scope, security posture, budget — and the client-fit engine reads it.
+    columns.stage2_answers = f;
+    columns.stage2_summary =
+      cleanLeadText(pick(payload, "summaryText", "summary_text"), STAGE_SUMMARY_MAX_LENGTH) || null;
   }
 
   return {
