@@ -64,6 +64,7 @@ import { Route as HooksHandoffParityRefreshRouteImport } from './routes/hooks.ha
 import { Route as HooksHandoffObservabilityPollRouteImport } from './routes/hooks.handoff-observability-poll'
 import { Route as HooksGithubRouteImport } from './routes/hooks.github'
 import { Route as HooksFleetDriftRouteImport } from './routes/hooks.fleet-drift'
+import { Route as HooksFeedbackForwardRetryRouteImport } from './routes/hooks.feedback-forward-retry'
 import { Route as HooksExpireReservationsRouteImport } from './routes/hooks.expire-reservations'
 import { Route as HooksEdgeDriftRouteImport } from './routes/hooks.edge-drift'
 import { Route as HooksEdgeDrainRouteImport } from './routes/hooks.edge-drain'
@@ -412,6 +413,12 @@ const HooksFleetDriftRoute = HooksFleetDriftRouteImport.update({
   path: '/hooks/fleet-drift',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HooksFeedbackForwardRetryRoute =
+  HooksFeedbackForwardRetryRouteImport.update({
+    id: '/hooks/feedback-forward-retry',
+    path: '/hooks/feedback-forward-retry',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const HooksExpireReservationsRoute = HooksExpireReservationsRouteImport.update({
   id: '/hooks/expire-reservations',
   path: '/hooks/expire-reservations',
@@ -831,6 +838,7 @@ export interface FileRoutesByFullPath {
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
+  '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
@@ -955,6 +963,7 @@ export interface FileRoutesByTo {
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
+  '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
@@ -1081,6 +1090,7 @@ export interface FileRoutesById {
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
+  '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
@@ -1208,6 +1218,7 @@ export interface FileRouteTypes {
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
     | '/hooks/expire-reservations'
+    | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
@@ -1332,6 +1343,7 @@ export interface FileRouteTypes {
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
     | '/hooks/expire-reservations'
+    | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
@@ -1457,6 +1469,7 @@ export interface FileRouteTypes {
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
     | '/hooks/expire-reservations'
+    | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
@@ -1580,6 +1593,7 @@ export interface RootRouteChildren {
   HooksEdgeDrainRoute: typeof HooksEdgeDrainRoute
   HooksEdgeDriftRoute: typeof HooksEdgeDriftRoute
   HooksExpireReservationsRoute: typeof HooksExpireReservationsRoute
+  HooksFeedbackForwardRetryRoute: typeof HooksFeedbackForwardRetryRoute
   HooksFleetDriftRoute: typeof HooksFleetDriftRoute
   HooksGithubRoute: typeof HooksGithubRoute
   HooksHandoffObservabilityPollRoute: typeof HooksHandoffObservabilityPollRoute
@@ -2020,6 +2034,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/fleet-drift'
       fullPath: '/hooks/fleet-drift'
       preLoaderRoute: typeof HooksFleetDriftRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/feedback-forward-retry': {
+      id: '/hooks/feedback-forward-retry'
+      path: '/hooks/feedback-forward-retry'
+      fullPath: '/hooks/feedback-forward-retry'
+      preLoaderRoute: typeof HooksFeedbackForwardRetryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/expire-reservations': {
@@ -2655,6 +2676,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksEdgeDrainRoute: HooksEdgeDrainRoute,
   HooksEdgeDriftRoute: HooksEdgeDriftRoute,
   HooksExpireReservationsRoute: HooksExpireReservationsRoute,
+  HooksFeedbackForwardRetryRoute: HooksFeedbackForwardRetryRoute,
   HooksFleetDriftRoute: HooksFleetDriftRoute,
   HooksGithubRoute: HooksGithubRoute,
   HooksHandoffObservabilityPollRoute: HooksHandoffObservabilityPollRoute,
