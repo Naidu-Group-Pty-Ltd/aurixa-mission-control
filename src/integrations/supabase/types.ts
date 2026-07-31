@@ -7830,6 +7830,38 @@ export type Database = {
       }
       waitlist_leads: {
         Row: {
+          additional_notes: string | null
+          airtable_record_id: string | null
+          airtable_status: string | null
+          application_id: string | null
+          form_version: string | null
+          landing_page: string | null
+          marketing_consent: boolean | null
+          primary_areas: string[]
+          privacy_acknowledged: boolean | null
+          privacy_notice_version: string | null
+          referrer: string | null
+          role: string | null
+          stage: number
+          stage2_access_mode: string | null
+          stage2_completed_at: string | null
+          stage2_investment: string | null
+          stage2_next_step: string | null
+          stage2_status: string | null
+          stage2_timeline: string | null
+          stage3_access_mode: string | null
+          stage3_booked_at: string | null
+          stage3_session_end: string | null
+          stage3_session_start: string | null
+          stage3_status: string | null
+          stage3_time_zone: string | null
+          stage_dedupe_key: string | null
+          synced_at: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
           account_id: string | null
           created_at: string
           dedupe_key: string | null
@@ -7850,6 +7882,38 @@ export type Database = {
           transaction_volume: string | null
         }
         Insert: {
+          additional_notes?: string | null
+          airtable_record_id?: string | null
+          airtable_status?: string | null
+          application_id?: string | null
+          form_version?: string | null
+          landing_page?: string | null
+          marketing_consent?: boolean | null
+          primary_areas?: string[]
+          privacy_acknowledged?: boolean | null
+          privacy_notice_version?: string | null
+          referrer?: string | null
+          role?: string | null
+          stage?: number
+          stage2_access_mode?: string | null
+          stage2_completed_at?: string | null
+          stage2_investment?: string | null
+          stage2_next_step?: string | null
+          stage2_status?: string | null
+          stage2_timeline?: string | null
+          stage3_access_mode?: string | null
+          stage3_booked_at?: string | null
+          stage3_session_end?: string | null
+          stage3_session_start?: string | null
+          stage3_status?: string | null
+          stage3_time_zone?: string | null
+          stage_dedupe_key?: string | null
+          synced_at?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           account_id?: string | null
           created_at?: string
           dedupe_key?: string | null
@@ -7870,6 +7934,38 @@ export type Database = {
           transaction_volume?: string | null
         }
         Update: {
+          additional_notes?: string | null
+          airtable_record_id?: string | null
+          airtable_status?: string | null
+          application_id?: string | null
+          form_version?: string | null
+          landing_page?: string | null
+          marketing_consent?: boolean | null
+          primary_areas?: string[]
+          privacy_acknowledged?: boolean | null
+          privacy_notice_version?: string | null
+          referrer?: string | null
+          role?: string | null
+          stage?: number
+          stage2_access_mode?: string | null
+          stage2_completed_at?: string | null
+          stage2_investment?: string | null
+          stage2_next_step?: string | null
+          stage2_status?: string | null
+          stage2_timeline?: string | null
+          stage3_access_mode?: string | null
+          stage3_booked_at?: string | null
+          stage3_session_end?: string | null
+          stage3_session_start?: string | null
+          stage3_status?: string | null
+          stage3_time_zone?: string | null
+          stage_dedupe_key?: string | null
+          synced_at?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           account_id?: string | null
           created_at?: string
           dedupe_key?: string | null
@@ -8443,6 +8539,8 @@ export type Database = {
         | "crm_renewal_due"
         | "crm_retention_due"
         | "crm_task_assigned"
+        | "lead_stage_two"
+        | "lead_stage_three"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -8799,6 +8897,8 @@ export const Constants = {
         "crm_renewal_due",
         "crm_retention_due",
         "crm_task_assigned",
+        "lead_stage_two",
+        "lead_stage_three",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],

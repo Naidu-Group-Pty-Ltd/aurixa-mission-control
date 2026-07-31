@@ -50,21 +50,74 @@ export const getAccount = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: uuid }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
-    const [account, contacts, activities, tasks, deals, contracts, onboarding, tickets, disputes, churn, offboarding, feedback] =
-      await Promise.all([
-        sb.from("crm_accounts").select("*, clones(id, name, slug)").eq("id", data.id).maybeSingle(),
-        sb.from("crm_contacts").select("*").eq("account_id", data.id).order("is_primary", { ascending: false }),
-        sb.from("crm_activities").select("*").eq("account_id", data.id).order("occurred_at", { ascending: false }).limit(100),
-        sb.from("crm_tasks").select("*").eq("account_id", data.id).order("due_at", { ascending: true }),
-        sb.from("crm_deals").select("*, crm_deal_line_items(*)").eq("account_id", data.id).order("created_at", { ascending: false }),
-        sb.from("crm_contracts").select("*").eq("account_id", data.id).order("term_start", { ascending: false }),
-        sb.from("crm_onboarding_tasks").select("*").eq("account_id", data.id).order("position"),
-        sb.from("crm_tickets").select("*").eq("account_id", data.id).order("created_at", { ascending: false }),
-        sb.from("crm_disputes").select("*").eq("account_id", data.id).order("opened_at", { ascending: false }),
-        sb.from("crm_churn_events").select("*").eq("account_id", data.id).order("requested_at", { ascending: false }),
-        sb.from("crm_offboarding_runs").select("*").eq("account_id", data.id).order("created_at", { ascending: false }),
-        sb.from("crm_feedback_requests").select("*").eq("account_id", data.id).order("requested_at", { ascending: false }),
-      ]);
+    const [
+      account,
+      contacts,
+      activities,
+      tasks,
+      deals,
+      contracts,
+      onboarding,
+      tickets,
+      disputes,
+      churn,
+      offboarding,
+      feedback,
+    ] = await Promise.all([
+      sb.from("crm_accounts").select("*, clones(id, name, slug)").eq("id", data.id).maybeSingle(),
+      sb
+        .from("crm_contacts")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("is_primary", { ascending: false }),
+      sb
+        .from("crm_activities")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("occurred_at", { ascending: false })
+        .limit(100),
+      sb
+        .from("crm_tasks")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("due_at", { ascending: true }),
+      sb
+        .from("crm_deals")
+        .select("*, crm_deal_line_items(*)")
+        .eq("account_id", data.id)
+        .order("created_at", { ascending: false }),
+      sb
+        .from("crm_contracts")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("term_start", { ascending: false }),
+      sb.from("crm_onboarding_tasks").select("*").eq("account_id", data.id).order("position"),
+      sb
+        .from("crm_tickets")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("created_at", { ascending: false }),
+      sb
+        .from("crm_disputes")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("opened_at", { ascending: false }),
+      sb
+        .from("crm_churn_events")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("requested_at", { ascending: false }),
+      sb
+        .from("crm_offboarding_runs")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("created_at", { ascending: false }),
+      sb
+        .from("crm_feedback_requests")
+        .select("*")
+        .eq("account_id", data.id)
+        .order("requested_at", { ascending: false }),
+    ]);
 
     if (account.error) throw account.error;
     if (!account.data) throw new Error("account_not_found");
@@ -74,10 +127,20 @@ export const getAccount = createServerFn({ method: "POST" })
     const tenantId = account.data.tenant_id as string | null;
     const [purchases, invoices, balance, seats] = await Promise.all([
       cloneId
-        ? sb.from("purchases").select("*").eq("clone_id", cloneId).order("created_at", { ascending: false }).limit(25)
+        ? sb
+            .from("purchases")
+            .select("*")
+            .eq("clone_id", cloneId)
+            .order("created_at", { ascending: false })
+            .limit(25)
         : Promise.resolve({ data: [] }),
       tenantId
-        ? sb.from("invoices").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(25)
+        ? sb
+            .from("invoices")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .order("created_at", { ascending: false })
+            .limit(25)
         : Promise.resolve({ data: [] }),
       tenantId
         ? sb.from("token_balances").select("*").eq("tenant_id", tenantId).maybeSingle()
@@ -143,7 +206,11 @@ export const upsertAccount = createServerFn({ method: "POST" })
     }
     const { data: row, error } = await context.supabase
       .from("crm_accounts")
-      .insert({ ...fields, created_by: context.userId, owner_user_id: fields.owner_user_id ?? context.userId })
+      .insert({
+        ...fields,
+        created_by: context.userId,
+        owner_user_id: fields.owner_user_id ?? context.userId,
+      })
       .select()
       .single();
     if (error) throw error;
@@ -315,8 +382,9 @@ export const convertLead = createServerFn({ method: "POST" })
         .eq("lead_id", data.lead_id)
         .is("account_id", null);
     }
-    return result as { ok: boolean; account_id?: string; error?: string };
-
+    // `idempotent` marks a lead that was already promoted — the account came
+    // back rather than being created a second time.
+    return result as { ok: boolean; account_id?: string; idempotent?: boolean; error?: string };
   });
 
 export const recomputeHealth = createServerFn({ method: "POST" })
