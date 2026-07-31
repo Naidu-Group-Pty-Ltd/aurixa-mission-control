@@ -7831,63 +7831,159 @@ export type Database = {
       waitlist_leads: {
         Row: {
           account_id: string | null
+          additional_notes: string | null
+          airtable_record_id: string | null
+          airtable_status: string | null
+          application_id: string | null
           created_at: string
           dedupe_key: string | null
           email: string
           entity_classification: string | null
           entity_name: string | null
           first_name: string
+          form_version: string | null
           id: string
+          landing_page: string | null
           last_name: string
+          marketing_consent: boolean | null
           metadata: Json
           mobile_number: string | null
           notes: string | null
           page: string | null
+          primary_areas: string[]
+          privacy_acknowledged: boolean | null
+          privacy_notice_version: string | null
+          referrer: string | null
+          role: string | null
           source: string
+          stage: number
+          stage_dedupe_key: string | null
+          stage2_access_mode: string | null
+          stage2_completed_at: string | null
+          stage2_investment: string | null
+          stage2_next_step: string | null
+          stage2_status: string | null
+          stage2_timeline: string | null
+          stage3_access_mode: string | null
+          stage3_booked_at: string | null
+          stage3_session_end: string | null
+          stage3_session_start: string | null
+          stage3_status: string | null
+          stage3_time_zone: string | null
           status: Database["public"]["Enums"]["lead_status"]
           submitted_at: string | null
+          synced_at: string | null
           tech_stack_bottlenecks: string | null
           transaction_volume: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
         }
         Insert: {
           account_id?: string | null
+          additional_notes?: string | null
+          airtable_record_id?: string | null
+          airtable_status?: string | null
+          application_id?: string | null
           created_at?: string
           dedupe_key?: string | null
           email: string
           entity_classification?: string | null
           entity_name?: string | null
           first_name: string
+          form_version?: string | null
           id?: string
+          landing_page?: string | null
           last_name: string
+          marketing_consent?: boolean | null
           metadata?: Json
           mobile_number?: string | null
           notes?: string | null
           page?: string | null
+          primary_areas?: string[]
+          privacy_acknowledged?: boolean | null
+          privacy_notice_version?: string | null
+          referrer?: string | null
+          role?: string | null
           source?: string
+          stage?: number
+          stage_dedupe_key?: string | null
+          stage2_access_mode?: string | null
+          stage2_completed_at?: string | null
+          stage2_investment?: string | null
+          stage2_next_step?: string | null
+          stage2_status?: string | null
+          stage2_timeline?: string | null
+          stage3_access_mode?: string | null
+          stage3_booked_at?: string | null
+          stage3_session_end?: string | null
+          stage3_session_start?: string | null
+          stage3_status?: string | null
+          stage3_time_zone?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           submitted_at?: string | null
+          synced_at?: string | null
           tech_stack_bottlenecks?: string | null
           transaction_volume?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Update: {
           account_id?: string | null
+          additional_notes?: string | null
+          airtable_record_id?: string | null
+          airtable_status?: string | null
+          application_id?: string | null
           created_at?: string
           dedupe_key?: string | null
           email?: string
           entity_classification?: string | null
           entity_name?: string | null
           first_name?: string
+          form_version?: string | null
           id?: string
+          landing_page?: string | null
           last_name?: string
+          marketing_consent?: boolean | null
           metadata?: Json
           mobile_number?: string | null
           notes?: string | null
           page?: string | null
+          primary_areas?: string[]
+          privacy_acknowledged?: boolean | null
+          privacy_notice_version?: string | null
+          referrer?: string | null
+          role?: string | null
           source?: string
+          stage?: number
+          stage_dedupe_key?: string | null
+          stage2_access_mode?: string | null
+          stage2_completed_at?: string | null
+          stage2_investment?: string | null
+          stage2_next_step?: string | null
+          stage2_status?: string | null
+          stage2_timeline?: string | null
+          stage3_access_mode?: string | null
+          stage3_booked_at?: string | null
+          stage3_session_end?: string | null
+          stage3_session_start?: string | null
+          stage3_status?: string | null
+          stage3_time_zone?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           submitted_at?: string | null
+          synced_at?: string | null
           tech_stack_bottlenecks?: string | null
           transaction_volume?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Relationships: [
           {
