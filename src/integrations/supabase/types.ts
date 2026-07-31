@@ -8443,6 +8443,8 @@ export type Database = {
         | "crm_renewal_due"
         | "crm_retention_due"
         | "crm_task_assigned"
+        | "lead_stage_two"
+        | "lead_stage_three"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -8799,6 +8801,8 @@ export const Constants = {
         "crm_renewal_due",
         "crm_retention_due",
         "crm_task_assigned",
+        "lead_stage_two",
+        "lead_stage_three",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
