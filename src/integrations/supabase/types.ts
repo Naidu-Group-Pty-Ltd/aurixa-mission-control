@@ -3159,15 +3159,21 @@ export type Database = {
       crm_fit_analyses: {
         Row: {
           account_id: string | null
+          agreement: number | null
           completed_at: string | null
           confidence: number | null
+          confidence_basis: Json
           correlation_map: Json
+          coverage: number | null
           created_at: string
           error: string | null
+          evidence_count: number | null
           grade: string | null
           headline: string | null
           id: string
           input_snapshot: Json
+          integrity: Json
+          knowledge_ids: string[]
           lead_id: string | null
           model: string | null
           open_questions: Json
@@ -3182,6 +3188,7 @@ export type Database = {
           requested_by: string | null
           research_summary: string | null
           risks: Json
+          samples: number
           score: number | null
           status: Database["public"]["Enums"]["crm_fit_status"]
           subject_email: string | null
@@ -3191,19 +3198,26 @@ export type Database = {
           updated_at: string
           validation: Json
           verdict: Database["public"]["Enums"]["crm_fit_verdict"] | null
+          verified_ratio: number | null
           version: number
         }
         Insert: {
           account_id?: string | null
+          agreement?: number | null
           completed_at?: string | null
           confidence?: number | null
+          confidence_basis?: Json
           correlation_map?: Json
+          coverage?: number | null
           created_at?: string
           error?: string | null
+          evidence_count?: number | null
           grade?: string | null
           headline?: string | null
           id?: string
           input_snapshot?: Json
+          integrity?: Json
+          knowledge_ids?: string[]
           lead_id?: string | null
           model?: string | null
           open_questions?: Json
@@ -3218,6 +3232,7 @@ export type Database = {
           requested_by?: string | null
           research_summary?: string | null
           risks?: Json
+          samples?: number
           score?: number | null
           status?: Database["public"]["Enums"]["crm_fit_status"]
           subject_email?: string | null
@@ -3227,19 +3242,26 @@ export type Database = {
           updated_at?: string
           validation?: Json
           verdict?: Database["public"]["Enums"]["crm_fit_verdict"] | null
+          verified_ratio?: number | null
           version?: number
         }
         Update: {
           account_id?: string | null
+          agreement?: number | null
           completed_at?: string | null
           confidence?: number | null
+          confidence_basis?: Json
           correlation_map?: Json
+          coverage?: number | null
           created_at?: string
           error?: string | null
+          evidence_count?: number | null
           grade?: string | null
           headline?: string | null
           id?: string
           input_snapshot?: Json
+          integrity?: Json
+          knowledge_ids?: string[]
           lead_id?: string | null
           model?: string | null
           open_questions?: Json
@@ -3254,6 +3276,7 @@ export type Database = {
           requested_by?: string | null
           research_summary?: string | null
           risks?: Json
+          samples?: number
           score?: number | null
           status?: Database["public"]["Enums"]["crm_fit_status"]
           subject_email?: string | null
@@ -3263,6 +3286,7 @@ export type Database = {
           updated_at?: string
           validation?: Json
           verdict?: Database["public"]["Enums"]["crm_fit_verdict"] | null
+          verified_ratio?: number | null
           version?: number
         }
         Relationships: [
@@ -3282,16 +3306,56 @@ export type Database = {
           },
         ]
       }
+      crm_fit_bands: {
+        Row: {
+          active: boolean
+          created_at: string
+          grade: string
+          id: string
+          label: string
+          min_score: number
+          sort_order: number
+          updated_at: string
+          verdict: Database["public"]["Enums"]["crm_fit_verdict"]
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          grade: string
+          id?: string
+          label: string
+          min_score: number
+          sort_order?: number
+          updated_at?: string
+          verdict: Database["public"]["Enums"]["crm_fit_verdict"]
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          grade?: string
+          id?: string
+          label?: string
+          min_score?: number
+          sort_order?: number
+          updated_at?: string
+          verdict?: Database["public"]["Enums"]["crm_fit_verdict"]
+        }
+        Relationships: []
+      }
       crm_fit_dimension_scores: {
         Row: {
           analysis_id: string
+          answered: boolean
+          capped: boolean
           created_at: string
           dimension: string
           evidence: Json
           id: string
+          is_veto: boolean
           label: string
           rationale: string | null
           raw_score: number
+          raw_spread: number | null
           sort_order: number
           verified: boolean
           weight: number
@@ -3299,13 +3363,17 @@ export type Database = {
         }
         Insert: {
           analysis_id: string
+          answered?: boolean
+          capped?: boolean
           created_at?: string
           dimension: string
           evidence?: Json
           id?: string
+          is_veto?: boolean
           label: string
           rationale?: string | null
           raw_score?: number
+          raw_spread?: number | null
           sort_order?: number
           verified?: boolean
           weight?: number
@@ -3313,13 +3381,17 @@ export type Database = {
         }
         Update: {
           analysis_id?: string
+          answered?: boolean
+          capped?: boolean
           created_at?: string
           dimension?: string
           evidence?: Json
           id?: string
+          is_veto?: boolean
           label?: string
           rationale?: string | null
           raw_score?: number
+          raw_spread?: number | null
           sort_order?: number
           verified?: boolean
           weight?: number
@@ -3335,16 +3407,74 @@ export type Database = {
           },
         ]
       }
+      crm_fit_knowledge: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          file_name: string | null
+          file_path: string | null
+          id: string
+          kind: Database["public"]["Enums"]["crm_fit_knowledge_kind"]
+          mime_type: string | null
+          pinned: boolean
+          size_bytes: number | null
+          summary: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_fit_knowledge_kind"]
+          mime_type?: string | null
+          pinned?: boolean
+          size_bytes?: number | null
+          summary?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["crm_fit_knowledge_kind"]
+          mime_type?: string | null
+          pinned?: boolean
+          size_bytes?: number | null
+          summary?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       crm_fit_rubric: {
         Row: {
           active: boolean
           created_at: string
           description: string | null
           dimension: string
+          evidence_required: boolean
           id: string
+          is_veto: boolean
           label: string
           sort_order: number
+          unevidenced_ceiling: number
           updated_at: string
+          veto_below: number | null
           weight: number
         }
         Insert: {
@@ -3352,10 +3482,14 @@ export type Database = {
           created_at?: string
           description?: string | null
           dimension: string
+          evidence_required?: boolean
           id?: string
+          is_veto?: boolean
           label: string
           sort_order?: number
+          unevidenced_ceiling?: number
           updated_at?: string
+          veto_below?: number | null
           weight?: number
         }
         Update: {
@@ -3363,10 +3497,14 @@ export type Database = {
           created_at?: string
           description?: string | null
           dimension?: string
+          evidence_required?: boolean
           id?: string
+          is_veto?: boolean
           label?: string
           sort_order?: number
+          unevidenced_ceiling?: number
           updated_at?: string
+          veto_below?: number | null
           weight?: number
         }
         Relationships: []
@@ -7859,10 +7997,12 @@ export type Database = {
           stage: number
           stage_dedupe_key: string | null
           stage2_access_mode: string | null
+          stage2_answers: Json
           stage2_completed_at: string | null
           stage2_investment: string | null
           stage2_next_step: string | null
           stage2_status: string | null
+          stage2_summary: string | null
           stage2_timeline: string | null
           stage3_access_mode: string | null
           stage3_booked_at: string | null
@@ -7911,10 +8051,12 @@ export type Database = {
           stage?: number
           stage_dedupe_key?: string | null
           stage2_access_mode?: string | null
+          stage2_answers?: Json
           stage2_completed_at?: string | null
           stage2_investment?: string | null
           stage2_next_step?: string | null
           stage2_status?: string | null
+          stage2_summary?: string | null
           stage2_timeline?: string | null
           stage3_access_mode?: string | null
           stage3_booked_at?: string | null
@@ -7963,10 +8105,12 @@ export type Database = {
           stage?: number
           stage_dedupe_key?: string | null
           stage2_access_mode?: string | null
+          stage2_answers?: Json
           stage2_completed_at?: string | null
           stage2_investment?: string | null
           stage2_next_step?: string | null
           stage2_status?: string | null
+          stage2_summary?: string | null
           stage2_timeline?: string | null
           stage3_access_mode?: string | null
           stage3_booked_at?: string | null
@@ -8446,6 +8590,15 @@ export type Database = {
         | "lost"
         | "withdrawn"
         | "settled"
+      crm_fit_knowledge_kind:
+        | "icp"
+        | "case_study"
+        | "positioning"
+        | "disqualification"
+        | "pricing"
+        | "objection"
+        | "process"
+        | "other"
       crm_fit_status: "queued" | "running" | "complete" | "failed"
       crm_fit_verdict:
         | "strong_fit"
@@ -8796,6 +8949,16 @@ export const Constants = {
         "lost",
         "withdrawn",
         "settled",
+      ],
+      crm_fit_knowledge_kind: [
+        "icp",
+        "case_study",
+        "positioning",
+        "disqualification",
+        "pricing",
+        "objection",
+        "process",
+        "other",
       ],
       crm_fit_status: ["queued", "running", "complete", "failed"],
       crm_fit_verdict: [
