@@ -44,6 +44,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { LibraryReingestDialog } from "@/components/library-reingest-dialog";
+import { PricingMapPanel } from "@/components/pricing-map-panel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useMemo, useCallback, useEffect } from "react";
@@ -136,6 +137,7 @@ function ModulesPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showDrift, setShowDrift] = useState(false);
   const [showIntel, setShowIntel] = useState(false);
+  const [showPricingMap, setShowPricingMap] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQ, setSearchQ] = useState("");
@@ -296,6 +298,10 @@ function ModulesPage() {
             <BarChart3 className="mr-2 h-3.5 w-3.5" />
             Intelligence
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowPricingMap(!showPricingMap)}>
+            <Layers className="mr-2 h-3.5 w-3.5" />
+            Pricing map
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowConfig(!showConfig)}>
             <Settings2 className="mr-2 h-3.5 w-3.5" />
             Config
@@ -319,6 +325,8 @@ function ModulesPage() {
 
       {/* Module Intelligence */}
       {showIntel && <ModuleIntelligencePanel />}
+
+      {showPricingMap && <PricingMapPanel />}
 
       {activeTab === "library" ? (
         <ModuleLibraryPanel />

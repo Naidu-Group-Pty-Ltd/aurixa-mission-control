@@ -23,6 +23,12 @@ export type ProvisionCloneInput = {
   cloudflareEnabled: boolean;
   notes: string;
   moduleIds: string[];
+  // Pricing tier the customer is on, and any add-ons bought on top of it.
+  // Recorded at creation so entitlement reconciliation has a baseline to diff
+  // against — without it, the first plan change looks like an initial sync and
+  // cannot tell an upgrade from a downgrade.
+  planSlug?: string | null;
+  addonSlugs?: string[];
   // When true, this clone must run on its own dedicated Supabase backend.
   // The wizard enqueues backend provisioning immediately after; DB triggers
   // prevent the backend from being deleted while this flag is set.
@@ -175,6 +181,8 @@ export const provisionClone = createServerFn({ method: "POST" })
         notes: data.notes || null,
         isolated_tenant: data.isolatedTenant === true,
         idempotency_key: data.idempotencyKey ?? null,
+        entitled_plan_slug: data.planSlug ?? null,
+        purchased_addon_slugs: data.addonSlugs ?? [],
       })
       .select()
       .single();

@@ -1277,6 +1277,68 @@ export type Database = {
           },
         ]
       }
+      clone_entitlement_reconciliations: {
+        Row: {
+          cascade_event_id: string | null
+          clone_id: string
+          created_at: string
+          direction: string
+          error_message: string | null
+          from_plan_slug: string | null
+          id: string
+          installed_slugs: string[]
+          ok: boolean
+          plan_change_event_id: string | null
+          revoked_slugs: string[]
+          to_plan_slug: string
+          triggered_by: string | null
+          unchanged_count: number
+          unmapped: Json
+        }
+        Insert: {
+          cascade_event_id?: string | null
+          clone_id: string
+          created_at?: string
+          direction: string
+          error_message?: string | null
+          from_plan_slug?: string | null
+          id?: string
+          installed_slugs?: string[]
+          ok?: boolean
+          plan_change_event_id?: string | null
+          revoked_slugs?: string[]
+          to_plan_slug: string
+          triggered_by?: string | null
+          unchanged_count?: number
+          unmapped?: Json
+        }
+        Update: {
+          cascade_event_id?: string | null
+          clone_id?: string
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          from_plan_slug?: string | null
+          id?: string
+          installed_slugs?: string[]
+          ok?: boolean
+          plan_change_event_id?: string | null
+          revoked_slugs?: string[]
+          to_plan_slug?: string
+          triggered_by?: string | null
+          unchanged_count?: number
+          unmapped?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clone_entitlement_reconciliations_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clone_handoffs: {
         Row: {
           backend_id: string | null
@@ -1867,6 +1929,10 @@ export type Database = {
           default_branch: string
           deploy_url: string | null
           drift_suggestions: Json
+          entitled_module_slugs: string[]
+          entitled_plan_slug: string | null
+          entitlement_keys: string[]
+          entitlements_synced_at: string | null
           github_app_installation_id: string | null
           github_owner: string
           github_repo: string
@@ -1883,7 +1949,9 @@ export type Database = {
           notes: string | null
           owner_user_id: string | null
           provisioning_method: Database["public"]["Enums"]["provisioning_method"]
+          purchased_addon_slugs: string[]
           repo_full_name: string | null
+          revoked_module_slugs: string[]
           slug: string
           subdomain: string | null
           subdomain_fqdn: string | null
@@ -1903,6 +1971,10 @@ export type Database = {
           default_branch?: string
           deploy_url?: string | null
           drift_suggestions?: Json
+          entitled_module_slugs?: string[]
+          entitled_plan_slug?: string | null
+          entitlement_keys?: string[]
+          entitlements_synced_at?: string | null
           github_app_installation_id?: string | null
           github_owner: string
           github_repo: string
@@ -1919,7 +1991,9 @@ export type Database = {
           notes?: string | null
           owner_user_id?: string | null
           provisioning_method: Database["public"]["Enums"]["provisioning_method"]
+          purchased_addon_slugs?: string[]
           repo_full_name?: string | null
+          revoked_module_slugs?: string[]
           slug: string
           subdomain?: string | null
           subdomain_fqdn?: string | null
@@ -1939,6 +2013,10 @@ export type Database = {
           default_branch?: string
           deploy_url?: string | null
           drift_suggestions?: Json
+          entitled_module_slugs?: string[]
+          entitled_plan_slug?: string | null
+          entitlement_keys?: string[]
+          entitlements_synced_at?: string | null
           github_app_installation_id?: string | null
           github_owner?: string
           github_repo?: string
@@ -1955,7 +2033,9 @@ export type Database = {
           notes?: string | null
           owner_user_id?: string | null
           provisioning_method?: Database["public"]["Enums"]["provisioning_method"]
+          purchased_addon_slugs?: string[]
           repo_full_name?: string | null
+          revoked_module_slugs?: string[]
           slug?: string
           subdomain?: string | null
           subdomain_fqdn?: string | null
@@ -5996,6 +6076,8 @@ export type Database = {
           from_plan_name: string | null
           from_plan_slug: string | null
           id: string
+          modules_reconciled_at: string | null
+          reconciliation_id: string | null
           source_ref: string
           tenant_id: string
           to_plan_name: string
@@ -6009,6 +6091,8 @@ export type Database = {
           from_plan_name?: string | null
           from_plan_slug?: string | null
           id?: string
+          modules_reconciled_at?: string | null
+          reconciliation_id?: string | null
           source_ref: string
           tenant_id: string
           to_plan_name: string
@@ -6022,6 +6106,8 @@ export type Database = {
           from_plan_name?: string | null
           from_plan_slug?: string | null
           id?: string
+          modules_reconciled_at?: string | null
+          reconciliation_id?: string | null
           source_ref?: string
           tenant_id?: string
           to_plan_name?: string
@@ -6127,6 +6213,57 @@ export type Database = {
           target_value?: string
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      pricing_module_map: {
+        Row: {
+          confidence: string
+          created_at: string
+          entitlement_key: string | null
+          id: string
+          is_override: boolean
+          mapping_kind: string
+          module_slugs: string[]
+          overridden_at: string | null
+          overridden_by: string | null
+          reason: string | null
+          source_kind: string
+          source_name: string
+          source_slug: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: string
+          created_at?: string
+          entitlement_key?: string | null
+          id?: string
+          is_override?: boolean
+          mapping_kind?: string
+          module_slugs?: string[]
+          overridden_at?: string | null
+          overridden_by?: string | null
+          reason?: string | null
+          source_kind: string
+          source_name: string
+          source_slug: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          entitlement_key?: string | null
+          id?: string
+          is_override?: boolean
+          mapping_kind?: string
+          module_slugs?: string[]
+          overridden_at?: string | null
+          overridden_by?: string | null
+          reason?: string | null
+          source_kind?: string
+          source_name?: string
+          source_slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
