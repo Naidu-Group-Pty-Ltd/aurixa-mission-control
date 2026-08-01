@@ -626,6 +626,93 @@ export type Database = {
           },
         ]
       }
+      clone_addon_purchases: {
+        Row: {
+          addon_name: string | null
+          addon_slug: string
+          cancelled_at: string | null
+          clone_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          current_period_end: string | null
+          external_ref: string | null
+          id: string
+          notes: string | null
+          purchased_at: string
+          quantity: number
+          source: string
+          status: string
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          stripe_subscription_item_id: string | null
+          tenant_id: string | null
+          unit_amount_cents: number | null
+          updated_at: string
+        }
+        Insert: {
+          addon_name?: string | null
+          addon_slug: string
+          cancelled_at?: string | null
+          clone_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_period_end?: string | null
+          external_ref?: string | null
+          id?: string
+          notes?: string | null
+          purchased_at?: string
+          quantity?: number
+          source?: string
+          status?: string
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_subscription_item_id?: string | null
+          tenant_id?: string | null
+          unit_amount_cents?: number | null
+          updated_at?: string
+        }
+        Update: {
+          addon_name?: string | null
+          addon_slug?: string
+          cancelled_at?: string | null
+          clone_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_period_end?: string | null
+          external_ref?: string | null
+          id?: string
+          notes?: string | null
+          purchased_at?: string
+          quantity?: number
+          source?: string
+          status?: string
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          stripe_subscription_item_id?: string | null
+          tenant_id?: string | null
+          unit_amount_cents?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clone_addon_purchases_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_addon_purchases_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clone_api_keys: {
         Row: {
           clone_id: string | null
@@ -1277,6 +1364,68 @@ export type Database = {
           },
         ]
       }
+      clone_entitlement_reconciliations: {
+        Row: {
+          cascade_event_id: string | null
+          clone_id: string
+          created_at: string
+          direction: string
+          error_message: string | null
+          from_plan_slug: string | null
+          id: string
+          installed_slugs: string[]
+          ok: boolean
+          plan_change_event_id: string | null
+          revoked_slugs: string[]
+          to_plan_slug: string
+          triggered_by: string | null
+          unchanged_count: number
+          unmapped: Json
+        }
+        Insert: {
+          cascade_event_id?: string | null
+          clone_id: string
+          created_at?: string
+          direction: string
+          error_message?: string | null
+          from_plan_slug?: string | null
+          id?: string
+          installed_slugs?: string[]
+          ok?: boolean
+          plan_change_event_id?: string | null
+          revoked_slugs?: string[]
+          to_plan_slug: string
+          triggered_by?: string | null
+          unchanged_count?: number
+          unmapped?: Json
+        }
+        Update: {
+          cascade_event_id?: string | null
+          clone_id?: string
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          from_plan_slug?: string | null
+          id?: string
+          installed_slugs?: string[]
+          ok?: boolean
+          plan_change_event_id?: string | null
+          revoked_slugs?: string[]
+          to_plan_slug?: string
+          triggered_by?: string | null
+          unchanged_count?: number
+          unmapped?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clone_entitlement_reconciliations_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clone_handoffs: {
         Row: {
           backend_id: string | null
@@ -1867,6 +2016,10 @@ export type Database = {
           default_branch: string
           deploy_url: string | null
           drift_suggestions: Json
+          entitled_module_slugs: string[]
+          entitled_plan_slug: string | null
+          entitlement_keys: string[]
+          entitlements_synced_at: string | null
           github_app_installation_id: string | null
           github_owner: string
           github_repo: string
@@ -1883,7 +2036,9 @@ export type Database = {
           notes: string | null
           owner_user_id: string | null
           provisioning_method: Database["public"]["Enums"]["provisioning_method"]
+          purchased_addon_slugs: string[]
           repo_full_name: string | null
+          revoked_module_slugs: string[]
           slug: string
           subdomain: string | null
           subdomain_fqdn: string | null
@@ -1903,6 +2058,10 @@ export type Database = {
           default_branch?: string
           deploy_url?: string | null
           drift_suggestions?: Json
+          entitled_module_slugs?: string[]
+          entitled_plan_slug?: string | null
+          entitlement_keys?: string[]
+          entitlements_synced_at?: string | null
           github_app_installation_id?: string | null
           github_owner: string
           github_repo: string
@@ -1919,7 +2078,9 @@ export type Database = {
           notes?: string | null
           owner_user_id?: string | null
           provisioning_method: Database["public"]["Enums"]["provisioning_method"]
+          purchased_addon_slugs?: string[]
           repo_full_name?: string | null
+          revoked_module_slugs?: string[]
           slug: string
           subdomain?: string | null
           subdomain_fqdn?: string | null
@@ -1939,6 +2100,10 @@ export type Database = {
           default_branch?: string
           deploy_url?: string | null
           drift_suggestions?: Json
+          entitled_module_slugs?: string[]
+          entitled_plan_slug?: string | null
+          entitlement_keys?: string[]
+          entitlements_synced_at?: string | null
           github_app_installation_id?: string | null
           github_owner?: string
           github_repo?: string
@@ -1955,7 +2120,9 @@ export type Database = {
           notes?: string | null
           owner_user_id?: string | null
           provisioning_method?: Database["public"]["Enums"]["provisioning_method"]
+          purchased_addon_slugs?: string[]
           repo_full_name?: string | null
+          revoked_module_slugs?: string[]
           slug?: string
           subdomain?: string | null
           subdomain_fqdn?: string | null
@@ -5996,6 +6163,8 @@ export type Database = {
           from_plan_name: string | null
           from_plan_slug: string | null
           id: string
+          modules_reconciled_at: string | null
+          reconciliation_id: string | null
           source_ref: string
           tenant_id: string
           to_plan_name: string
@@ -6009,6 +6178,8 @@ export type Database = {
           from_plan_name?: string | null
           from_plan_slug?: string | null
           id?: string
+          modules_reconciled_at?: string | null
+          reconciliation_id?: string | null
           source_ref: string
           tenant_id: string
           to_plan_name: string
@@ -6022,6 +6193,8 @@ export type Database = {
           from_plan_name?: string | null
           from_plan_slug?: string | null
           id?: string
+          modules_reconciled_at?: string | null
+          reconciliation_id?: string | null
           source_ref?: string
           tenant_id?: string
           to_plan_name?: string
@@ -6127,6 +6300,57 @@ export type Database = {
           target_value?: string
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      pricing_module_map: {
+        Row: {
+          confidence: string
+          created_at: string
+          entitlement_key: string | null
+          id: string
+          is_override: boolean
+          mapping_kind: string
+          module_slugs: string[]
+          overridden_at: string | null
+          overridden_by: string | null
+          reason: string | null
+          source_kind: string
+          source_name: string
+          source_slug: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: string
+          created_at?: string
+          entitlement_key?: string | null
+          id?: string
+          is_override?: boolean
+          mapping_kind?: string
+          module_slugs?: string[]
+          overridden_at?: string | null
+          overridden_by?: string | null
+          reason?: string | null
+          source_kind: string
+          source_name: string
+          source_slug: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          entitlement_key?: string | null
+          id?: string
+          is_override?: boolean
+          mapping_kind?: string
+          module_slugs?: string[]
+          overridden_at?: string | null
+          overridden_by?: string | null
+          reason?: string | null
+          source_kind?: string
+          source_name?: string
+          source_slug?: string
+          updated_at?: string
         }
         Relationships: []
       }

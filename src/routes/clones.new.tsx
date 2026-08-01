@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useModules, usePrimeConfig } from "@/lib/queries";
+import { TierModulePicker, type TierSelection } from "@/components/tier-module-picker";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { GitFork, Copy, Layers, Info, Shield, Check, Database } from "lucide-react";
 import { toast } from "sonner";
@@ -19,7 +20,10 @@ import { provisionClone } from "@/server/clone-provisioning.functions";
 import { provisionBackend } from "@/lib/backend-provisioning.functions";
 import { enqueueEdgeJob } from "@/server/edge-provisioning.functions";
 import { requestCloneSubdomain } from "@/server/subdomain-hosting.functions";
-import { checkGithubAppPreflight, type GithubPreflightResult } from "@/lib/github-preflight.functions";
+import {
+  checkGithubAppPreflight,
+  type GithubPreflightResult,
+} from "@/lib/github-preflight.functions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 
@@ -88,6 +92,10 @@ function NewClone() {
   const [subdomainSlug, setSubdomainSlug] = useState("");
   const requestSubdomainFn = useServerFn(requestCloneSubdomain);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [tierSelection, setTierSelection] = useState<TierSelection>({
+    planSlug: null,
+    addonSlugs: [],
+  });
   const [notes, setNotes] = useState("");
   const [billingUserId, setBillingUserId] = useState("");
   const [billingStripeCustomerId, setBillingStripeCustomerId] = useState("");
@@ -110,7 +118,6 @@ function NewClone() {
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
-
 
   const preflightFn = useServerFn(checkGithubAppPreflight);
   const [preflight, setPreflight] = useState<GithubPreflightResult | null>(null);
@@ -144,8 +151,8 @@ function NewClone() {
         data: {
           targetOwner: owner,
           method,
-          templateOwner: method === "template" ? prime?.github_owner ?? null : null,
-          templateRepo: method === "template" ? prime?.github_repo ?? null : null,
+          templateOwner: method === "template" ? (prime?.github_owner ?? null) : null,
+          templateRepo: method === "template" ? (prime?.github_repo ?? null) : null,
         },
       });
       setPreflight(res);
@@ -175,8 +182,14 @@ function NewClone() {
     }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, ownerMode, transferTarget, prime?.default_clone_org, prime?.github_owner, prime?.github_repo]);
-
+  }, [
+    method,
+    ownerMode,
+    transferTarget,
+    prime?.default_clone_org,
+    prime?.github_owner,
+    prime?.github_repo,
+  ]);
 
   // Isolated tenants ALWAYS need a dedicated backend — enforce it as the
   // wizard's source of truth so the checkbox never drifts out of sync.
@@ -233,7 +246,10 @@ function NewClone() {
       // Derive the slug suffix from the idempotency key so retries reuse
       // the same target repo name — otherwise the second attempt would
       // race against a partially-created GitHub repo. (Audit finding #13.)
-      const slugSuffix = idempotencyKey.replace(/[^a-z0-9]/gi, "").slice(0, 6).toLowerCase();
+      const slugSuffix = idempotencyKey
+        .replace(/[^a-z0-9]/gi, "")
+        .slice(0, 6)
+        .toLowerCase();
       const result = await provision({
         data: {
           name,
@@ -247,13 +263,14 @@ function NewClone() {
           cloudflareEnabled: cloudflare,
           notes,
           moduleIds: Array.from(picked),
+          planSlug: tierSelection.planSlug,
+          addonSlugs: tierSelection.addonSlugs,
           isolatedTenant,
           billingUserId: billingUserId.trim() || null,
           billingStripeCustomerId: billingStripeCustomerId.trim() || null,
           idempotencyKey,
         },
       });
-
 
       if (!result.ok) {
         toast.error(result.error);
@@ -270,7 +287,6 @@ function NewClone() {
             : `Clone provisioned${result.githubUrl ? " on GitHub" : ""}`,
         );
       }
-
 
       // Enqueue backend provisioning if enabled. The wizard only awaits the
       // enqueue (fast); the actual provisioning is executed by the pg_cron
@@ -336,7 +352,9 @@ function NewClone() {
           .slice(0, 63);
         if (desired) {
           try {
-            const r = await requestSubdomainFn({ data: { cloneId: result.cloneId, slug: desired } });
+            const r = await requestSubdomainFn({
+              data: { cloneId: result.cloneId, slug: desired },
+            });
             toast.info(
               r.status === "queued"
                 ? `Subdomain queued — ${r.fqdn}`
@@ -555,57 +573,13 @@ function NewClone() {
         </CardContent>
       </Card>
 
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">4 · Modules to inject</CardTitle>
-          <CardDescription>
-            Pick which modules from the prime catalog ship in this clone. Others are excluded.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {modules.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No modules detected yet. Run AI module detection from the{" "}
-              <span className="font-mono text-foreground">Modules</span> page.
-            </div>
-          ) : (
-            <div className="grid gap-2 md:grid-cols-2">
-              {modules.map((m) => {
-                const active = picked.has(m.id);
-                return (
-                  <label
-                    key={m.id}
-                    className={cn(
-                      "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors",
-                      active
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/40",
-                    )}
-                  >
-                    <Checkbox
-                      checked={active}
-                      onCheckedChange={() => togglePick(m.id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-semibold">{m.name}</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {m.status}
-                        </Badge>
-                      </div>
-                      {m.description && (
-                        <div className="mt-1 text-xs text-muted-foreground">{m.description}</div>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <TierModulePicker
+        modules={modules}
+        picked={picked}
+        onPickedChange={setPicked}
+        selection={tierSelection}
+        onSelectionChange={setTierSelection}
+      />
 
       <Card>
         <CardHeader>
@@ -628,8 +602,9 @@ function NewClone() {
             <div className="space-y-0.5">
               <div className="text-sm font-medium">Isolated tenant</div>
               <div className="text-xs text-muted-foreground">
-                Locks this clone to its own dedicated backend. Recommended for client-owned deployments.
-                While enabled, the backend cannot be deleted and this clone cannot fall back to the prime database.
+                Locks this clone to its own dedicated backend. Recommended for client-owned
+                deployments. While enabled, the backend cannot be deleted and this clone cannot fall
+                back to the prime database.
               </div>
             </div>
           </label>
@@ -647,7 +622,9 @@ function NewClone() {
             <span className="text-sm">
               Provision a dedicated backend for this clone
               {isolatedTenant && (
-                <span className="ml-2 text-xs text-muted-foreground">(required — isolated tenant)</span>
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (required — isolated tenant)
+                </span>
               )}
             </span>
           </label>
@@ -758,14 +735,22 @@ function NewClone() {
             <Layers className="h-4 w-4 text-info" /> 6b · Subdomain hosting
           </CardTitle>
           <CardDescription>
-            Every clone gets an <code className="rounded bg-muted px-1 text-xs">&lt;slug&gt;.aurixasystems.com.au</code>{" "}
-            subdomain via Cloudflare DNS. Dormant if Cloudflare isn't configured yet — the record fans out automatically once{" "}
-            <a href="/settings/domains" className="underline">Settings → Domains</a> is populated.
+            Every clone gets an{" "}
+            <code className="rounded bg-muted px-1 text-xs">&lt;slug&gt;.aurixasystems.com.au</code>{" "}
+            subdomain via Cloudflare DNS. Dormant if Cloudflare isn't configured yet — the record
+            fans out automatically once{" "}
+            <a href="/settings/domains" className="underline">
+              Settings → Domains
+            </a>{" "}
+            is populated.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <label className="flex cursor-pointer items-center gap-3">
-            <Checkbox checked={subdomainEnabled} onCheckedChange={(v) => setSubdomainEnabled(!!v)} />
+            <Checkbox
+              checked={subdomainEnabled}
+              onCheckedChange={(v) => setSubdomainEnabled(!!v)}
+            />
             <span className="text-sm">Reserve a subdomain for this clone</span>
           </label>
           {subdomainEnabled && (
@@ -776,13 +761,21 @@ function NewClone() {
                   <Input
                     value={subdomainSlug}
                     onChange={(e) => setSubdomainSlug(e.target.value)}
-                    placeholder={name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "my-clone"}
+                    placeholder={
+                      name
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-|-$/g, "") || "my-clone"
+                    }
                   />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">.aurixasystems.com.au</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    .aurixasystems.com.au
+                  </span>
                 </div>
               </div>
               <div className="text-xs text-muted-foreground self-end">
-                Reserved slugs (www, api, admin, …) are blocked. Availability is checked on submit; conflicts surface as an error.
+                Reserved slugs (www, api, admin, …) are blocked. Availability is checked on submit;
+                conflicts surface as an error.
               </div>
             </div>
           )}

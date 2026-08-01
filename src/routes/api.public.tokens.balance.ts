@@ -76,9 +76,38 @@ export const Route = createFileRoute("/api/public/tokens/balance")({
           console.warn("[tokens/balance] expiry schedule unavailable", err);
         }
 
+        // Entitled add-ons for this clone.
+        //
+        // The clone's plan-tier gate could never decide an add-on: a module
+        // sold separately has an empty tier list, so `planIncludesModule`
+        // deliberately fell through to the user-permission check rather than
+        // lock out a workspace that had paid for it. That leaves add-ons
+        // effectively ungated on the clone. Supplying them here is what closes
+        // it — the balance call is the one request every clone already makes.
+        //
+        // `past_due` still entitles, matching how the reconciler treats it: a
+        // failed card should not strip a feature mid-period.
+        // Best-effort, like the expiry schedule above — a balance read must not
+        // fail because the entitlement query did, and an empty list degrades to
+        // exactly the behaviour clones have today.
+        let addonSlugs: string[] = [];
+        try {
+          const { data: addons } = await supabaseAdmin
+            .from("clone_addon_purchases")
+            .select("addon_slug")
+            .eq("clone_id", key.clone_id)
+            .in("status", ["active", "past_due"]);
+          addonSlugs = [
+            ...new Set(((addons ?? []) as Array<{ addon_slug: string }>).map((a) => a.addon_slug)),
+          ].sort();
+        } catch (err) {
+          console.warn("[tokens/balance] add-on entitlements unavailable", err);
+        }
+
         return jsonResponse({
           ok: true,
           tenant: ten.data,
+          entitlements: { addons: addonSlugs },
           balance: bal.data ?? {
             available: 0,
             reserved: 0,

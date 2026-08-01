@@ -67,6 +67,7 @@ import { Route as HooksGithubRouteImport } from './routes/hooks.github'
 import { Route as HooksFleetDriftRouteImport } from './routes/hooks.fleet-drift'
 import { Route as HooksFeedbackForwardRetryRouteImport } from './routes/hooks.feedback-forward-retry'
 import { Route as HooksExpireReservationsRouteImport } from './routes/hooks.expire-reservations'
+import { Route as HooksEntitlementDrainRouteImport } from './routes/hooks.entitlement-drain'
 import { Route as HooksEdgeDriftRouteImport } from './routes/hooks.edge-drift'
 import { Route as HooksEdgeDrainRouteImport } from './routes/hooks.edge-drain'
 import { Route as HooksDriftRefreshRouteImport } from './routes/hooks.drift-refresh'
@@ -434,6 +435,11 @@ const HooksFeedbackForwardRetryRoute =
 const HooksExpireReservationsRoute = HooksExpireReservationsRouteImport.update({
   id: '/hooks/expire-reservations',
   path: '/hooks/expire-reservations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HooksEntitlementDrainRoute = HooksEntitlementDrainRouteImport.update({
+  id: '/hooks/entitlement-drain',
+  path: '/hooks/entitlement-drain',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksEdgeDriftRoute = HooksEdgeDriftRouteImport.update({
@@ -883,6 +889,7 @@ export interface FileRoutesByFullPath {
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
+  '/hooks/entitlement-drain': typeof HooksEntitlementDrainRoute
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
   '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
@@ -1015,6 +1022,7 @@ export interface FileRoutesByTo {
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
+  '/hooks/entitlement-drain': typeof HooksEntitlementDrainRoute
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
   '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
@@ -1149,6 +1157,7 @@ export interface FileRoutesById {
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
+  '/hooks/entitlement-drain': typeof HooksEntitlementDrainRoute
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
   '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
@@ -1284,6 +1293,7 @@ export interface FileRouteTypes {
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
+    | '/hooks/entitlement-drain'
     | '/hooks/expire-reservations'
     | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
@@ -1416,6 +1426,7 @@ export interface FileRouteTypes {
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
+    | '/hooks/entitlement-drain'
     | '/hooks/expire-reservations'
     | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
@@ -1549,6 +1560,7 @@ export interface FileRouteTypes {
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
+    | '/hooks/entitlement-drain'
     | '/hooks/expire-reservations'
     | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
@@ -1680,6 +1692,7 @@ export interface RootRouteChildren {
   HooksDriftRefreshRoute: typeof HooksDriftRefreshRoute
   HooksEdgeDrainRoute: typeof HooksEdgeDrainRoute
   HooksEdgeDriftRoute: typeof HooksEdgeDriftRoute
+  HooksEntitlementDrainRoute: typeof HooksEntitlementDrainRoute
   HooksExpireReservationsRoute: typeof HooksExpireReservationsRoute
   HooksFeedbackForwardRetryRoute: typeof HooksFeedbackForwardRetryRoute
   HooksFleetDriftRoute: typeof HooksFleetDriftRoute
@@ -2146,6 +2159,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/expire-reservations'
       fullPath: '/hooks/expire-reservations'
       preLoaderRoute: typeof HooksExpireReservationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/entitlement-drain': {
+      id: '/hooks/entitlement-drain'
+      path: '/hooks/entitlement-drain'
+      fullPath: '/hooks/entitlement-drain'
+      preLoaderRoute: typeof HooksEntitlementDrainRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/edge-drift': {
@@ -2819,6 +2839,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksDriftRefreshRoute: HooksDriftRefreshRoute,
   HooksEdgeDrainRoute: HooksEdgeDrainRoute,
   HooksEdgeDriftRoute: HooksEdgeDriftRoute,
+  HooksEntitlementDrainRoute: HooksEntitlementDrainRoute,
   HooksExpireReservationsRoute: HooksExpireReservationsRoute,
   HooksFeedbackForwardRetryRoute: HooksFeedbackForwardRetryRoute,
   HooksFleetDriftRoute: HooksFleetDriftRoute,
@@ -2881,3 +2902,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

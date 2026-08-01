@@ -23,6 +23,12 @@ export type ProvisionCloneInput = {
   cloudflareEnabled: boolean;
   notes: string;
   moduleIds: string[];
+  // Pricing tier the customer is on, and any add-ons bought on top of it.
+  // Recorded at creation so entitlement reconciliation has a baseline to diff
+  // against — without it, the first plan change looks like an initial sync and
+  // cannot tell an upgrade from a downgrade.
+  planSlug?: string | null;
+  addonSlugs?: string[];
   // When true, this clone must run on its own dedicated Supabase backend.
   // The wizard enqueues backend provisioning immediately after; DB triggers
   // prevent the backend from being deleted while this flag is set.
@@ -175,12 +181,30 @@ export const provisionClone = createServerFn({ method: "POST" })
         notes: data.notes || null,
         isolated_tenant: data.isolatedTenant === true,
         idempotency_key: data.idempotencyKey ?? null,
+        entitled_plan_slug: data.planSlug ?? null,
       })
       .select()
       .single();
 
     if (insertErr || !inserted) {
       return { ok: false, error: insertErr?.message ?? "Clone insert failed" };
+    }
+
+    // Record any add-ons bought alongside the tier. Written as purchase rows,
+    // not to `clones.purchased_addon_slugs` — that column is derived by a
+    // trigger now, so writing it directly would be overwritten on the next
+    // purchase change.
+    if ((data.addonSlugs ?? []).length > 0) {
+      await supabase.from("clone_addon_purchases").insert(
+        (data.addonSlugs ?? []).map((addon_slug) => ({
+          clone_id: inserted.id,
+          addon_slug,
+          status: "active" as const,
+          source: "operator" as const,
+          created_by: userId,
+          notes: "Selected during clone provisioning",
+        })),
+      );
     }
 
     // Install picked modules
