@@ -705,6 +705,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "clone_addon_purchases_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
             foreignKeyName: "clone_addon_purchases_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1423,6 +1430,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clones"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_entitlement_reconciliations_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
           },
         ]
       }
@@ -8837,6 +8851,8 @@ export type Database = {
           from_plan_name: string | null
           from_plan_slug: string | null
           id: string
+          modules_reconciled_at: string | null
+          reconciliation_id: string | null
           source_ref: string
           tenant_id: string
           to_plan_name: string
