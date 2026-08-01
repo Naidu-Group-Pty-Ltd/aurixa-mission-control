@@ -299,3 +299,72 @@ export async function markDetachedByStripeId(stripePaymentMethodId: string): Pro
     await reorderPaymentMethods(row.tenant_id, ordered);
   }
 }
+
+// ── Reconciliation against Stripe ───────────────────────────────────────────
+
+export type StripeWalletTruth = {
+  /** False when Stripe could not be reached — the UI must not claim knowledge. */
+  verified: boolean;
+  /** The payment method Stripe will actually charge, if any. */
+  defaultPaymentMethodId: string | null;
+  /** Stripe payment-method ids currently attached to the customer. */
+  attachedIds: Set<string>;
+};
+
+/**
+ * Ask Stripe what it actually holds for this tenant's customer.
+ *
+ * The wallet table is a local mirror, and a mirror can drift: a card detached
+ * in the Stripe dashboard, a default changed by a subscription flow, or a
+ * syncStripeDefaultPaymentMethod call that failed silently (it is deliberately
+ * best-effort) all leave the rows saying one thing while Stripe does another.
+ * Showing a confident "Primary" badge that Stripe disagrees with is worse than
+ * showing nothing, because the number it governs is a real charge.
+ *
+ * Never throws: an unreachable Stripe yields verified:false, which the caller
+ * renders as "couldn't confirm" rather than as a discrepancy.
+ */
+export async function readStripeWalletTruth(
+  rows: PaymentMethodRow[],
+): Promise<StripeWalletTruth> {
+  const customerId = rows.find((r) => r.stripe_customer_id)?.stripe_customer_id;
+  if (!customerId) {
+    return { verified: true, defaultPaymentMethodId: null, attachedIds: new Set() };
+  }
+  try {
+    const stripe = getStripe();
+    const [customer, attached] = await Promise.all([
+      stripe.customers.retrieve(customerId),
+      stripe.paymentMethods.list({ customer: customerId, type: "card", limit: 20 }),
+    ]);
+    // A deleted customer carries none of the invoice settings, and the union
+    // Stripe returns has to be narrowed before the field is reachable.
+    const live = customer.deleted === true ? null : (customer as Stripe.Customer);
+    const defaultPm = live?.invoice_settings?.default_payment_method ?? null;
+    return {
+      verified: true,
+      defaultPaymentMethodId:
+        typeof defaultPm === "string" ? defaultPm : (defaultPm?.id ?? null),
+      attachedIds: new Set(attached.data.map((pm) => pm.id)),
+    };
+  } catch (err) {
+    console.error("[wallet] readStripeWalletTruth failed:", err);
+    return { verified: false, defaultPaymentMethodId: null, attachedIds: new Set() };
+  }
+}
+
+/**
+ * Force the tenant's Stripe default back onto its primary card.
+ *
+ * The same operation the wallet performs after every reorder, exposed so an
+ * operator can repair drift without having to reorder cards to trigger it.
+ * Returns the post-sync truth so the caller can confirm it took.
+ */
+export async function reconcileStripeDefault(
+  tenantId: string,
+): Promise<{ ok: boolean; defaultPaymentMethodId: string | null }> {
+  await syncStripeDefaultPaymentMethod(tenantId);
+  const rows = await listActivePaymentMethods(tenantId);
+  const truth = await readStripeWalletTruth(rows);
+  return { ok: truth.verified, defaultPaymentMethodId: truth.defaultPaymentMethodId };
+}
