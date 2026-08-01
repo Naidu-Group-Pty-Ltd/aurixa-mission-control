@@ -5,6 +5,8 @@ import { ensureTenant, jsonResponse, resolveCloneApiKey } from "@/server/clone-a
 import { checkRateLimit } from "@/server/token-rate-limit.server";
 import {
   detachPaymentMethod,
+  readStripeWalletTruth,
+  reconcileStripeDefault,
   listActivePaymentMethods,
   MAX_PAYMENT_METHODS,
   PRIORITY_ROLES,
@@ -42,6 +44,13 @@ const ActionSchema = z.discriminatedUnion("action", [
     tenant_ref: z.string().min(1).max(200),
     payment_method_id: z.string().uuid(),
   }),
+  // Repair drift: push the primary card back onto the Stripe customer as its
+  // default. Reordering already does this, but needing to reorder cards to fix
+  // a stale default is not a repair anybody should have to discover.
+  z.object({
+    action: z.literal("sync_default"),
+    tenant_ref: z.string().min(1).max(200),
+  }),
 ]);
 
 const SCOPES = ["billing:handoff", "tokens:read", "tokens:meter"];
@@ -63,8 +72,28 @@ async function resolveTenantId(
   return tenant?.id ?? null;
 }
 
-function serialize(rows: Awaited<ReturnType<typeof listActivePaymentMethods>>) {
+type WalletTruth = Awaited<ReturnType<typeof readStripeWalletTruth>>;
+
+/**
+ * Serialise the wallet, annotated with what Stripe actually holds.
+ *
+ * `priority` is this database's opinion; `is_stripe_default` is Stripe's. They
+ * are reported separately and deliberately never reconciled here, because a
+ * dashboard that quietly papers over the difference is how a workspace ends up
+ * believing it will be charged on a card Stripe has already forgotten.
+ */
+function serialize(
+  rows: Awaited<ReturnType<typeof listActivePaymentMethods>>,
+  truth?: WalletTruth,
+) {
   return rows.map((r) => ({
+    stripe_payment_method_id: r.stripe_payment_method_id,
+    is_stripe_default: truth?.verified
+      ? truth.defaultPaymentMethodId === r.stripe_payment_method_id
+      : null,
+    attached_at_stripe: truth?.verified
+      ? truth.attachedIds.has(r.stripe_payment_method_id)
+      : null,
     id: r.id,
     brand: r.brand,
     last4: r.last4,
@@ -100,10 +129,15 @@ export const Route = createFileRoute("/api/public/billing/payment-methods")({
 
         try {
           const rows = await listActivePaymentMethods(tenantId);
+          // Read Stripe alongside the rows so the caller can show what will
+          // actually be charged rather than what this table last recorded.
+          const truth = await readStripeWalletTruth(rows);
           return jsonResponse({
             ok: true,
-            payment_methods: serialize(rows),
+            payment_methods: serialize(rows, truth),
             max_payment_methods: MAX_PAYMENT_METHODS,
+            stripe_verified: truth.verified,
+            stripe_default_payment_method_id: truth.defaultPaymentMethodId,
           });
         } catch (err) {
           return jsonResponse({ ok: false, error: (err as Error).message }, 500);
@@ -137,7 +171,12 @@ export const Route = createFileRoute("/api/public/billing/payment-methods")({
         if (!tenantId) return jsonResponse({ ok: false, error: "tenant_not_found" }, 404);
 
         try {
-          if (data.action === "remove") {
+          if (data.action === "sync_default") {
+            const synced = await reconcileStripeDefault(tenantId);
+            if (!synced.ok) {
+              return jsonResponse({ ok: false, error: "stripe_unreachable" }, 502);
+            }
+          } else if (data.action === "remove") {
             const result = await detachPaymentMethod(tenantId, data.payment_method_id);
             if (!result.ok) return jsonResponse(result, 400);
           } else if (data.action === "reorder") {
@@ -160,10 +199,13 @@ export const Route = createFileRoute("/api/public/billing/payment-methods")({
           }
 
           const rows = await listActivePaymentMethods(tenantId);
+          const truth = await readStripeWalletTruth(rows);
           return jsonResponse({
             ok: true,
-            payment_methods: serialize(rows),
+            payment_methods: serialize(rows, truth),
             max_payment_methods: MAX_PAYMENT_METHODS,
+            stripe_verified: truth.verified,
+            stripe_default_payment_method_id: truth.defaultPaymentMethodId,
           });
         } catch (err) {
           return jsonResponse({ ok: false, error: (err as Error).message }, 500);
