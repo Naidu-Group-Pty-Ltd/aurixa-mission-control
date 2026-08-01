@@ -51,10 +51,35 @@ export const Route = createFileRoute("/api/public/storefront/handoff")({
 
         const plan = await planForTenant(handoff.tenant_id).catch(() => null);
 
+        // Add-ons held, so the storefront can gate documentation the same way
+        // the clone's own user guide does. Tier alone cannot answer it: a
+        // separately-sold module carries an empty tier list, so a Launch
+        // workspace that bought Market Updates looks identical to one that did
+        // not unless the add-ons travel too.
+        //
+        // Wrapped like the balance endpoint's copy of this query: a docs page
+        // is not worth failing a handoff resolution over. An empty list means
+        // "none known", which the gate treats as no add-ons rather than as an
+        // error — the tier entitlements still resolve normally.
+        let addonSlugs: string[] = [];
+        if (handoff.clone_id) {
+          try {
+            const { data: addons } = await supabaseAdmin
+              .from("clone_addon_purchases")
+              .select("addon_slug")
+              .eq("clone_id", handoff.clone_id)
+              .in("status", ["active", "past_due"]);
+            addonSlugs = [...new Set((addons ?? []).map((a) => a.addon_slug))].sort();
+          } catch (err) {
+            console.warn("[storefront/handoff] add-on entitlements unavailable", err);
+          }
+        }
+
         return storefrontJson({
           ok: true,
           current_plan_slug: plan?.slug ?? null,
           current_plan_name: plan?.name ?? null,
+          addon_slugs: addonSlugs,
           handoff_id: handoff.id,
           clone_name: cloneName,
           origin_username: handoff.origin_username,
