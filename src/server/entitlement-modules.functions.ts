@@ -9,6 +9,14 @@ import {
   classifyChange,
 } from "./entitlement-modules.server";
 import { resolveEntitledModules, buildFullMapping } from "@/lib/pricing/module-mapping";
+import { MODULES } from "@/lib/pricing/aurixa-catalog";
+import {
+  listAddonPurchases,
+  grantAddon,
+  cancelAddon,
+  syncFromStripeItems,
+  type StripeLineItem,
+} from "./addon-purchases.server";
 
 /**
  * Bring one clone's installed modules in line with its billing plan.
@@ -216,27 +224,121 @@ export const getCloneEntitlements = createServerFn({ method: "POST" })
     };
   });
 
-/** Set the priced add-ons a clone has bought on top of its tier. */
-export const setCloneAddons = createServerFn({ method: "POST" })
+/** Every add-on a clone holds, live and historical. */
+export const listCloneAddons = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { cloneId: string; addonSlugs: string[] }) => {
+  .inputValidator((data: { cloneId: string }) => {
     if (!data?.cloneId) throw new Error("cloneId required");
-    if (!Array.isArray(data.addonSlugs)) throw new Error("addonSlugs required");
     return data;
   })
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("clones")
-      .update({ purchased_addon_slugs: data.addonSlugs })
-      .eq("id", data.cloneId);
-    if (error) return { ok: false as const, error: error.message };
+    const purchases = await listAddonPurchases(context.supabase, data.cloneId);
+    return { ok: true as const, purchases, catalogue: MODULES };
+  });
 
-    // Applying the purchase immediately is the point — an add-on the customer
-    // has paid for should not wait for the next plan change to arrive.
-    return reconcileCloneEntitlements({
+/**
+ * Grant one add-on to a clone and apply it immediately — an add-on the
+ * customer has paid for should not wait for the next plan change to arrive.
+ */
+export const grantCloneAddon = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { cloneId: string; addonSlug: string; notes?: string }) => {
+    if (!data?.cloneId) throw new Error("cloneId required");
+    if (!data?.addonSlug) throw new Error("addonSlug required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const granted = await grantAddon({
+      supabase: context.supabase,
+      input: {
+        cloneId: data.cloneId,
+        addonSlug: data.addonSlug,
+        source: "operator",
+        notes: data.notes ?? null,
+        userId: context.userId,
+      },
+    });
+    if (!granted.ok) return { ok: false as const, error: granted.error };
+
+    await context.supabase.from("audit_log").insert({
+      action: "clone.addon_granted",
+      entity_type: "clone",
+      entity_id: data.cloneId,
+      actor_user_id: context.userId,
+      metadata: { addon_slug: data.addonSlug, already_held: granted.alreadyHeld ?? false },
+    });
+
+    const recon = await reconcileCloneEntitlements({
       supabase: context.supabase,
       options: { cloneId: data.cloneId, userId: context.userId, direction: "manual" },
     });
+    return { ok: true as const, alreadyHeld: granted.alreadyHeld ?? false, reconciliation: recon };
+  });
+
+/**
+ * Cancel an add-on. Consistent with a tier downgrade, this stops the
+ * entitlement and leaves the module's files in place.
+ */
+export const cancelCloneAddon = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { cloneId: string; addonSlug: string; reason?: string }) => {
+    if (!data?.cloneId) throw new Error("cloneId required");
+    if (!data?.addonSlug) throw new Error("addonSlug required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const res = await cancelAddon({
+      supabase: context.supabase,
+      cloneId: data.cloneId,
+      addonSlug: data.addonSlug,
+      reason: data.reason,
+    });
+    if (!res.ok) return { ok: false as const, error: res.error };
+
+    await context.supabase.from("audit_log").insert({
+      action: "clone.addon_cancelled",
+      entity_type: "clone",
+      entity_id: data.cloneId,
+      actor_user_id: context.userId,
+      metadata: { addon_slug: data.addonSlug, reason: data.reason ?? null },
+    });
+
+    const recon = await reconcileCloneEntitlements({
+      supabase: context.supabase,
+      options: { cloneId: data.cloneId, userId: context.userId, direction: "manual" },
+    });
+    return { ok: true as const, cancelled: res.cancelled, reconciliation: recon };
+  });
+
+/**
+ * Reconcile a clone's add-ons against live Stripe subscription items.
+ *
+ * This is the entry point a line-item webhook calls. Idempotent on the
+ * subscription item id, so a replayed delivery converges instead of granting
+ * the same add-on twice.
+ */
+export const syncCloneAddonsFromStripe = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { cloneId: string; items: StripeLineItem[] }) => {
+    if (!data?.cloneId) throw new Error("cloneId required");
+    if (!Array.isArray(data.items)) throw new Error("items required");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const res = await syncFromStripeItems({
+      supabase: context.supabase,
+      cloneId: data.cloneId,
+      items: data.items,
+      userId: context.userId,
+    });
+
+    if (res.granted.length > 0 || res.cancelled.length > 0) {
+      await reconcileCloneEntitlements({
+        supabase: context.supabase,
+        options: { cloneId: data.cloneId, userId: context.userId, direction: "manual" },
+      });
+    }
+    return res;
   });
 
 /** The derived mapping, without touching the database — for previews. */

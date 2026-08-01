@@ -73,9 +73,9 @@ CREATE TRIGGER pricing_module_map_updated
 ALTER TABLE public.clones
   ADD COLUMN IF NOT EXISTS entitled_plan_slug text,
   ADD COLUMN IF NOT EXISTS entitled_module_slugs text[] NOT NULL DEFAULT '{}',
-  -- Priced add-on slugs bought on top of the tier. There is no per-clone
-  -- purchase table yet, so this is the record: operator-set today, and the
-  -- obvious column for a Stripe line-item sync to write later.
+  -- Priced add-on slugs bought on top of the tier. Superseded later in this
+  -- same PR by `clone_addon_purchases`, which turns this into a trigger-derived
+  -- cache — see 20260801140000. Kept here so the migrations replay in order.
   ADD COLUMN IF NOT EXISTS purchased_addon_slugs text[] NOT NULL DEFAULT '{}',
   -- Installed but no longer entitled. Files stay deployed; the clone gates
   -- these in its UI. Recorded so an operator can see what a downgrade cost.

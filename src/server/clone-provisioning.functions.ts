@@ -182,13 +182,29 @@ export const provisionClone = createServerFn({ method: "POST" })
         isolated_tenant: data.isolatedTenant === true,
         idempotency_key: data.idempotencyKey ?? null,
         entitled_plan_slug: data.planSlug ?? null,
-        purchased_addon_slugs: data.addonSlugs ?? [],
       })
       .select()
       .single();
 
     if (insertErr || !inserted) {
       return { ok: false, error: insertErr?.message ?? "Clone insert failed" };
+    }
+
+    // Record any add-ons bought alongside the tier. Written as purchase rows,
+    // not to `clones.purchased_addon_slugs` — that column is derived by a
+    // trigger now, so writing it directly would be overwritten on the next
+    // purchase change.
+    if ((data.addonSlugs ?? []).length > 0) {
+      await supabase.from("clone_addon_purchases").insert(
+        (data.addonSlugs ?? []).map((addon_slug) => ({
+          clone_id: inserted.id,
+          addon_slug,
+          status: "active" as const,
+          source: "operator" as const,
+          created_by: userId,
+          notes: "Selected during clone provisioning",
+        })),
+      );
     }
 
     // Install picked modules

@@ -29,6 +29,7 @@ import {
   type EntitlementResolution,
 } from "@/lib/pricing/module-mapping";
 import { TIERS } from "@/lib/pricing/aurixa-catalog";
+import { activeAddonSlugs } from "./addon-purchases.server";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -137,19 +138,15 @@ export async function resolveClonePlan(
 }
 
 /**
- * Priced add-ons a clone has bought on top of its tier.
+ * Priced add-ons a clone currently holds.
  *
- * Held on the clone rather than in a purchase table because none exists yet —
- * add-ons are operator-set today. When Stripe line items start driving this,
- * they write the same column and nothing here changes.
+ * Read from `clone_addon_purchases` — current state with a status lifecycle —
+ * rather than the `purchases` event log, which never retracts and would keep a
+ * cancelled add-on entitling code forever. `past_due` still entitles, so a
+ * failed card does not strip features mid-period.
  */
 async function loadPurchasedAddons(supabase: Supabase, cloneId: string): Promise<string[]> {
-  const { data } = await supabase
-    .from("clones")
-    .select("purchased_addon_slugs")
-    .eq("id", cloneId)
-    .maybeSingle();
-  return (data?.purchased_addon_slugs as string[] | null) ?? [];
+  return activeAddonSlugs(supabase, cloneId);
 }
 
 export type ReconcileOptions = {
