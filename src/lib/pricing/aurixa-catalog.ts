@@ -150,11 +150,17 @@ export type PricedModule = {
 export const MODULES: readonly PricedModule[] = [
   // Main Dashboard
   {
+    // Market News Feed. Bundled into SCALE only — the signed-off commercial
+    // rules for the tiered-entitlement rollout place it beside Commercial /
+    // Industrial: included at Scale, and an independently purchasable add-on
+    // for Launch and Growth. (The original sheet transcription had it
+    // arriving with Growth; the entitlement rollout superseded that, and the
+    // prime app, this catalogue and the pricing site moved together.)
     slug: "market-updates",
     name: "Market Updates",
     category: "Main Dashboard",
     monthlyInclGstCents: 5900,
-    includedIn: ["growth", "scale"],
+    includedIn: ["scale"],
   },
   {
     slug: "commercial-industrial",

@@ -99,10 +99,6 @@ export const TIER_FEATURES: Record<string, TierFeatures> = {
     inherits: "Launch",
     groups: [
       {
-        heading: "Main Dashboard",
-        items: [{ name: "Market Updates" }],
-      },
-      {
         heading: "Reports & Analysis",
         items: [
           { name: "Generated Reports", subs: ["Comparisons"] },
@@ -124,7 +120,11 @@ export const TIER_FEATURES: Record<string, TierFeatures> = {
     groups: [
       {
         heading: "Main Dashboard",
-        items: [{ name: "Commercial / Industrial" }, { name: "Opportunity Marketplace" }],
+        items: [
+          { name: "Market Updates" },
+          { name: "Commercial / Industrial" },
+          { name: "Opportunity Marketplace" },
+        ],
       },
       {
         heading: "Client & CRM",

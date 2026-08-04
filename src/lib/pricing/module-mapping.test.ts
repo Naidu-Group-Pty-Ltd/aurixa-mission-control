@@ -173,8 +173,10 @@ describe("resolveEntitledModules", () => {
   });
 
   it("adds exactly the modules a tier introduces", () => {
+    // Market Updates no longer arrives with Growth — it is Scale-bundled and
+    // otherwise an add-on.
     const delta = diffModules(launch.moduleSlugs, growth.moduleSlugs);
-    expect(delta.toInstall).toEqual(["deal-pipeline", "market-updates"]);
+    expect(delta.toInstall).toEqual(["deal-pipeline"]);
     expect(delta.toRevoke).toEqual([]);
   });
 
@@ -215,8 +217,11 @@ describe("resolveEntitledModules", () => {
   });
 
   it("honours an operator override over the derived mapping", () => {
+    // Scale, because market-updates is only reached through a tier at Scale
+    // since the Scale-only bundling change; the override mechanics are what
+    // is under test here.
     const r = resolveEntitledModules({
-      planSlug: "growth",
+      planSlug: "scale",
       knownModules: KNOWN,
       overrides: { "module:market-updates": ["listings"] },
     });
