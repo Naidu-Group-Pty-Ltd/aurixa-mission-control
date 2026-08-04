@@ -134,13 +134,19 @@ describe("module catalogue", () => {
     }
   });
 
-  it("includes with Growth exactly what the sheet introduces at Growth", () => {
+  it("includes with Growth exactly what Growth introduces", () => {
+    // Market Updates moved to Scale-only bundling in the tiered-entitlement
+    // rollout — Growth reaches it through the add-on, not the tier.
     const added = MODULES.filter(
       (m) => m.includedIn.includes("growth") && !m.includedIn.includes("launch"),
     ).map((m) => m.slug);
     expect(added.sort()).toEqual(
-      ["cashflow-comparisons", "deal-pipeline", "market-updates", "report-comparisons"].sort(),
+      ["cashflow-comparisons", "deal-pipeline", "report-comparisons"].sort(),
     );
+  });
+
+  it("bundles Market Updates into Scale only", () => {
+    expect(moduleBySlug("market-updates")!.includedIn).toEqual(["scale"]);
   });
 
   it("keeps AML/CTF an add-on on every tier — it is what the gap is made of", () => {

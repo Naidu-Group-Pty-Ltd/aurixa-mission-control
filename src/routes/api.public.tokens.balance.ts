@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ensureTenant, jsonResponse, resolveCloneApiKey } from "@/server/clone-api-keys.server";
 import { checkRateLimit } from "@/server/token-rate-limit.server";
 import { EXPIRY_WARNING_DAYS, TOKEN_EXPIRY_DAYS } from "@/server/token-lots.server";
+import { AML_MODULE_SLUG, TIER_INCLUDES_AML, tierBySlug } from "@/lib/pricing/aurixa-catalog";
 
 export const Route = createFileRoute("/api/public/tokens/balance")({
   server: {
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/api/public/tokens/balance")({
           supabaseAdmin
             .from("tenants")
             .select(
-              "id, external_ref, display_name, status, current_period_end, billing_exempt, billing_plans:plan_id(slug, name, monthly_allowance, overage_policy)",
+              "id, external_ref, display_name, status, current_period_end, billing_exempt, metadata, billing_plans:plan_id(slug, name, monthly_allowance, overage_policy)",
             )
             .eq("id", tenant.tenantId)
             .maybeSingle(),
@@ -102,6 +103,32 @@ export const Route = createFileRoute("/api/public/tokens/balance")({
           ].sort();
         } catch (err) {
           console.warn("[tokens/balance] add-on entitlements unavailable", err);
+        }
+
+        // AML/CTF is entitled by the purchased SKU, never by tier membership.
+        // Every tier's headline SKU — the one Stripe charges — includes the
+        // module (TIER_INCLUDES_AML), so a tenant on a known tier is entitled
+        // unless a without-AML SKU is recorded. Stating it HERE makes this
+        // response the authoritative answer; clones no longer have to assume.
+        // A future without-AML SKU sets tenants.metadata.aml_excluded and
+        // this stops adding the slug.
+        try {
+          const planSlug = (ten.data as { billing_plans?: { slug?: string | null } | null } | null)
+            ?.billing_plans?.slug;
+          const amlExcluded = Boolean(
+            (ten.data as { metadata?: Record<string, unknown> | null } | null)?.metadata?.aml_excluded,
+          );
+          if (
+            TIER_INCLUDES_AML &&
+            !amlExcluded &&
+            planSlug &&
+            tierBySlug(planSlug) &&
+            !addonSlugs.includes(AML_MODULE_SLUG)
+          ) {
+            addonSlugs = [...addonSlugs, AML_MODULE_SLUG].sort();
+          }
+        } catch (err) {
+          console.warn("[tokens/balance] AML entitlement derivation failed", err);
         }
 
         return jsonResponse({
