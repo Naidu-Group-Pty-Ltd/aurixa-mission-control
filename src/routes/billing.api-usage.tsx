@@ -98,12 +98,59 @@ function ApiUsagePage() {
   });
   const rates = useQuery({ queryKey: ["api-provider-rates"], queryFn: () => ratesFn({}) });
 
-  const summary = overview.data?.ok ? overview.data.summary : null;
-  const tenants = (summary?.tenants ?? []) as Array<Record<string, unknown>>;
-  const providers = (summary?.providers ?? []) as Array<Record<string, unknown>>;
-  const charges = overview.data?.ok ? overview.data.charges : [];
-  const gaps = overview.data?.ok ? overview.data.gaps : [];
-  const canManage = overview.data?.ok ? overview.data.canManage : false;
+  // A page about money must never render "$0.00" because it failed to load.
+  //
+  // This is shape-based rather than a truthiness check, and that matters. A
+  // failing server function does not always reject: an auth failure resolves
+  // with the plain string "Unauthorized: No authorization header provided",
+  // which is truthy, has no `ok`, and sailed through every guard — so a
+  // signed-out session, or an operator without the role, saw a confident and
+  // fully rendered page of zeros. Anything that is not our `{ ok }` envelope
+  // is a failure, and on this page a failure has to look like one.
+  const settled = !overview.isPending && !overview.isFetching;
+  const envelope =
+    overview.data && typeof overview.data === "object" && "ok" in overview.data
+      ? (overview.data as {
+          ok: boolean;
+          error?: string;
+          period?: string;
+          summary?: Record<string, unknown>;
+          charges?: Array<Record<string, unknown>>;
+          gaps?: Array<{ secret_name: string; reason: string; count: number }>;
+          canManage?: boolean;
+        })
+      : null;
+  const loadError: string | null = overview.isError
+    ? ((overview.error as Error)?.message ?? "request failed")
+    : envelope?.ok === false
+      ? (envelope.error ??
+        "The usage query was rejected without a reason. This is usually an expired session or a missing operator role.")
+      : settled && !envelope
+        ? typeof overview.data === "string" && overview.data.length > 0
+          ? `${overview.data.slice(0, 300)} — usually an expired session or a missing operator role.`
+          : "The usage query returned no response. Sign in again, and check your role if it persists."
+        : null;
+
+  const summary = envelope?.ok ? (envelope.summary ?? null) : null;
+  // Memoised, not derived inline: `?? []` mints a new array on every render,
+  // which would make the useMemo deps below change every time and recompute
+  // the totals on a page that is meant to sit open.
+  const tenants = useMemo(
+    () => (summary?.tenants ?? []) as Array<Record<string, unknown>>,
+    [summary],
+  );
+  const providers = useMemo(
+    () => (summary?.providers ?? []) as Array<Record<string, unknown>>,
+    [summary],
+  );
+  const charges = envelope?.ok ? (envelope.charges ?? []) : [];
+  const gaps = envelope?.ok ? (envelope.gaps ?? []) : [];
+  const canManage = envelope?.ok ? Boolean(envelope.canManage) : false;
+  const notMigrated =
+    !!loadError &&
+    /does not exist|schema cache|could not find the function|relation .* does not exist/i.test(
+      loadError,
+    );
 
   const totals = useMemo(() => {
     let charge = 0;
@@ -126,7 +173,7 @@ function ApiUsagePage() {
 
   function exportTenants() {
     downloadCSV(
-      `api-usage-${overview.data?.period ?? "period"}.csv`,
+      `api-usage-${envelope?.period ?? "period"}.csv`,
       toCSV(
         tenants.map((t) => ({
           tenant: t.tenant_name,
@@ -166,37 +213,72 @@ function ApiUsagePage() {
         }
       />
 
-      {overview.data?.ok === false && (
+      {loadError && (
         <Card className="border-destructive">
-          <CardContent className="pt-6 text-sm text-destructive">{overview.data.error}</CardContent>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              {notMigrated ? "Metering schema not installed" : "Could not load usage"}
+            </CardTitle>
+            <CardDescription>
+              {notMigrated ? (
+                <>
+                  The API-usage tables and functions are missing from this database. Apply{" "}
+                  <code className="text-xs">
+                    supabase/migrations/20260807090000_api_usage_metering.sql
+                  </code>{" "}
+                  and reload. Until then nothing is being metered and piggybacked vendor spend is
+                  not recoverable — the figures below are not zero, they are unknown.
+                </>
+              ) : (
+                <>
+                  The figures below are <strong>not</strong> zero — they could not be read. Do not
+                  treat this page as evidence that nothing was spent.
+                </>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 font-mono text-xs text-muted-foreground">
+            {loadError}
+          </CardContent>
         </Card>
       )}
 
       <div className="grid gap-4 md:grid-cols-4">
+        {/* `unknown` rather than a formatted zero whenever the read failed or is
+            still in flight: on a billing page a confident "$0.00" is a claim,
+            and one we cannot make until the data is actually in. */}
         <StatCard
           icon={Coins}
           label="Billable this period"
-          value={formatMicros(totals.charge)}
-          hint={`${totals.events.toLocaleString()} call${totals.events === 1 ? "" : "s"} metered`}
+          value={loadError ? "—" : overview.isPending ? "…" : formatMicros(totals.charge)}
+          hint={
+            loadError
+              ? "Unknown — could not read the meter"
+              : `${totals.events.toLocaleString()} call${totals.events === 1 ? "" : "s"} metered`
+          }
+          tone={loadError ? "warning" : "default"}
         />
         <StatCard
           icon={TrendingUp}
           label="Our vendor cost"
-          value={formatMicros(totals.cost)}
-          hint={`Margin ${formatMicros(totals.margin)}`}
+          value={loadError ? "—" : overview.isPending ? "…" : formatMicros(totals.cost)}
+          hint={loadError ? "Unknown" : `Margin ${formatMicros(totals.margin)}`}
+          tone={loadError ? "warning" : "default"}
         />
         <StatCard
           icon={ShieldCheck}
           label="Covered by tenant keys"
-          value={byokTotal.toLocaleString()}
+          value={loadError ? "—" : byokTotal.toLocaleString()}
           hint="Units run on a workspace's own key — never charged"
+          tone={loadError ? "warning" : "default"}
         />
         <StatCard
           icon={AlertTriangle}
           label="Unbillable calls"
-          value={gaps.reduce((s, g) => s + g.count, 0).toLocaleString()}
+          value={loadError ? "—" : gaps.reduce((s, g) => s + g.count, 0).toLocaleString()}
           hint="Uncatalogued or unattributable — spend we cannot recover"
-          tone={gaps.length ? "warning" : "default"}
+          tone={loadError || gaps.length ? "warning" : "default"}
         />
       </div>
 
@@ -250,9 +332,15 @@ function ApiUsagePage() {
         <TabsContent value="tenants" className="mt-4">
           <Card>
             <CardContent className="pt-6">
-              {tenants.length === 0 ? (
+              {loadError ? (
                 <EmptyState
-                  icon={Coins}
+                  icon={<AlertTriangle />}
+                  title="Usage could not be read"
+                  description="This is not an empty period — the query failed. See the error above."
+                />
+              ) : tenants.length === 0 ? (
+                <EmptyState
+                  icon={<Coins />}
                   title="No metered usage this period"
                   description="Clones report API consumption on the usage:report scope. If a clone is live and this is empty, check that its Mission Control key carries that scope."
                 />
@@ -426,7 +514,7 @@ function ChargesTable({ charges, canManage, onChanged }) {
       <Card>
         <CardContent className="pt-6">
           <EmptyState
-            icon={Receipt}
+            icon={<Receipt />}
             title="Nothing settled yet"
             description="Periods close once they end. The nightly sweep closes them and adds what is owed to the tenant's next Stripe invoice."
           />
@@ -504,7 +592,6 @@ function RatesTable({ data, onChanged }) {
   const upsertFn = useServerFn(upsertApiProviderRate);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const canManage = data?.ok ? data.canManage : false;
 
   async function save(secret: string, patch: Record<string, unknown>) {
     setBusy(secret);
@@ -518,12 +605,21 @@ function RatesTable({ data, onChanged }) {
     }
   }
 
-  if (!data?.ok) {
+  // Same rule as the overview: a non-envelope response (a 401 resolves as a
+  // bare string) must not be mistaken for "still loading" forever.
+  const envelope = data && typeof data === "object" && "ok" in data ? data : null;
+  const canManage = Boolean(envelope?.ok && envelope.canManage);
+  if (!envelope?.ok) {
+    const message =
+      envelope?.error ??
+      (typeof data === "string" && data.length > 0
+        ? data.slice(0, 300)
+        : data === undefined
+          ? "Loading…"
+          : "The rate catalog could not be read — check your session and operator role.");
     return (
       <Card>
-        <CardContent className="pt-6 text-sm text-muted-foreground">
-          {data?.error ?? "Loading…"}
-        </CardContent>
+        <CardContent className="pt-6 text-sm text-muted-foreground">{message}</CardContent>
       </Card>
     );
   }
@@ -557,7 +653,7 @@ function RatesTable({ data, onChanged }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.rates.map((r) => (
+            {envelope.rates.map((r) => (
               <TableRow key={r.secret_name} className={r.is_active ? undefined : "opacity-50"}>
                 <TableCell>
                   <div className="font-medium">{r.display_name}</div>
