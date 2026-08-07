@@ -32,7 +32,7 @@ export const Route = createFileRoute("/hooks/api-usage-settle")({
           // vendors and no way to recover it — that needs a person, not a log line.
           if (result.failed > 0) {
             await supabaseAdmin.from("notifications").insert({
-              kind: "api_usage_settlement_failed",
+              kind: "api_usage_settlement_failed" as never,
               severity: "warning",
               title: `API usage settlement: ${result.failed} charge(s) could not be billed`,
               body: result.errors

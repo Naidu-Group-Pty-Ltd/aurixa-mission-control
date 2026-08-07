@@ -113,6 +113,377 @@ export type Database = {
         }
         Relationships: []
       }
+      api_provider_rates: {
+        Row: {
+          category: string
+          cost_micros_per_unit: number
+          created_at: string
+          currency: string
+          display_name: string
+          id: string
+          included_free_units: number
+          is_active: boolean
+          is_billable: boolean
+          notes: string | null
+          provider: string
+          resale_micros_per_unit: number
+          secret_name: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          cost_micros_per_unit?: number
+          created_at?: string
+          currency?: string
+          display_name: string
+          id?: string
+          included_free_units?: number
+          is_active?: boolean
+          is_billable?: boolean
+          notes?: string | null
+          provider: string
+          resale_micros_per_unit?: number
+          secret_name: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          cost_micros_per_unit?: number
+          created_at?: string
+          currency?: string
+          display_name?: string
+          id?: string
+          included_free_units?: number
+          is_active?: boolean
+          is_billable?: boolean
+          notes?: string | null
+          provider?: string
+          resale_micros_per_unit?: number
+          secret_name?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_usage_charge_lines: {
+        Row: {
+          amount_micros: number
+          billable_quantity: number
+          byok_quantity: number
+          charge_id: string
+          charged_quantity: number
+          display_name: string
+          free_units_applied: number
+          id: string
+          provider: string
+          rate_micros_per_unit: number
+          secret_name: string
+          unit: string
+        }
+        Insert: {
+          amount_micros?: number
+          billable_quantity?: number
+          byok_quantity?: number
+          charge_id: string
+          charged_quantity?: number
+          display_name: string
+          free_units_applied?: number
+          id?: string
+          provider: string
+          rate_micros_per_unit?: number
+          secret_name: string
+          unit: string
+        }
+        Update: {
+          amount_micros?: number
+          billable_quantity?: number
+          byok_quantity?: number
+          charge_id?: string
+          charged_quantity?: number
+          display_name?: string
+          free_units_applied?: number
+          id?: string
+          provider?: string
+          rate_micros_per_unit?: number
+          secret_name?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_charge_lines_charge_id_fkey"
+            columns: ["charge_id"]
+            isOneToOne: false
+            referencedRelation: "api_usage_charges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_usage_charges: {
+        Row: {
+          amount_cents: number
+          amount_micros: number
+          clone_id: string | null
+          closed_at: string | null
+          cost_micros: number
+          created_at: string
+          currency: string
+          id: string
+          invoiced_at: string | null
+          last_error: string | null
+          metadata: Json
+          period_end: string
+          period_start: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_invoice_item_id: string | null
+          tenant_id: string
+          updated_at: string
+          waived_by: string | null
+          waived_reason: string | null
+        }
+        Insert: {
+          amount_cents?: number
+          amount_micros?: number
+          clone_id?: string | null
+          closed_at?: string | null
+          cost_micros?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          invoiced_at?: string | null
+          last_error?: string | null
+          metadata?: Json
+          period_end: string
+          period_start: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_invoice_item_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          waived_by?: string | null
+          waived_reason?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          amount_micros?: number
+          clone_id?: string | null
+          closed_at?: string | null
+          cost_micros?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          invoiced_at?: string | null
+          last_error?: string | null
+          metadata?: Json
+          period_end?: string
+          period_start?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_invoice_item_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          waived_by?: string | null
+          waived_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_charges_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_usage_charges_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "api_usage_charges_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_usage_events: {
+        Row: {
+          billable: boolean
+          billing_reason: string
+          call_status: string
+          clone_id: string | null
+          cost_micros: number
+          created_at: string
+          currency: string
+          feature: string | null
+          id: string
+          idempotency_key: string
+          metadata: Json
+          model: string | null
+          occurred_at: string
+          period_start: string
+          provider: string
+          quantity: number
+          rated_micros: number
+          secret_name: string
+          tenant_id: string
+          unit: string
+        }
+        Insert: {
+          billable?: boolean
+          billing_reason: string
+          call_status?: string
+          clone_id?: string | null
+          cost_micros?: number
+          created_at?: string
+          currency?: string
+          feature?: string | null
+          id?: string
+          idempotency_key: string
+          metadata?: Json
+          model?: string | null
+          occurred_at?: string
+          period_start: string
+          provider: string
+          quantity?: number
+          rated_micros?: number
+          secret_name: string
+          tenant_id: string
+          unit: string
+        }
+        Update: {
+          billable?: boolean
+          billing_reason?: string
+          call_status?: string
+          clone_id?: string | null
+          cost_micros?: number
+          created_at?: string
+          currency?: string
+          feature?: string | null
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          model?: string | null
+          occurred_at?: string
+          period_start?: string
+          provider?: string
+          quantity?: number
+          rated_micros?: number
+          secret_name?: string
+          tenant_id?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_events_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_usage_events_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "api_usage_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_usage_rollups: {
+        Row: {
+          billable_quantity: number
+          byok_quantity: number
+          clone_id: string | null
+          cost_micros: number
+          currency: string
+          error_count: number
+          event_count: number
+          first_seen_at: string
+          gross_charge_micros: number
+          gross_quantity: number
+          id: string
+          last_seen_at: string
+          period_start: string
+          provider: string
+          secret_name: string
+          tenant_id: string
+          unit: string
+        }
+        Insert: {
+          billable_quantity?: number
+          byok_quantity?: number
+          clone_id?: string | null
+          cost_micros?: number
+          currency?: string
+          error_count?: number
+          event_count?: number
+          first_seen_at?: string
+          gross_charge_micros?: number
+          gross_quantity?: number
+          id?: string
+          last_seen_at?: string
+          period_start: string
+          provider: string
+          secret_name: string
+          tenant_id: string
+          unit: string
+        }
+        Update: {
+          billable_quantity?: number
+          byok_quantity?: number
+          clone_id?: string | null
+          cost_micros?: number
+          currency?: string
+          error_count?: number
+          event_count?: number
+          first_seen_at?: string
+          gross_charge_micros?: number
+          gross_quantity?: number
+          id?: string
+          last_seen_at?: string
+          period_start?: string
+          provider?: string
+          secret_name?: string
+          tenant_id?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_rollups_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_usage_rollups_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "api_usage_rollups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -8611,6 +8982,14 @@ export type Database = {
         }
         Returns: Json
       }
+      api_usage_fleet_summary: {
+        Args: { _period_start?: string }
+        Returns: Json
+      }
+      api_usage_tenant_summary: {
+        Args: { _period_start?: string; _tenant_id: string }
+        Returns: Json
+      }
       apply_seat_plan_change: {
         Args: { _plan_slug: string; _source_ref: string; _tenant_id: string }
         Returns: Json
@@ -8653,6 +9032,10 @@ export type Database = {
         Returns: boolean
       }
       clone_requires_backend: { Args: { _clone_id: string }; Returns: boolean }
+      close_api_usage_period: {
+        Args: { _period_start: string; _tenant_id: string }
+        Returns: Json
+      }
       codex_fleet_overview: {
         Args: never
         Returns: {
@@ -8735,6 +9118,7 @@ export type Database = {
         Returns: undefined
       }
       prune_repo_blob_analysis: { Args: never; Returns: number }
+      purge_api_usage_events: { Args: never; Returns: Json }
       purge_log_tables: {
         Args: never
         Returns: {
@@ -8750,6 +9134,21 @@ export type Database = {
       recompute_token_balance: {
         Args: { _tenant_id: string }
         Returns: undefined
+      }
+      record_api_usage_event: {
+        Args: {
+          _call_status?: string
+          _clone_id: string
+          _feature?: string
+          _idempotency_key: string
+          _metadata?: Json
+          _model?: string
+          _occurred_at?: string
+          _quantity: number
+          _secret_name: string
+          _tenant_id: string
+        }
+        Returns: Json
       }
       refresh_token_balance: {
         Args: { _max_age_seconds?: number; _tenant_id: string }
@@ -8812,6 +9211,10 @@ export type Database = {
           _ttl_seconds?: number
         }
         Returns: Json
+      }
+      resolve_api_key_billability: {
+        Args: { _clone_id: string; _secret_name: string }
+        Returns: string
       }
       revoke_scheduled_keys: { Args: never; Returns: Json }
       role_level: {
