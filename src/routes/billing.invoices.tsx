@@ -8,6 +8,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -15,6 +16,8 @@ import {
   CreditCard,
   ExternalLink,
   FileText,
+  Loader2,
+  Moon,
   ReceiptText,
 } from "lucide-react";
 
@@ -39,7 +42,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listInvoices, listPaymentMethodsAdmin } from "@/lib/invoices.functions";
+import {
+  listInvoices,
+  listPaymentMethodsAdmin,
+  renderDarkInvoicePdf,
+} from "@/lib/invoices.functions";
 import { useClones } from "@/lib/queries";
 
 const ALL = "__all__";
@@ -83,12 +90,44 @@ function InvoicesPage() {
 
   const listFn = useServerFn(listInvoices);
   const walletFn = useServerFn(listPaymentMethodsAdmin);
+  const darkPdfFn = useServerFn(renderDarkInvoicePdf);
   const { data: clones } = useClones();
 
   const [cloneId, setCloneId] = useState<string>(cloneParam ?? ALL);
   const [status, setStatus] = useState<string>(ALL);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  /** Which row is currently rendering, so its button can spin. */
+  const [darkPdfFor, setDarkPdfFor] = useState<string | null>(null);
+
+  /**
+   * Fetch the Aurixa dark tax invoice and hand it to the browser.
+   *
+   * Server fns speak JSON, so the PDF arrives base64-encoded and is turned
+   * back into bytes here. The object URL is revoked on the next tick — leaving
+   * it alive pins the whole document in memory for the life of the tab.
+   */
+  const downloadDarkPdf = async (stripeInvoiceId: string) => {
+    setDarkPdfFor(stripeInvoiceId);
+    try {
+      const result = await darkPdfFn({ data: { stripeInvoiceId } });
+      if (!result?.ok) {
+        toast.error(`Could not render the invoice: ${result?.error ?? "unknown error"}`);
+        return;
+      }
+      const bytes = Uint8Array.from(atob(result.base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDarkPdfFor(null);
+    }
+  };
 
   const filters = useMemo(
     () => ({
@@ -300,10 +339,30 @@ function InvoicesPage() {
                               href={r.invoice_pdf_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title="Invoice PDF"
+                              title="Stripe invoice PDF (white)"
                             >
                               <FileText className="h-3.5 w-3.5" />
                             </a>
+                          </Button>
+                        )}
+                        {/* The Aurixa-rendered dark tax invoice. Offered beside
+                            Stripe's, never instead of it: Stripe's PDF is the
+                            system of record, this is the branded presentation
+                            of the same figures. */}
+                        {r.stripe_invoice_id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Aurixa tax invoice (dark)"
+                            disabled={darkPdfFor === r.stripe_invoice_id}
+                            onClick={() => void downloadDarkPdf(r.stripe_invoice_id)}
+                          >
+                            {darkPdfFor === r.stripe_invoice_id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Moon className="h-3.5 w-3.5" />
+                            )}
                           </Button>
                         )}
                       </div>

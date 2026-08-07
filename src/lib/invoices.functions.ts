@@ -5,6 +5,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireOperator } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { invoicePdfFilename, renderStripeInvoicePdf } from "@/server/invoice-pdf.server";
+import { buildInvoiceDocument } from "@/lib/brand/invoiceDocument.pure";
 
 const adminAny = supabaseAdmin as any;
 
@@ -102,4 +104,44 @@ export const listPaymentMethodsAdmin = createServerFn({ method: "POST" })
       tenants: undefined,
     }));
     return { ok: true as const, paymentMethods };
+  });
+
+/**
+ * The dark Aurixa tax invoice for one mirrored invoice, base64-encoded.
+ *
+ * Base64 rather than a streamed response because server fns speak JSON; the
+ * operator UI turns it back into a Blob. Invoices are one page, so the ~1.3x
+ * encoding cost is measured in kilobytes.
+ *
+ * Stripe's own white PDF is still on the row as `invoice_pdf_url` and is still
+ * the system of record — this is the branded presentation of the same figures.
+ */
+export const renderDarkInvoicePdf = createServerFn({ method: "POST" })
+  .middleware([requireOperator])
+  .inputValidator((input) => z.object({ stripeInvoiceId: z.string().min(3).max(120) }).parse(input))
+  .handler(async ({ data }) => {
+    // Through the mirror, not straight to Stripe: an operator id typed into
+    // this endpoint should only ever resolve to an invoice this deployment
+    // actually knows about.
+    const { data: row } = await adminAny
+      .from("invoices")
+      .select("stripe_invoice_id, number")
+      .eq("stripe_invoice_id", data.stripeInvoiceId)
+      .maybeSingle();
+    if (!row) return { ok: false as const, error: "invoice_not_found" };
+
+    try {
+      const pdf = await renderStripeInvoicePdf(data.stripeInvoiceId);
+      let binary = "";
+      for (const byte of pdf) binary += String.fromCharCode(byte);
+      return {
+        ok: true as const,
+        filename: invoicePdfFilename(
+          buildInvoiceDocument({ number: row.number, id: data.stripeInvoiceId, total: 0 }),
+        ),
+        base64: btoa(binary),
+      };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+    }
   });

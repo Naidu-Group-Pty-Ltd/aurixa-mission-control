@@ -59,6 +59,58 @@ the same two values are set there as well. Both are covered by an
 API version will not take them, the invoice is still issued and the sale still
 completes.
 
+## The dark tax invoice PDF
+
+Stripe's invoice PDF **cannot** be made dark. `secondary_color` — the field that
+paints backgrounds everywhere else — is documented as not applying to PDFs, and
+invoice rendering templates, the other lever, carry only the memo, the footer,
+custom fields and line-item grouping. There is no colour or layout control.
+
+So the dark invoice is a document Mission Control renders:
+
+| File                                              | Role                                                   |
+| ------------------------------------------------- | ------------------------------------------------------ |
+| `src/lib/brand/invoiceDocument.pure.ts`           | Stripe invoice → printable model. Pure, 15 tests.      |
+| `src/server/invoice-pdf.server.ts`                | Model → A4 PDF on the `base950` ground, via `pdf-lib`. |
+| `src/routes/api.public.billing.invoice-pdf.ts`    | Clone-key-scoped download for command centres.         |
+| `renderDarkInvoicePdf` in `invoices.functions.ts` | Operator download, wired into Billing → Invoices.      |
+
+**It is offered beside Stripe's PDF, never instead of it.** Stripe's remains the
+system of record and `invoice_pdf_url` still points at it.
+
+Two PDFs for one transaction is a real hazard: the moment they can disagree
+about a number, one is wrong and nobody knows which. Three things make it safe:
+
+1. **Nothing is computed.** Every amount is copied from the Stripe invoice, and
+   a total Stripe did not send is _omitted_ rather than derived — including the
+   ex-GST line, which is `total_excluding_tax` when Stripe provides it and
+   simply absent when it does not. `total − tax` is right almost always, and
+   "almost always" is the wrong standard for a tax invoice. A test asserts it
+   does not quietly reappear.
+2. **It reads live from Stripe**, not from the `invoices` mirror. The mirror
+   carries totals but no line items and no billing address; a tax invoice
+   assembled from a partial copy is the exact divergence this is avoiding. The
+   mirror's job here is authorisation — it is what scopes a clone API key to its
+   own invoices, and going to Stripe first would render any invoice on the
+   account to anyone holding any key.
+3. **The page names its source.** Every render carries "Restates Stripe invoice
+   `in_…`; figures as issued by Stripe; nothing on this page is recalculated."
+
+Smaller choices: dates are formatted in `Australia/Sydney`, because an invoice
+issued from Kellyville is dated locally and a Worker's UTC clock would date some
+of them a day early (this is deliberately _not_ the Stripe account's
+Asia/Kuala_Lumpur dashboard timezone, which governs reporting only). The type is
+Helvetica, not Inter — one of the PDF standard 14, so no font bytes ride in the
+Worker bundle for every request that is not a PDF. The lockup is the
+**transparent** variant, not the tile Stripe gets: this page's ground is ours,
+and the opaque tile would leave a visible box edge where its glow stops.
+
+Preview it without issuing anything:
+
+```
+bun run scripts/render-invoice-pdf-preview.ts [out.pdf]
+```
+
 ## `include_inclusive_tax` is not cosmetic
 
 Every Aurixa price is tax-**inclusive** — GST is contained in the figure, not
