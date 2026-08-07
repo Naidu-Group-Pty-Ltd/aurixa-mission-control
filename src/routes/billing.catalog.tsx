@@ -21,6 +21,7 @@ import { listPricingCatalog } from "@/lib/pricing-catalog.functions";
 import { createStripeCheckout } from "@/lib/stripe.functions";
 import { EmptyState } from "@/components/empty-state";
 import { ReportCostIndexCard } from "@/components/billing/report-cost-index-card";
+import { BrandSyncCard } from "@/components/billing/brand-sync-card";
 import { CatalogSyncCard } from "@/components/billing/catalog-sync-card";
 import { PackSyncCard } from "@/components/billing/pack-sync-card";
 import { ModuleSyncCard } from "@/components/billing/module-sync-card";
@@ -293,6 +294,7 @@ function CatalogPage() {
               Credits deducted per generated report. Clones meter these via the token reservation
               API.
             </p>
+            <BrandSyncCard />
             <CatalogSyncCard />
             <PackSyncCard />
             <ModuleSyncCard />

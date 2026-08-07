@@ -15,6 +15,7 @@ import {
   recordPurchaseInitiated,
 } from "@/server/purchases.server";
 import { intentAllows } from "@/server/billing-handoffs.server";
+import { AURIXA_INVOICE_FOOTER, AURIXA_INVOICE_RENDERING } from "@/lib/brand/aurixa-brand";
 import { countActivePaymentMethods, MAX_PAYMENT_METHODS } from "@/server/payment-methods.server";
 import {
   contactFromHandoffRow,
@@ -100,6 +101,15 @@ export async function ensureStripeCustomer(
     // then sees their own email already filled in on Stripe's page.
     ...(contact.email ? { email: contact.email } : {}),
     ...(contact.phone ? { phone: contact.phone } : {}),
+    // Carried on the Customer so that SUBSCRIPTION invoices get it too: Stripe
+    // mints those on the renewal cycle with no request of ours to attach
+    // settings to, and inherits them from here. `include_inclusive_tax` is not
+    // cosmetic — every Aurixa price is tax-inclusive, and the default display
+    // would print line items ex-GST and disagree with what was quoted.
+    invoice_settings: {
+      footer: AURIXA_INVOICE_FOOTER,
+      rendering_options: { ...AURIXA_INVOICE_RENDERING },
+    },
     metadata: {
       tenant_id: tenantId,
       external_ref: tenant.external_ref ?? "",
@@ -276,7 +286,19 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
             metadata: sharedMeta,
             ...(receiptEmail ? { receipt_email: receiptEmail } : {}),
           },
-          invoice_creation: { enabled: true, invoice_data: { metadata: sharedMeta } },
+          // The one-off invoice Stripe issues for this payment. The footer and
+          // tax display are set here as well as on the Customer because a
+          // one-off invoice is created from THIS request: it does not inherit
+          // the Customer's invoice_settings the way a subscription cycle
+          // invoice does.
+          invoice_creation: {
+            enabled: true,
+            invoice_data: {
+              metadata: sharedMeta,
+              footer: AURIXA_INVOICE_FOOTER,
+              rendering_options: { ...AURIXA_INVOICE_RENDERING },
+            },
+          },
         }),
   };
 
@@ -310,6 +332,21 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
       label: "tax_id_collection",
       matches: /tax_id_collection|tax id/i,
       apply: (p) => ({ ...p, tax_id_collection: { enabled: false } }),
+    },
+    {
+      // Branding on the invoice is presentation. If an account or API version
+      // will not take the footer or the tax display, the invoice is still
+      // issued and the sale still completes — plainer, but issued.
+      label: "invoice_presentation",
+      matches: /rendering_options|amount_tax_display|footer/i,
+      apply: (p) => {
+        const inv = (p as Record<string, unknown>).invoice_creation as
+          | { enabled: boolean; invoice_data?: Record<string, unknown> }
+          | undefined;
+        if (!inv?.invoice_data) return p;
+        const { footer: _f, rendering_options: _r, ...keep } = inv.invoice_data;
+        return { ...p, invoice_creation: { ...inv, invoice_data: keep } } as typeof p;
+      },
     },
   ];
 
