@@ -145,9 +145,42 @@ Charges under `MIN_INVOICEABLE_CENTS` (50c) close, are marked invoiced with
 `below_threshold`, and never reach Stripe: reconciling them costs more than they
 collect.
 
-A **Stripe invoice item** is the primitive, not a separate payment. It rides on
-the tenant's next subscription invoice as an extra line, which is what "an
-additional charge for API key usage" means on a statement.
+### An invoice item is not a bill
+
+A Stripe **invoice item** is a pending line waiting for an invoice to attach
+itself to. Stripe attaches pending items on its own **only** when a subscription
+cycle renews. So a settled charge needs one of two treatments, and picking wrong
+is silent — an orphaned invoice item never errors, it just never gets collected:
+
+| tenant | what happens | why |
+|---|---|---|
+| has a live subscription | item left pending | it rides the next cycle invoice as an extra line, which is what "an additional charge for API key usage" should look like on a statement. Raising our own as well would bill the same usage twice |
+| no subscription | standalone invoice raised **and finalised** | no cycle will ever sweep the item up |
+
+The second case is the normal one today, not an edge case: the Aurixa Stripe
+account has no subscriptions at all. `planCollection()` in
+`src/lib/api-usage-rating.ts` owns the decision and is unit-tested, because the
+three outcomes are "billed once", "billed twice" and "never billed".
+
+**Finalising** is what turns a draft into a bill — it assigns the invoice
+number, mints the hosted page and the PDF, and lets Stripe collect. The invoice
+is created with `auto_advance: false` and finalised as a separate explicit step,
+so it cannot be emailed before its lines are confirmed, and with
+`pending_invoice_items_behavior: "include"` so the item we just created is
+actually swept onto it — without that, Stripe raises an empty invoice and leaves
+the item pending, which is the exact failure this is here to prevent.
+
+### Receipts
+
+Receipts are never created — not here, not anywhere. Stripe emits them itself
+when a payment succeeds, if receipt emails are enabled on the account. There is
+no API that makes one, and nothing in this repo should try. The checkout path
+already passes `receipt_email` and enables `invoice_creation`, so a product
+purchase produces both an invoice and a receipt without any help from us.
+
+`api_usage_uncollected_charges()` lists charges that reached an invoice item but
+no invoice after a full cycle plus slack. Empty is the healthy state; anything
+in it is correctly-metered revenue that is not being collected.
 
 Waiving a charge never edits the meter. Events and rollups stay exactly as
 reported; the waiver is recorded with who and why, so a written-off month still

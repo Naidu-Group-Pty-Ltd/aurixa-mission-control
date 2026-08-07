@@ -6,6 +6,7 @@ import {
   microsToCents,
   settleLines,
   normalizeEvent,
+  planCollection,
   MAX_QUANTITY,
   MAX_BACKDATE_DAYS,
   type RollupLine,
@@ -255,5 +256,51 @@ describe("normalizeEvent", () => {
     const r = normalizeEvent({ ...ok, status: "error" }, now);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.event.status).toBe("error");
+  });
+});
+
+describe("planCollection", () => {
+  const base = {
+    amountCents: 500,
+    minInvoiceableCents: 50,
+    hasCustomer: true,
+    subscription: { activeCount: 0 },
+  };
+
+  it("raises an invoice when no subscription cycle will ever sweep the item up", () => {
+    // The Aurixa account has zero subscriptions, so this is the normal path,
+    // not the edge case. Without it every settled charge is orphaned.
+    const plan = planCollection(base);
+    expect(plan.action).toBe("raise_invoice");
+  });
+
+  it("waits for the cycle when the customer has a live subscription", () => {
+    // Raising our own invoice here would bill the same usage twice: Stripe
+    // already sweeps pending items onto the next renewal.
+    const plan = planCollection({ ...base, subscription: { activeCount: 1 } });
+    expect(plan.action).toBe("await_cycle");
+  });
+
+  it("skips when there is no customer to bill", () => {
+    const plan = planCollection({ ...base, hasCustomer: false });
+    expect(plan).toEqual({ action: "skip", reason: "no_stripe_customer" });
+  });
+
+  it("skips a charge worth less than it costs to reconcile", () => {
+    expect(planCollection({ ...base, amountCents: 12 }).action).toBe("skip");
+    expect(planCollection({ ...base, amountCents: 50 }).action).toBe("raise_invoice");
+  });
+
+  it("skips a zero charge rather than raising an empty invoice", () => {
+    expect(planCollection({ ...base, amountCents: 0 })).toEqual({
+      action: "skip",
+      reason: "nothing_owed",
+    });
+  });
+
+  it("checks the customer before the amount, so a missing customer is never hidden by a small bill", () => {
+    // Both are wrong, but only one is an operator problem worth surfacing.
+    const plan = planCollection({ ...base, hasCustomer: false, amountCents: 1 });
+    expect(plan.reason).toBe("no_stripe_customer");
   });
 });

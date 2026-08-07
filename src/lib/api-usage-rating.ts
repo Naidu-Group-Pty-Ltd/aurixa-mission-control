@@ -286,3 +286,60 @@ export function normalizeEvent(raw: unknown, now = new Date()): NormalizeResult 
     },
   };
 }
+
+// ─── Collecting a settled charge ─────────────────────────────────────────────
+//
+// A Stripe *invoice item* is not a bill. It is a pending line waiting for an
+// invoice to attach itself to, and Stripe only attaches pending items on its
+// own when a subscription cycle renews. So the same charge needs two different
+// treatments depending on the customer, and getting it wrong is silent: an
+// orphaned invoice item never errors, it just never gets collected.
+
+export type CollectionPlan =
+  /** The customer has a live subscription — the item rides its next cycle
+   *  invoice. Raising our own would bill them twice for the same period. */
+  | { action: "await_cycle"; reason: string }
+  /** No cycle will ever sweep this up, so we raise and finalise an invoice. */
+  | { action: "raise_invoice"; reason: string }
+  /** Nothing worth collecting, or nothing to collect it against. */
+  | { action: "skip"; reason: string };
+
+export type SubscriptionState = {
+  /** Subscriptions in a state that still produces invoices. */
+  activeCount: number;
+  /** When the next cycle invoice is due, if known. */
+  nextCycleAt?: string | null;
+};
+
+/**
+ * Decide how a settled charge actually reaches a bill.
+ *
+ * Pure because it is the difference between billing a customer once, twice, or
+ * never, and none of those are things to discover in production.
+ */
+export function planCollection(args: {
+  amountCents: number;
+  minInvoiceableCents: number;
+  hasCustomer: boolean;
+  subscription: SubscriptionState;
+  /** Days after which waiting for a cycle that never comes is a lost charge. */
+  ageDays?: number;
+}): CollectionPlan {
+  if (!args.hasCustomer) {
+    return { action: "skip", reason: "no_stripe_customer" };
+  }
+  if (args.amountCents <= 0) {
+    return { action: "skip", reason: "nothing_owed" };
+  }
+  if (args.amountCents < args.minInvoiceableCents) {
+    // Reconciling a 12c invoice costs more than it collects.
+    return { action: "skip", reason: "below_threshold" };
+  }
+  if (args.subscription.activeCount > 0) {
+    return {
+      action: "await_cycle",
+      reason: "pending_item_rides_subscription_invoice",
+    };
+  }
+  return { action: "raise_invoice", reason: "no_subscription_to_ride" };
+}

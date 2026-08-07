@@ -9,17 +9,37 @@
  *      closed period returns it untouched rather than charging twice.
  *
  *   2. INVOICE — push the closed amount to Stripe as an *invoice item* on the
- *      tenant's customer. An invoice item is the right primitive: it rides on
- *      the tenant's next subscription invoice as an additional line rather than
- *      minting a separate payment, which is exactly what "an extra charge for
- *      API key usage" means on a statement.
+ *      tenant's customer, then make sure that item actually reaches a bill.
  *
  * Splitting them means a Stripe outage cannot corrupt the billing record, and a
  * disputed charge can be waived after close without unwinding the meter.
+ *
+ * ON STEP 2, AND WHY IT IS NOT JUST AN INVOICE ITEM
+ * ------------------------------------------------
+ * An invoice item is not a bill. It is a pending line waiting for an invoice to
+ * attach itself to, and Stripe only attaches pending items on its own when a
+ * subscription cycle renews. So the same charge needs two different treatments:
+ *
+ *   • Tenant WITH a live subscription — leave the item pending. It rides the
+ *     next cycle invoice as an extra line, which is exactly what "an additional
+ *     charge for API key usage" should look like on a statement. Raising our
+ *     own invoice as well would bill the same usage twice.
+ *   • Tenant WITHOUT one — raise a standalone invoice and finalise it, because
+ *     no cycle will ever sweep the item up.
+ *
+ * The second case is the normal one today, not an edge case: the Aurixa Stripe
+ * account has no subscriptions at all, so before this every settled charge
+ * would have been metered, rated, converted to cents — and then never
+ * collected, with nothing anywhere reporting an error.
+ *
+ * Finalising is what turns a draft into a bill: it assigns the invoice number,
+ * mints the hosted page and the PDF, and lets Stripe collect and email the
+ * receipt. Receipts are never created here, or anywhere — Stripe emits them
+ * itself when a payment succeeds. There is no API that makes one.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
-import { formatMicros } from "@/lib/api-usage-rating";
+import { formatMicros, planCollection } from "@/lib/api-usage-rating";
 
 // The metering tables are newer than the generated DB types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,7 +143,14 @@ export async function findClosablePeriods(
 
 export type InvoiceResult =
   | { ok: true; skipped: true; reason: string }
-  | { ok: true; skipped: false; invoiceItemId: string; amountCents: number }
+  | {
+      ok: true;
+      skipped: false;
+      invoiceItemId: string;
+      /** The invoice raised to collect it, or null when it rides a subscription cycle. */
+      invoiceId: string | null;
+      amountCents: number;
+    }
   | { ok: false; error: string };
 
 /**
@@ -223,11 +250,74 @@ export async function invoiceClosedCharge(chargeId: string): Promise<InvoiceResu
       { idempotencyKey: `api-usage-charge-${chargeId}` },
     );
 
+    // An invoice item is NOT a bill. It is a pending line waiting for an
+    // invoice, and Stripe only attaches pending items on its own when a
+    // subscription cycle renews. A tenant with no subscription would otherwise
+    // have this metered, rated, settled — and then never collected, silently.
+    const subs = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 100,
+    });
+    const activeCount = subs.data.filter((s) =>
+      ["active", "trialing", "past_due", "unpaid"].includes(s.status),
+    ).length;
+
+    const plan = planCollection({
+      amountCents: row.amount_cents,
+      minInvoiceableCents: MIN_INVOICEABLE_CENTS,
+      hasCustomer: true,
+      subscription: { activeCount },
+    });
+
+    let invoiceId: string | null = null;
+    let finalizedAt: string | null = null;
+
+    if (plan.action === "raise_invoice") {
+      // `pending_invoice_items_behavior: "include"` is what sweeps the item we
+      // just created onto this invoice. Without it Stripe raises an empty
+      // invoice and leaves the item pending — the exact failure this is here
+      // to prevent.
+      const invoice = await stripe.invoices.create(
+        {
+          customer: customerId,
+          collection_method: "charge_automatically",
+          // Finalising is a separate, explicit step below, so the invoice
+          // cannot be emailed before its lines are confirmed.
+          auto_advance: false,
+          pending_invoice_items_behavior: "include",
+          description,
+          metadata: {
+            kind: "api_usage",
+            charge_id: chargeId,
+            tenant_id: row.tenant_id,
+            period_start: row.period_start,
+            period_end: row.period_end,
+          },
+        },
+        { idempotencyKey: `api-usage-invoice-${chargeId}` },
+      );
+
+      // Finalising is what turns a draft into a bill: it assigns the invoice
+      // number, mints the hosted page and the PDF, and lets Stripe collect and
+      // email a receipt on payment. A draft does none of that.
+      const finalized = await stripe.invoices.finalizeInvoice(
+        invoice.id as string,
+        { auto_advance: true },
+        { idempotencyKey: `api-usage-invoice-finalize-${chargeId}` },
+      );
+      invoiceId = finalized.id as string;
+      finalizedAt = new Date().toISOString();
+    }
+
     await adminAny
       .from("api_usage_charges")
       .update({
         status: "invoiced",
         stripe_invoice_item_id: item.id,
+        stripe_invoice_id: invoiceId,
+        invoice_mode: plan.action === "raise_invoice" ? "standalone" : "subscription_cycle",
+        invoice_finalized_at: finalizedAt,
         stripe_customer_id: customerId,
         invoiced_at: new Date().toISOString(),
         last_error: null,
@@ -241,13 +331,23 @@ export async function invoiceClosedCharge(chargeId: string): Promise<InvoiceResu
       metadata: {
         charge_id: chargeId,
         stripe_invoice_item_id: item.id,
+        stripe_invoice_id: invoiceId,
+        collection: plan.action,
+        collection_reason: plan.reason,
+        active_subscriptions: activeCount,
         amount_cents: row.amount_cents,
         currency: row.currency,
         period_start: row.period_start,
       },
     });
 
-    return { ok: true, skipped: false, invoiceItemId: item.id, amountCents: row.amount_cents };
+    return {
+      ok: true,
+      skipped: false,
+      invoiceItemId: item.id,
+      invoiceId,
+      amountCents: row.amount_cents,
+    };
   } catch (e) {
     const message = e instanceof Error ? e.message : "stripe_error";
     await adminAny
@@ -262,6 +362,9 @@ export type SweepResult = {
   closed: number;
   alreadyClosed: number;
   invoiced: number;
+  /** Of `invoiced`, how many needed a standalone invoice raised for them.
+   *  The rest are pending against a subscription cycle. */
+  invoicesRaised: number;
   skipped: number;
   failed: number;
   totalCents: number;
@@ -279,6 +382,7 @@ export async function sweepApiUsageSettlement(now = new Date()): Promise<SweepRe
     closed: 0,
     alreadyClosed: 0,
     invoiced: 0,
+    invoicesRaised: 0,
     skipped: 0,
     failed: 0,
     totalCents: 0,
@@ -305,6 +409,7 @@ export async function sweepApiUsageSettlement(now = new Date()): Promise<SweepRe
       out.skipped += 1;
     } else {
       out.invoiced += 1;
+      if (invoiced.invoiceId) out.invoicesRaised += 1;
       out.totalCents += invoiced.amountCents;
     }
   }
