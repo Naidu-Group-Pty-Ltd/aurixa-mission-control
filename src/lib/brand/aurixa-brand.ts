@@ -29,10 +29,15 @@
  * treatment entirely — the mistake is easy to make and invisible until a real
  * receipt lands in somebody's inbox.
  *
- * The invoice PDF is the one surface that stays light: it is a document meant
- * to be printed and filed, Stripe gives no control over its paper, and a
- * dark-flooded A4 page is a wasted cartridge. It picks up the brand colour and
- * the logo, which is what carries the identity there.
+ * Stripe's own invoice PDF is the one surface that stays light. Stripe gives no
+ * control over its paper — `secondary_color` is documented as not applying to
+ * PDFs at all, and invoice rendering templates carry only the memo, footer,
+ * custom fields and line grouping. It picks up the brand colour and the logo,
+ * and that is the whole of what can be done to it.
+ *
+ * A genuinely dark invoice is therefore a document we render ourselves:
+ * `invoiceDocument.pure.ts` and `server/invoice-pdf.server.ts`. It is offered
+ * beside Stripe's PDF, never instead of it.
  */
 
 /** The marketing site's `@theme` tokens, as literal hex. */
@@ -110,11 +115,29 @@ export const AURIXA_BRAND_ASSETS: Readonly<Record<BrandAssetKind, BrandAssetSpec
   },
 };
 
+/**
+ * The same lockup with no ground under it.
+ *
+ * Never uploaded to Stripe — it is the right source wherever we own the
+ * background, and the one place that is true is our own dark tax invoice PDF,
+ * where compositing the opaque tile onto the page would leave a visible box
+ * edge where the tile's glow stops.
+ */
+export const AURIXA_LOCKUP_TRANSPARENT: Omit<BrandAssetSpec, "purpose"> = {
+  kind: "logo",
+  path: "/brand/stripe/aurixa-stripe-logo-transparent.png",
+  width: 1600,
+  height: 604,
+};
+
 /** Where the assets are served from when nothing overrides it. */
 export const DEFAULT_BRAND_ASSET_ORIGIN = "https://aurixasystems.com.au";
 
 /** Absolute URL for a brand asset on a given origin. */
-export function brandAssetUrl(asset: BrandAssetSpec, origin = DEFAULT_BRAND_ASSET_ORIGIN): string {
+export function brandAssetUrl(
+  asset: Pick<BrandAssetSpec, "path">,
+  origin = DEFAULT_BRAND_ASSET_ORIGIN,
+): string {
   return `${origin.replace(/\/+$/, "")}${asset.path}`;
 }
 
