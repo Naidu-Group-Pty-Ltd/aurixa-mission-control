@@ -23,6 +23,7 @@
 import type Stripe from "stripe";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
+import { AURIXA_INVOICE_FOOTER, AURIXA_INVOICE_RENDERING } from "@/lib/brand/aurixa-brand";
 
 export type BillingContact = {
   email: string | null;
@@ -260,6 +261,32 @@ export async function syncStripeCustomerContact(
       update.name = orgName;
       result.applied.push("name");
     }
+  }
+
+  // Invoice presentation — the footer and the tax display on every invoice this
+  // Customer is ever sent, including subscription cycle invoices, which are
+  // minted by Stripe with no request of ours to hang settings off.
+  //
+  // Unlike the identity fields above, this is OUR copy rather than the buyer's,
+  // so it is kept CURRENT rather than seeded once: a workspace that bought
+  // before the branding cutover would otherwise carry a blank footer forever.
+  // Only these two sub-fields are sent — Stripe merges `invoice_settings`
+  // field by field, which is the same behaviour payment-methods.server.ts
+  // already relies on when it sets `default_payment_method` on its own.
+  const invoiceSettings = (current.invoice_settings ?? {}) as {
+    footer?: string | null;
+    rendering_options?: { amount_tax_display?: string | null } | null;
+  };
+  if (
+    invoiceSettings.footer !== AURIXA_INVOICE_FOOTER ||
+    invoiceSettings.rendering_options?.amount_tax_display !==
+      AURIXA_INVOICE_RENDERING.amount_tax_display
+  ) {
+    update.invoice_settings = {
+      footer: AURIXA_INVOICE_FOOTER,
+      rendering_options: { ...AURIXA_INVOICE_RENDERING },
+    };
+    result.applied.push("invoice_settings");
   }
 
   // Metadata always reflects the latest buyer — it is diagnostic, not billing.
