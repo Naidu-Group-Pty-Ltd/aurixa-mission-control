@@ -5,7 +5,16 @@
  */
 export type CloneApiScope = {
   value: string;
-  group: "tokens" | "seats" | "devices" | "pricing" | "billing" | "webhooks" | "edge" | "health";
+  group:
+    | "tokens"
+    | "seats"
+    | "devices"
+    | "pricing"
+    | "billing"
+    | "webhooks"
+    | "edge"
+    | "health"
+    | "usage";
   label: string;
   description: string;
   default?: boolean;
@@ -66,7 +75,27 @@ export const CLONE_API_SCOPES: CloneApiScope[] = [
     value: "edge:read",
     group: "edge",
     label: "Edge — read status",
-    description: "Read-only access to this clone's edge/CDN provider status, posture, and last sync.",
+    description:
+      "Read-only access to this clone's edge/CDN provider status, posture, and last sync.",
+    default: false,
+  },
+  {
+    value: "usage:report",
+    group: "usage",
+    label: "API usage — report",
+    description:
+      "Report third-party API consumption (AI tokens, emails, property lookups) made on keys forwarded from the prime, so piggybacked spend can be recharged. Keys the clone supplies itself are metered but never billed.",
+    // On by default: a clone provisioned with our forwarded vendor keys spends
+    // our money from its first request, and a key issued without this scope
+    // meters nothing at all — the gap is silent and unrecoverable.
+    default: true,
+  },
+  {
+    value: "usage:read",
+    group: "usage",
+    label: "API usage — read",
+    description:
+      "Read this clone's own API usage totals and current-period charge, so a workspace can show its operators what it is spending.",
     default: false,
   },
   {

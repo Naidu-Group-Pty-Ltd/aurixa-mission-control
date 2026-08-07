@@ -28,6 +28,7 @@ import {
   GitFork,
 
   Handshake,
+  KeyRound,
   LayoutDashboard,
   Newspaper,
   Palette,
@@ -243,6 +244,12 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Pricing Catalog",
         icon: Tags,
         keywords: "prices plans packs",
+      },
+      {
+        to: "/billing/api-usage",
+        label: "API Usage",
+        icon: KeyRound,
+        keywords: "api keys metering piggyback byok openai resend vendor spend recharge",
       },
       { to: "/billing/topup", label: "Top-up", icon: Coins, keywords: "tokens credits" },
     ],
