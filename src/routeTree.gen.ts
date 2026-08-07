@@ -77,6 +77,7 @@ import { Route as HooksCodexNightlyRouteImport } from './routes/hooks.codex-nigh
 import { Route as HooksCascadeDrainRouteImport } from './routes/hooks.cascade-drain'
 import { Route as HooksBrandDriftRouteImport } from './routes/hooks.brand-drift'
 import { Route as HooksBackendProvisioningDrainRouteImport } from './routes/hooks.backend-provisioning-drain'
+import { Route as HooksApiUsageSettleRouteImport } from './routes/hooks.api-usage-settle'
 import { Route as HooksAirtableSyncRouteImport } from './routes/hooks.airtable-sync'
 import { Route as HandoffsNewRouteImport } from './routes/handoffs.new'
 import { Route as HandoffsHandoffIdRouteImport } from './routes/handoffs.$handoffId'
@@ -94,12 +95,14 @@ import { Route as BillingPurchasesRouteImport } from './routes/billing.purchases
 import { Route as BillingInvoicesRouteImport } from './routes/billing.invoices'
 import { Route as BillingCatalogRouteImport } from './routes/billing.catalog'
 import { Route as BillingCancelRouteImport } from './routes/billing.cancel'
+import { Route as BillingApiUsageRouteImport } from './routes/billing.api-usage'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as CrmAccountsIndexRouteImport } from './routes/crm.accounts.index'
 import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.$accountId'
 import { Route as ClonesCloneIdSecretsRouteImport } from './routes/clones.$cloneId.secrets'
 import { Route as ClientsHandoffTokenRouteImport } from './routes/clients.handoff.$token'
 import { Route as ApiPublicPurchasesRouteImport } from './routes/api.public.purchases'
+import { Route as ApiPublicUsageReportRouteImport } from './routes/api.public.usage.report'
 import { Route as ApiPublicTokensReserveRouteImport } from './routes/api.public.tokens.reserve'
 import { Route as ApiPublicTokensPlanChangeRouteImport } from './routes/api.public.tokens.plan-change'
 import { Route as ApiPublicTokensPacksRouteImport } from './routes/api.public.tokens.packs'
@@ -488,6 +491,11 @@ const HooksBackendProvisioningDrainRoute =
     path: '/hooks/backend-provisioning-drain',
     getParentRoute: () => rootRouteImport,
   } as any)
+const HooksApiUsageSettleRoute = HooksApiUsageSettleRouteImport.update({
+  id: '/hooks/api-usage-settle',
+  path: '/hooks/api-usage-settle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HooksAirtableSyncRoute = HooksAirtableSyncRouteImport.update({
   id: '/hooks/airtable-sync',
   path: '/hooks/airtable-sync',
@@ -573,6 +581,11 @@ const BillingCancelRoute = BillingCancelRouteImport.update({
   path: '/billing/cancel',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BillingApiUsageRoute = BillingApiUsageRouteImport.update({
+  id: '/billing/api-usage',
+  path: '/billing/api-usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -601,6 +614,11 @@ const ClientsHandoffTokenRoute = ClientsHandoffTokenRouteImport.update({
 const ApiPublicPurchasesRoute = ApiPublicPurchasesRouteImport.update({
   id: '/api/public/purchases',
   path: '/api/public/purchases',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicUsageReportRoute = ApiPublicUsageReportRouteImport.update({
+  id: '/api/public/usage/report',
+  path: '/api/public/usage/report',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTokensReserveRoute = ApiPublicTokensReserveRouteImport.update({
@@ -863,6 +881,7 @@ export interface FileRoutesByFullPath {
   '/slo': typeof SloRoute
   '/yggdrasil': typeof YggdrasilRoute
   '/api/health': typeof ApiHealthRoute
+  '/billing/api-usage': typeof BillingApiUsageRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/catalog': typeof BillingCatalogRoute
   '/billing/invoices': typeof BillingInvoicesRoute
@@ -880,6 +899,7 @@ export interface FileRoutesByFullPath {
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
   '/hooks/airtable-sync': typeof HooksAirtableSyncRoute
+  '/hooks/api-usage-settle': typeof HooksApiUsageSettleRoute
   '/hooks/backend-provisioning-drain': typeof HooksBackendProvisioningDrainRoute
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
@@ -962,6 +982,7 @@ export interface FileRoutesByFullPath {
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
+  '/api/public/usage/report': typeof ApiPublicUsageReportRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
   '/api/public/seats/devices/register': typeof ApiPublicSeatsDevicesRegisterRoute
@@ -996,6 +1017,7 @@ export interface FileRoutesByTo {
   '/slo': typeof SloRoute
   '/yggdrasil': typeof YggdrasilRoute
   '/api/health': typeof ApiHealthRoute
+  '/billing/api-usage': typeof BillingApiUsageRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/catalog': typeof BillingCatalogRoute
   '/billing/invoices': typeof BillingInvoicesRoute
@@ -1013,6 +1035,7 @@ export interface FileRoutesByTo {
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
   '/hooks/airtable-sync': typeof HooksAirtableSyncRoute
+  '/hooks/api-usage-settle': typeof HooksApiUsageSettleRoute
   '/hooks/backend-provisioning-drain': typeof HooksBackendProvisioningDrainRoute
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
@@ -1095,6 +1118,7 @@ export interface FileRoutesByTo {
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
+  '/api/public/usage/report': typeof ApiPublicUsageReportRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
   '/api/public/seats/devices/register': typeof ApiPublicSeatsDevicesRegisterRoute
@@ -1131,6 +1155,7 @@ export interface FileRoutesById {
   '/slo': typeof SloRoute
   '/yggdrasil': typeof YggdrasilRoute
   '/api/health': typeof ApiHealthRoute
+  '/billing/api-usage': typeof BillingApiUsageRoute
   '/billing/cancel': typeof BillingCancelRoute
   '/billing/catalog': typeof BillingCatalogRoute
   '/billing/invoices': typeof BillingInvoicesRoute
@@ -1148,6 +1173,7 @@ export interface FileRoutesById {
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
   '/hooks/airtable-sync': typeof HooksAirtableSyncRoute
+  '/hooks/api-usage-settle': typeof HooksApiUsageSettleRoute
   '/hooks/backend-provisioning-drain': typeof HooksBackendProvisioningDrainRoute
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
   '/hooks/cascade-drain': typeof HooksCascadeDrainRoute
@@ -1230,6 +1256,7 @@ export interface FileRoutesById {
   '/api/public/tokens/packs': typeof ApiPublicTokensPacksRoute
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
+  '/api/public/usage/report': typeof ApiPublicUsageReportRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
   '/api/public/seats/devices/register': typeof ApiPublicSeatsDevicesRegisterRoute
@@ -1267,6 +1294,7 @@ export interface FileRouteTypes {
     | '/slo'
     | '/yggdrasil'
     | '/api/health'
+    | '/billing/api-usage'
     | '/billing/cancel'
     | '/billing/catalog'
     | '/billing/invoices'
@@ -1284,6 +1312,7 @@ export interface FileRouteTypes {
     | '/handoffs/$handoffId'
     | '/handoffs/new'
     | '/hooks/airtable-sync'
+    | '/hooks/api-usage-settle'
     | '/hooks/backend-provisioning-drain'
     | '/hooks/brand-drift'
     | '/hooks/cascade-drain'
@@ -1366,6 +1395,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/packs'
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
+    | '/api/public/usage/report'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
     | '/api/public/seats/devices/register'
@@ -1400,6 +1430,7 @@ export interface FileRouteTypes {
     | '/slo'
     | '/yggdrasil'
     | '/api/health'
+    | '/billing/api-usage'
     | '/billing/cancel'
     | '/billing/catalog'
     | '/billing/invoices'
@@ -1417,6 +1448,7 @@ export interface FileRouteTypes {
     | '/handoffs/$handoffId'
     | '/handoffs/new'
     | '/hooks/airtable-sync'
+    | '/hooks/api-usage-settle'
     | '/hooks/backend-provisioning-drain'
     | '/hooks/brand-drift'
     | '/hooks/cascade-drain'
@@ -1499,6 +1531,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/packs'
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
+    | '/api/public/usage/report'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
     | '/api/public/seats/devices/register'
@@ -1534,6 +1567,7 @@ export interface FileRouteTypes {
     | '/slo'
     | '/yggdrasil'
     | '/api/health'
+    | '/billing/api-usage'
     | '/billing/cancel'
     | '/billing/catalog'
     | '/billing/invoices'
@@ -1551,6 +1585,7 @@ export interface FileRouteTypes {
     | '/handoffs/$handoffId'
     | '/handoffs/new'
     | '/hooks/airtable-sync'
+    | '/hooks/api-usage-settle'
     | '/hooks/backend-provisioning-drain'
     | '/hooks/brand-drift'
     | '/hooks/cascade-drain'
@@ -1633,6 +1668,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/packs'
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
+    | '/api/public/usage/report'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
     | '/api/public/seats/devices/register'
@@ -1669,6 +1705,7 @@ export interface RootRouteChildren {
   SloRoute: typeof SloRoute
   YggdrasilRoute: typeof YggdrasilRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  BillingApiUsageRoute: typeof BillingApiUsageRoute
   BillingCancelRoute: typeof BillingCancelRoute
   BillingCatalogRoute: typeof BillingCatalogRoute
   BillingInvoicesRoute: typeof BillingInvoicesRoute
@@ -1683,6 +1720,7 @@ export interface RootRouteChildren {
   CrmTicketsRoute: typeof CrmTicketsRoute
   FleetEdgeRoute: typeof FleetEdgeRoute
   HooksAirtableSyncRoute: typeof HooksAirtableSyncRoute
+  HooksApiUsageSettleRoute: typeof HooksApiUsageSettleRoute
   HooksBackendProvisioningDrainRoute: typeof HooksBackendProvisioningDrainRoute
   HooksBrandDriftRoute: typeof HooksBrandDriftRoute
   HooksCascadeDrainRoute: typeof HooksCascadeDrainRoute
@@ -1747,6 +1785,7 @@ export interface RootRouteChildren {
   ApiPublicTokensPacksRoute: typeof ApiPublicTokensPacksRoute
   ApiPublicTokensPlanChangeRoute: typeof ApiPublicTokensPlanChangeRoute
   ApiPublicTokensReserveRoute: typeof ApiPublicTokensReserveRoute
+  ApiPublicUsageReportRoute: typeof ApiPublicUsageReportRoute
   ApiPublicSeatsDevicesHeartbeatRoute: typeof ApiPublicSeatsDevicesHeartbeatRoute
   ApiPublicSeatsDevicesListRoute: typeof ApiPublicSeatsDevicesListRoute
   ApiPublicSeatsDevicesRegisterRoute: typeof ApiPublicSeatsDevicesRegisterRoute
@@ -2231,6 +2270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HooksBackendProvisioningDrainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hooks/api-usage-settle': {
+      id: '/hooks/api-usage-settle'
+      path: '/hooks/api-usage-settle'
+      fullPath: '/hooks/api-usage-settle'
+      preLoaderRoute: typeof HooksApiUsageSettleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hooks/airtable-sync': {
       id: '/hooks/airtable-sync'
       path: '/hooks/airtable-sync'
@@ -2350,6 +2396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BillingCancelRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/billing/api-usage': {
+      id: '/billing/api-usage'
+      path: '/billing/api-usage'
+      fullPath: '/billing/api-usage'
+      preLoaderRoute: typeof BillingApiUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -2390,6 +2443,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/purchases'
       fullPath: '/api/public/purchases'
       preLoaderRoute: typeof ApiPublicPurchasesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/usage/report': {
+      id: '/api/public/usage/report'
+      path: '/api/public/usage/report'
+      fullPath: '/api/public/usage/report'
+      preLoaderRoute: typeof ApiPublicUsageReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/tokens/reserve': {
@@ -2816,6 +2876,7 @@ const rootRouteChildren: RootRouteChildren = {
   SloRoute: SloRoute,
   YggdrasilRoute: YggdrasilRoute,
   ApiHealthRoute: ApiHealthRoute,
+  BillingApiUsageRoute: BillingApiUsageRoute,
   BillingCancelRoute: BillingCancelRoute,
   BillingCatalogRoute: BillingCatalogRoute,
   BillingInvoicesRoute: BillingInvoicesRoute,
@@ -2830,6 +2891,7 @@ const rootRouteChildren: RootRouteChildren = {
   CrmTicketsRoute: CrmTicketsRoute,
   FleetEdgeRoute: FleetEdgeRoute,
   HooksAirtableSyncRoute: HooksAirtableSyncRoute,
+  HooksApiUsageSettleRoute: HooksApiUsageSettleRoute,
   HooksBackendProvisioningDrainRoute: HooksBackendProvisioningDrainRoute,
   HooksBrandDriftRoute: HooksBrandDriftRoute,
   HooksCascadeDrainRoute: HooksCascadeDrainRoute,
@@ -2894,6 +2956,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTokensPacksRoute: ApiPublicTokensPacksRoute,
   ApiPublicTokensPlanChangeRoute: ApiPublicTokensPlanChangeRoute,
   ApiPublicTokensReserveRoute: ApiPublicTokensReserveRoute,
+  ApiPublicUsageReportRoute: ApiPublicUsageReportRoute,
   ApiPublicSeatsDevicesHeartbeatRoute: ApiPublicSeatsDevicesHeartbeatRoute,
   ApiPublicSeatsDevicesListRoute: ApiPublicSeatsDevicesListRoute,
   ApiPublicSeatsDevicesRegisterRoute: ApiPublicSeatsDevicesRegisterRoute,

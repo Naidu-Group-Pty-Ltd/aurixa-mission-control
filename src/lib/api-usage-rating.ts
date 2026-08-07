@@ -1,0 +1,288 @@
+/**
+ * Rating rules for piggybacked third-party API keys.
+ *
+ * A clone provisioned by Mission Control boots with the prime's own vendor keys
+ * forwarded into its Supabase project. Every call it then makes on one of those
+ * keys is billed to *our* vendor account, so it has to be attributable and
+ * rechargeable. A clone that supplies its own key costs us nothing and must
+ * provably cost the tenant nothing too.
+ *
+ * The rules live here, pure, because they decide money. `record_api_usage_event`
+ * applies the same rules inside the ingest transaction (it has to — the
+ * billability lookup and the rollup upsert must be atomic); this module is what
+ * pins them to tests, and what the ingest route and settlement share for
+ * validation, normalisation and the micros→cents conversion.
+ */
+
+/** What one unit of a provider is. Must match the SQL `unit` CHECK. */
+export const USAGE_UNITS = [
+  "request",
+  "token",
+  "email",
+  "minute",
+  "document",
+  "page",
+  "render",
+  "verification",
+  "message",
+  "lookup",
+] as const;
+export type UsageUnit = (typeof USAGE_UNITS)[number];
+
+/**
+ * Why an event was or was not charged. Every event carries one, including the
+ * free ones — "we didn't charge you" is only credible if it says why.
+ */
+export type BillingReason =
+  /** The clone is running on our forwarded key. The only billable outcome. */
+  | "inherited"
+  /** The clone supplied its own key. Metered for insight, charged at nothing. */
+  | "byok"
+  /** No key on the clone at all, or no clone (the prime's own tenant). */
+  | "no_key"
+  /** We have no record of lending this clone this key — never charge on a guess. */
+  | "unknown_secret"
+  /** Catalogued, but flagged as platform overhead rather than tenant usage. */
+  | "not_billable"
+  /** The vendor call failed. Metered; charging for nothing delivered is indefensible. */
+  | "error_call"
+  /** The secret is not in the rate catalog yet. Surfaced so an operator prices it. */
+  | "rate_missing";
+
+export const BILLING_REASONS: BillingReason[] = [
+  "inherited",
+  "byok",
+  "no_key",
+  "unknown_secret",
+  "not_billable",
+  "error_call",
+  "rate_missing",
+];
+
+/** `clone_backend_secrets.status` — the only input to the piggyback question. */
+export type CloneSecretStatus = "inherited" | "set" | "missing" | "failed";
+
+/**
+ * The piggyback rule, in one place.
+ *
+ * `null` for the secret status means we have no row: provisioning never lent
+ * this clone this key. That is not the same as "missing" (we tried and nothing
+ * landed) and neither is billable — but they are distinct on the dashboard,
+ * because `unknown_secret` at volume means the reporter is sending a name the
+ * provisioner does not know, which is a bug to fix, not spend to collect.
+ */
+export function resolveBillingReason(args: {
+  cloneId: string | null;
+  secretStatus: CloneSecretStatus | null;
+  rateExists: boolean;
+  rateIsBillable: boolean;
+  callStatus: "success" | "error";
+}): BillingReason {
+  if (!args.rateExists) return "rate_missing";
+  if (!args.rateIsBillable) return "not_billable";
+  // A tenant with no clone is the prime itself — our project, our key.
+  if (args.cloneId === null) return "no_key";
+  if (args.secretStatus === null) return "unknown_secret";
+  if (args.secretStatus === "set") return "byok";
+  if (args.secretStatus !== "inherited") return "no_key";
+  // Only a call that actually succeeded on our key reaches a charge.
+  if (args.callStatus === "error") return "error_call";
+  return "inherited";
+}
+
+export function isBillable(reason: BillingReason): boolean {
+  return reason === "inherited";
+}
+
+// ─── Money ───────────────────────────────────────────────────────────────────
+//
+// Rates are carried in micros (1e-6 of a currency unit) because per-token
+// prices sit far below a cent: AUD 0.0000006 per Gemini Flash input token
+// rounds to zero cents and would meter as free forever. Micros become cents
+// exactly once, on the settled total — never per line, or a thousand sub-cent
+// calls would each round to nothing and bill as zero.
+
+export const MICROS_PER_CENT = 10_000;
+
+/** Round to the 6dp the `numeric(18,6)` columns hold, so TS and SQL agree. */
+export function roundMicros(value: number): number {
+  return Math.round(value * 1e6) / 1e6;
+}
+
+export function rateEvent(quantity: number, resaleMicrosPerUnit: number): number {
+  const qty = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
+  const rate =
+    Number.isFinite(resaleMicrosPerUnit) && resaleMicrosPerUnit > 0 ? resaleMicrosPerUnit : 0;
+  return roundMicros(qty * rate);
+}
+
+/** Half-up, matching the SQL `FLOOR(x / 10000 + 0.5)`. */
+export function microsToCents(micros: number): number {
+  if (!Number.isFinite(micros) || micros <= 0) return 0;
+  return Math.floor(micros / MICROS_PER_CENT + 0.5);
+}
+
+export function formatMicros(micros: number, currency = "AUD"): string {
+  const amount = (Number.isFinite(micros) ? micros : 0) / (MICROS_PER_CENT * 100);
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency,
+    // Sub-cent totals are common on a young tenant; showing "$0.00" for real
+    // spend reads as a broken meter, so keep four places until it matters.
+    minimumFractionDigits: 2,
+    maximumFractionDigits: Math.abs(amount) < 0.01 && amount !== 0 ? 4 : 2,
+  }).format(amount);
+}
+
+// ─── Settlement ──────────────────────────────────────────────────────────────
+
+export type RollupLine = {
+  secret_name: string;
+  provider: string;
+  display_name?: string | null;
+  unit: string;
+  billable_quantity: number;
+  byok_quantity: number;
+  /** Free units this provider forgives per tenant per period. */
+  included_free_units: number;
+  resale_micros_per_unit: number;
+};
+
+export type SettledLine = {
+  secret_name: string;
+  provider: string;
+  display_name: string;
+  unit: string;
+  billable_quantity: number;
+  free_units_applied: number;
+  charged_quantity: number;
+  rate_micros_per_unit: number;
+  amount_micros: number;
+  byok_quantity: number;
+};
+
+/**
+ * Apply each provider's free allowance and rate the remainder.
+ *
+ * The allowance is per tenant per period, which is why it is applied here and
+ * not at ingest: forgiving it per event would forgive it once per call.
+ *
+ * A line with nothing billable is still kept when the tenant's own key covered
+ * work, because that saving is the whole argument for bringing your own key and
+ * it belongs on the statement.
+ */
+export function settleLines(lines: RollupLine[]): {
+  lines: SettledLine[];
+  totalMicros: number;
+  totalCents: number;
+} {
+  const settled: SettledLine[] = [];
+  let total = 0;
+
+  for (const line of lines) {
+    const billable = Math.max(line.billable_quantity ?? 0, 0);
+    const free = Math.min(Math.max(line.included_free_units ?? 0, 0), billable);
+    const charged = Math.max(billable - free, 0);
+    const rate = Math.max(line.resale_micros_per_unit ?? 0, 0);
+    const amount = roundMicros(charged * rate);
+    const byok = Math.max(line.byok_quantity ?? 0, 0);
+
+    total += amount;
+
+    if (charged > 0 || byok > 0) {
+      settled.push({
+        secret_name: line.secret_name,
+        provider: line.provider,
+        display_name: line.display_name || line.secret_name,
+        unit: line.unit,
+        billable_quantity: billable,
+        free_units_applied: free,
+        charged_quantity: charged,
+        rate_micros_per_unit: rate,
+        amount_micros: amount,
+        byok_quantity: byok,
+      });
+    }
+  }
+
+  const totalMicros = roundMicros(total);
+  return { lines: settled, totalMicros, totalCents: microsToCents(totalMicros) };
+}
+
+// ─── Ingest validation ───────────────────────────────────────────────────────
+
+export type ReportedEvent = {
+  secret_name: string;
+  quantity: number;
+  idempotency_key: string;
+  model?: string | null;
+  feature?: string | null;
+  status?: "success" | "error";
+  occurred_at?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type NormalizedEvent = ReportedEvent & {
+  status: "success" | "error";
+  occurred_at: string;
+  metadata: Record<string, unknown>;
+};
+
+/** Secret names are env-var names; anything else is a caller bug, not usage. */
+const SECRET_NAME_RX = /^[A-Z_][A-Z0-9_]*$/;
+
+/** Wide enough for a month of one tenant's tokens, tight enough to catch a
+ *  reporter that sends bytes where it meant tokens. */
+export const MAX_QUANTITY = 1_000_000_000;
+
+/** How far back a batch may backdate an event. Longer than any retry window,
+ *  short enough that a clock-skewed clone cannot rewrite a settled period. */
+export const MAX_BACKDATE_DAYS = 35;
+
+export type NormalizeResult = { ok: true; event: NormalizedEvent } | { ok: false; error: string };
+
+export function normalizeEvent(raw: unknown, now = new Date()): NormalizeResult {
+  const e = raw as ReportedEvent;
+  if (!e || typeof e !== "object") return { ok: false, error: "not_an_object" };
+
+  const name = typeof e.secret_name === "string" ? e.secret_name.trim() : "";
+  if (!name) return { ok: false, error: "missing_secret_name" };
+  if (!SECRET_NAME_RX.test(name)) return { ok: false, error: `invalid_secret_name: ${name}` };
+
+  const key = typeof e.idempotency_key === "string" ? e.idempotency_key.trim() : "";
+  if (!key) return { ok: false, error: "missing_idempotency_key" };
+  if (key.length > 200) return { ok: false, error: "idempotency_key_too_long" };
+
+  const qty = e.quantity;
+  if (typeof qty !== "number" || !Number.isFinite(qty)) {
+    return { ok: false, error: `invalid_quantity: ${name}` };
+  }
+  if (qty < 0) return { ok: false, error: `negative_quantity: ${name}` };
+  if (qty > MAX_QUANTITY) return { ok: false, error: `quantity_out_of_range: ${name}` };
+
+  const status = e.status === "error" ? "error" : "success";
+
+  let occurred = now;
+  if (e.occurred_at) {
+    const parsed = new Date(e.occurred_at);
+    if (Number.isNaN(parsed.getTime())) return { ok: false, error: `invalid_occurred_at: ${name}` };
+    const ageDays = (now.getTime() - parsed.getTime()) / 86_400_000;
+    if (ageDays > MAX_BACKDATE_DAYS) return { ok: false, error: `occurred_at_too_old: ${name}` };
+    // A clone clock running fast must not book usage into a future period.
+    occurred = parsed.getTime() > now.getTime() ? now : parsed;
+  }
+
+  return {
+    ok: true,
+    event: {
+      secret_name: name,
+      quantity: qty,
+      idempotency_key: key,
+      model: typeof e.model === "string" ? e.model.slice(0, 120) : null,
+      feature: typeof e.feature === "string" ? e.feature.slice(0, 120) : null,
+      status,
+      occurred_at: occurred.toISOString(),
+      metadata: e.metadata && typeof e.metadata === "object" ? e.metadata : {},
+    },
+  };
+}
