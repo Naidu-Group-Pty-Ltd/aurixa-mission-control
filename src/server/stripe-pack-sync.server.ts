@@ -25,6 +25,7 @@ import {
   packPerCreditCents,
   type TopupPack,
 } from "@/lib/pricing/aurixa-catalog";
+import { TAX_CODE_TOPUP_PACK } from "@/lib/pricing/tax-codes";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
@@ -146,6 +147,11 @@ async function ensurePackProduct(stripe: Stripe, pack: TopupPack, row?: PackRow)
       if (productId) {
         await stripe.products.update(productId, {
           name,
+          // Set on every path, not just creation: a pack resolved through an
+          // existing price or through search would otherwise keep whatever
+          // code it already carried — which for the legacy packs was
+          // "tangible goods".
+          tax_code: TAX_CODE_TOPUP_PACK,
           metadata: { aurixa_pack: pack.slug, aurixa_pack_credits: String(pack.credits) },
         });
         return productId;
@@ -158,7 +164,7 @@ async function ensurePackProduct(stripe: Stripe, pack: TopupPack, row?: PackRow)
   try {
     const found = await stripe.products.search({ query: `metadata['aurixa_pack']:'${pack.slug}'` });
     if (found.data[0]) {
-      await stripe.products.update(found.data[0].id, { name });
+      await stripe.products.update(found.data[0].id, { name, tax_code: TAX_CODE_TOPUP_PACK });
       return found.data[0].id;
     }
   } catch {
@@ -167,6 +173,8 @@ async function ensurePackProduct(stripe: Stripe, pack: TopupPack, row?: PackRow)
 
   const created = await stripe.products.create({
     name,
+    // Credits are taxed at purchase, as the service they buy — see tax-codes.ts.
+    tax_code: TAX_CODE_TOPUP_PACK,
     description: `${pack.credits.toLocaleString("en-AU")} report credits, valid 30 days. ${pack.positioning}.`,
     metadata: {
       aurixa_pack: pack.slug,

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { TAX_CODE_SAAS, TAX_CODE_TOPUP_PACK } from "@/lib/pricing/tax-codes";
 import { describe, expect, it } from "vitest";
 import { planPackSync, type PackRow } from "./stripe-pack-sync.server";
 import { TOPUP_PACKS, gstComponentCents } from "@/lib/pricing/aurixa-catalog";
@@ -179,5 +182,30 @@ describe("a pack added outside the ladder", () => {
       stripe_price_id: "price_x",
     };
     expect(planPackSync([...CUTOVER, extra]).retire).toEqual(["credits-mystery"]);
+  });
+});
+
+describe("credit pack tax code", () => {
+  it("taxes credit packs at purchase, as the service the credits buy", () => {
+    // Operator decision (2026-08-07): tax falls at purchase, not redemption.
+    // So a pack is a prepayment for hosted software and carries the same code
+    // as the tiers and modules.
+    expect(TAX_CODE_TOPUP_PACK).toBe(TAX_CODE_SAAS);
+  });
+
+  it("is deliberately NOT the gift-card code", () => {
+    // txcd_90020000 models stored value: non-taxable at purchase, with the
+    // liability deferred to redemption. That is the opposite of the decision,
+    // and picking it by accident would zero-rate every top-up sale.
+    expect(TAX_CODE_TOPUP_PACK).not.toBe("txcd_90020000");
+  });
+
+  it("sets the code on every path the sync can take, not just creation", () => {
+    // A pack resolved through an existing price or through metadata search
+    // would otherwise keep whatever code it already carried — which for the
+    // four legacy packs was "General — Tangible Goods".
+    const src = readFileSync(join(process.cwd(), "src/server/stripe-pack-sync.server.ts"), "utf8");
+    const occurrences = src.match(/tax_code:\s*TAX_CODE_TOPUP_PACK/g) ?? [];
+    expect(occurrences.length).toBe(3);
   });
 });

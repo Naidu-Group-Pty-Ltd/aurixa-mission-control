@@ -44,17 +44,29 @@ export const TAX_CODE_SAAS = "txcd_10103000";
 export const TAX_CODE_PROFESSIONAL_SERVICES = "txcd_20030000";
 
 /**
- * Top-up credit packs — deliberately NOT given a default here.
+ * Top-up credit packs.
  *
- * Prepaid credits are the one genuinely ambiguous case in this catalogue, and
- * the existing account does not agree with itself about them: the four legacy
- * "N Credit Pack" products carry `txcd_10000000` (tangible goods), while the
- * eight generated "Aurixa N Credit Pack" products carry nothing at all.
+ * Prepaid credits are the one case in this catalogue with two defensible
+ * answers, because the question is *when* tax falls, not what the thing is:
  *
- * The treatment turns on whether tax falls at purchase or at redemption, which
- * is a question for an accountant and not one to settle in a constant. Left
- * unset so the packs keep inheriting the account default and the disagreement
- * stays visible, rather than being silently resolved by whoever edited this
- * file last.
+ *   • at REDEMPTION — the pack is stored value, like a gift card. Stripe's
+ *     `txcd_90020000` ("Gift card") models this and is **non-taxable at
+ *     purchase**; GST would fall later, when credits are spent on a report.
+ *   • at PURCHASE — the pack is a prepayment for the service it buys, and is
+ *     taxed then, at the rate of that service.
+ *
+ * **Purchase was chosen** (operator decision, 2026-08-07). So the pack is
+ * taxed as what the credits buy — hosted software — and carries the same SaaS
+ * code as the tiers and modules. This is deliberately NOT the gift-card code:
+ * `txcd_90020000` would zero-rate the sale and defer the liability, which is
+ * the opposite of the decision.
+ *
+ * That also settles a disagreement the live account had with itself. The four
+ * legacy "N Credit Pack" products carried `txcd_10000000` (tangible goods) —
+ * right on timing, wrong on category — and the eight generated "Aurixa N
+ * Credit Pack" products carried nothing at all. All twelve now agree.
+ *
+ * NOT TAX ADVICE. The timing decision was the operator's; this constant only
+ * records it in one place instead of twelve.
  */
-export const TAX_CODE_TOPUP_PACK: string | undefined = undefined;
+export const TAX_CODE_TOPUP_PACK = TAX_CODE_SAAS;
