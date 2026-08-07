@@ -37,6 +37,7 @@ import {
   gstComponentCents,
   type PricedModule,
 } from "@/lib/pricing/aurixa-catalog";
+import { TAX_CODE_SAAS } from "@/lib/pricing/tax-codes";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
@@ -99,6 +100,7 @@ function tierList(slugs: readonly string[]): string {
 export function moduleProductShape(mod: PricedModule): {
   name: string;
   description: string;
+  tax_code: string;
   metadata: Record<string, string>;
 } {
   const bundledInEveryTier = mod.slug === AML_MODULE_SLUG && TIER_INCLUDES_AML;
@@ -112,6 +114,9 @@ export function moduleProductShape(mod: PricedModule): {
     // Agent" — and prefixing those produces "Aurixa Aurixa Agent" on the
     // customer's invoice.
     name: mod.name.startsWith("Aurixa ") ? mod.name : `Aurixa ${mod.name}`,
+    // See tax-codes.ts: without this the module inherits the account's
+    // tangible-goods default. Every module is hosted software.
+    tax_code: TAX_CODE_SAAS,
     description: [mod.note, included].filter(Boolean).join(" "),
     metadata: {
       aurixa_module: mod.slug,

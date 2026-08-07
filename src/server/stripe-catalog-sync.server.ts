@@ -23,6 +23,7 @@ import {
   tierHeadlineCents,
   type Tier,
 } from "@/lib/pricing/aurixa-catalog";
+import { TAX_CODE_SAAS } from "@/lib/pricing/tax-codes";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin as any;
@@ -201,10 +202,14 @@ export async function loadPlanRows(): Promise<PlanRow[]> {
 function productShape(tier: Tier): {
   name: string;
   description: string;
+  tax_code: string;
   metadata: Record<string, string>;
 } {
   return {
     name: `Aurixa ${tier.name}`,
+    // Without this the product inherits the account default, which is
+    // "General — Tangible Goods". A seat tier is hosted software.
+    tax_code: TAX_CODE_SAAS,
     description:
       `${tier.monthlyCredits.toLocaleString("en-AU")} report credits included every month. ` +
       `${tier.seatMin}\u2013${tier.seatMax} seats. ${tier.blurb}`,
@@ -315,9 +320,7 @@ async function ensurePrice(
  */
 export function tierApplyOrder(plan: SyncPlan): Tier[] {
   const position = new Map(plan.renames.map((r, i) => [r.to, i]));
-  return [...TIERS].sort(
-    (a, b) => (position.get(a.slug) ?? -1) - (position.get(b.slug) ?? -1),
-  );
+  return [...TIERS].sort((a, b) => (position.get(a.slug) ?? -1) - (position.get(b.slug) ?? -1));
 }
 
 export type ApplyResult = {
@@ -341,7 +344,10 @@ export type ApplyResult = {
  * the sheet already contains GST. Left at Stripe's default, enabling Stripe
  * Tax later would ADD 10% on top and quietly overcharge every customer.
  */
-export async function applyCatalogSync(plan: SyncPlan, rows: readonly PlanRow[] = []): Promise<ApplyResult> {
+export async function applyCatalogSync(
+  plan: SyncPlan,
+  rows: readonly PlanRow[] = [],
+): Promise<ApplyResult> {
   const stripe = getStripe();
   const result: ApplyResult = {
     applied: true,

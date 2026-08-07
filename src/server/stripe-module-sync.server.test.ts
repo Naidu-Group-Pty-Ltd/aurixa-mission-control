@@ -10,6 +10,7 @@ import {
   gstComponentCents,
   moduleBySlug,
 } from "@/lib/pricing/aurixa-catalog";
+import { TAX_CODE_SAAS } from "@/lib/pricing/tax-codes";
 
 /** A catalog row as the price-list migration leaves it: priced, live, unlinked. */
 const row = (slug: string, over: Partial<ModuleRow> = {}): ModuleRow => ({
@@ -167,6 +168,29 @@ describe("moduleProductShape", () => {
   it("tags every product with the slug the sync searches on", () => {
     for (const mod of PURCHASABLE_MODULES) {
       expect(moduleProductShape(mod).metadata.aurixa_module).toBe(mod.slug);
+    }
+  });
+});
+
+describe("moduleProductShape — tax code", () => {
+  it("codes every module as SaaS rather than inheriting the account default", () => {
+    // The account default is txcd_10000000, "General — Tangible Goods". A
+    // product minted without a tax_code inherits it, which is how all 22 live
+    // modules ended up taxed as physical goods. Domestically that is invisible
+    // (10% GST either way); across a border it is the wrong tax on a legal
+    // document.
+    for (const slug of ["deal-pipeline", "aurixa-agent", "client-forms", "market-updates"]) {
+      const mod = moduleBySlug(slug);
+      if (!mod) continue;
+      expect(moduleProductShape(mod).tax_code, slug).toBe(TAX_CODE_SAAS);
+    }
+  });
+
+  it("never leaves tax_code unset", () => {
+    // The failure mode is omission, not a wrong value — so assert presence.
+    for (const mod of PURCHASABLE_MODULES) {
+      const shape = moduleProductShape(mod);
+      expect(shape.tax_code, mod.slug).toBeTruthy();
     }
   });
 });

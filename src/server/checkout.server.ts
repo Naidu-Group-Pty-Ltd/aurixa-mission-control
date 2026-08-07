@@ -153,8 +153,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   if (!priceId) {
     return {
       ok: false as const,
-      error:
-        args.period === "annual" ? "annual_price_not_linked" : "stripe_price_not_linked",
+      error: args.period === "annual" ? "annual_price_not_linked" : "stripe_price_not_linked",
     };
   }
 
@@ -334,6 +333,38 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
       dropped.add(next.label);
       params = next.apply(params);
     }
+  }
+
+  // A degradation is a successful sale on worse terms, and the worst of them
+  // is tax: with `automatic_tax` dropped, Stripe issues the invoice with no
+  // GST on it. The buyer still pays, the checkout still returns ok, and until
+  // now the only trace was a console.warn nobody reads — which for an
+  // Australian business means an invalid tax invoice going out silently.
+  // Record it where a person will see it.
+  if (dropped.size > 0) {
+    const lostTax = dropped.has("automatic_tax");
+    await supabaseAdmin
+      .from("notifications")
+      .insert({
+        kind: "checkout_degraded",
+        severity: lostTax ? "warning" : "info",
+        title: lostTax
+          ? "Checkout completed WITHOUT tax calculation"
+          : `Checkout degraded: ${Array.from(dropped).join(", ")}`,
+        body: lostTax
+          ? `Stripe rejected automatic_tax, so this session's invoice carries no GST. ` +
+            `Check Stripe Tax is active and the head office address is set. ` +
+            `Session ${session.id}, item ${item.slug}.`
+          : `Dropped ${Array.from(dropped).join(", ")} to complete the sale. Session ${session.id}.`,
+        clone_id: cloneId,
+        url: "/billing/purchases",
+        metadata: { session_id: session.id, dropped: Array.from(dropped), item: item.slug },
+      })
+      .then(
+        () => undefined,
+        // Never let the alert fail the sale it is reporting on.
+        () => undefined,
+      );
   }
 
   // Attribution bookkeeping. Best-effort insert (never blocks checkout);
