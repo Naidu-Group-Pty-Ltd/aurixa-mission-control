@@ -98,7 +98,7 @@ export const Route = createFileRoute("/api/public/usage/report")({
 
         for (const raw of data.events) {
           const norm = normalizeEvent(raw, now);
-          if (!norm.ok) {
+          if (norm.ok === false) {
             rejected += 1;
             results.push({
               idempotency_key:

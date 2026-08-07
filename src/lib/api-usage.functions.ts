@@ -13,6 +13,7 @@ import {
   waiveCharge,
 } from "@/server/api-usage-settlement.server";
 import { USAGE_UNITS } from "@/lib/api-usage-rating";
+import type { Json } from "@/integrations/supabase/types";
 
 // `requireSupabaseAuth` does not thread its context into the handler's inferred
 // type. Narrow it here rather than switching the whole file off with
@@ -95,7 +96,7 @@ export const getApiUsageOverview = createServerFn({ method: "GET" })
     return {
       ok: true as const,
       period,
-      summary: summary as Record<string, unknown>,
+      summary: summary as Json,
       charges: charges ?? [],
       gaps: Array.from(gapCounts.values()).sort((a, b) => b.count - a.count),
       canManage: isAdmin(roles),

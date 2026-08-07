@@ -287,7 +287,7 @@ export async function sweepApiUsageSettlement(now = new Date()): Promise<SweepRe
 
   for (const period of await findClosablePeriods(now)) {
     const closed = await closeUsagePeriod(period.tenant_id, period.period_start);
-    if (!closed.ok) {
+    if (closed.ok === false) {
       out.failed += 1;
       out.errors.push({ ...period, error: closed.error });
       continue;
@@ -296,12 +296,12 @@ export async function sweepApiUsageSettlement(now = new Date()): Promise<SweepRe
     else out.closed += 1;
 
     const invoiced = await invoiceClosedCharge(closed.chargeId);
-    if (!invoiced.ok) {
+    if (invoiced.ok === false) {
       out.failed += 1;
       out.errors.push({ ...period, error: invoiced.error });
       continue;
     }
-    if (invoiced.skipped) {
+    if (invoiced.skipped === true) {
       out.skipped += 1;
     } else {
       out.invoiced += 1;
