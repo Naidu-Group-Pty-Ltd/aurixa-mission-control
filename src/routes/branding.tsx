@@ -1178,6 +1178,9 @@ function ProfileEditor({
     contact_phone: initialContact.contact_phone ?? "",
     contact_address: initialContact.contact_address ?? "",
     contact_website: initialContact.contact_website ?? "",
+    legal_name: initialContact.legal_name ?? "",
+    abn: initialContact.abn ?? "",
+    licence_number: initialContact.licence_number ?? "",
   });
   const [assets, setAssets] = useState<AssetEntry[]>(initialAssets);
   const [saving, setSaving] = useState(false);
@@ -1413,6 +1416,29 @@ function ProfileEditor({
                 value={contact.contact_address}
                 onChange={(e) => setContact((p) => ({ ...p, contact_address: e.target.value }))}
               />
+            </div>
+            <div className="border-t pt-3">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Legal identity — printed on generated legal documents (agreements, reports):
+                the registered entity, its ABN/ACN and licence details.
+              </p>
+              <div className="space-y-3">
+                <Field
+                  label="Legal entity name"
+                  value={contact.legal_name}
+                  onChange={(v) => setContact((p) => ({ ...p, legal_name: v }))}
+                />
+                <Field
+                  label="ABN / ACN"
+                  value={contact.abn}
+                  onChange={(v) => setContact((p) => ({ ...p, abn: v }))}
+                />
+                <Field
+                  label="Licence number"
+                  value={contact.licence_number}
+                  onChange={(v) => setContact((p) => ({ ...p, licence_number: v }))}
+                />
+              </div>
             </div>
           </TabsContent>
 

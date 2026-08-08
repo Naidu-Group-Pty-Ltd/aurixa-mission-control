@@ -15,6 +15,39 @@ function jsonbLiteral(value: unknown): string {
   return `$brand$${json}$brand$::jsonb`;
 }
 
+/**
+ * Translate the bundle's contact block onto the keys the prime actually
+ * reads from `contact_details` (`snapshot.pure.ts` → `name`, `abn`, `email`,
+ * `phone`, `address`, `website`, plus the legacy `company_name`).
+ *
+ * The `contact_*` names this module historically cascaded are keys the prime
+ * never consumed — a cascaded email or phone silently never reached a single
+ * generated document. Both shapes are written: the prime's keys so documents
+ * pick the values up, and the original `contact_*` keys so nothing that
+ * learned to read them breaks.
+ */
+export function primeContactPayload(contact: ReportContact): Record<string, unknown> {
+  const text = (v: unknown) => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s || undefined;
+  };
+  const mapped: Record<string, unknown> = {
+    ...contact,
+    name: text(contact.legal_name) ?? text(contact.contact_name),
+    company_name: text(contact.legal_name) ?? text(contact.contact_name),
+    abn: text(contact.abn),
+    licence_number: text(contact.licence_number),
+    email: text(contact.contact_email),
+    phone: text(contact.contact_phone),
+    address: text(contact.contact_address),
+    website: text(contact.contact_website),
+  };
+  for (const [key, value] of Object.entries(mapped)) {
+    if (value === undefined || value === null || value === "") delete mapped[key];
+  }
+  return mapped;
+}
+
 export function buildApplySql(args: {
   brand_config: BrandConfig;
   report_contact: ReportContact;
@@ -23,7 +56,7 @@ export function buildApplySql(args: {
   const { brand_config, report_contact, config_hash } = args;
 
   const wlPayload = jsonbLiteral({ ...brand_config, _aurixa_hash: config_hash });
-  const rcPayload = jsonbLiteral(report_contact);
+  const rcPayload = jsonbLiteral(primeContactPayload(report_contact));
 
   return `
 -- Aurixa branding cascade — hash:${config_hash}

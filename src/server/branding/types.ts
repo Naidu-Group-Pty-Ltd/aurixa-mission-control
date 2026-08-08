@@ -28,6 +28,14 @@ export type ReportContact = {
   contact_phone?: string | null;
   contact_address?: string | null;
   contact_website?: string | null;
+  // Legal identity — what a workspace prints on generated legal documents
+  // (agreements, reports): the registered entity, its ABN/ACN and licence
+  // details. The colour-and-logo fields above make a document *branded*;
+  // these are what make it *theirs*. Cascaded into the workspace's
+  // `global_report_settings.contact_details` like everything else here.
+  legal_name?: string | null;
+  abn?: string | null;
+  licence_number?: string | null;
   [key: string]: unknown;
 };
 
