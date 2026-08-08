@@ -954,8 +954,8 @@ export interface FileRoutesByFullPath {
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
   '/crm/accounts/': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
-  '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/invoice-pdf': typeof ApiPublicBillingInvoicePdfRoute
+  '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
   '/api/public/clones/rotate-key': typeof ApiPublicClonesRotateKeyRoute
   '/api/public/edge/status': typeof ApiPublicEdgeStatusRoute
@@ -1091,8 +1091,8 @@ export interface FileRoutesByTo {
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
   '/crm/accounts': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
-  '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/invoice-pdf': typeof ApiPublicBillingInvoicePdfRoute
+  '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
   '/api/public/clones/rotate-key': typeof ApiPublicClonesRotateKeyRoute
   '/api/public/edge/status': typeof ApiPublicEdgeStatusRoute
@@ -1230,8 +1230,8 @@ export interface FileRoutesById {
   '/crm/accounts/$accountId': typeof CrmAccountsAccountIdRoute
   '/crm/accounts/': typeof CrmAccountsIndexRoute
   '/api/public/billing/handoff': typeof ApiPublicBillingHandoffRoute
-  '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/invoice-pdf': typeof ApiPublicBillingInvoicePdfRoute
+  '/api/public/billing/invoices': typeof ApiPublicBillingInvoicesRoute
   '/api/public/billing/payment-methods': typeof ApiPublicBillingPaymentMethodsRoute
   '/api/public/clones/rotate-key': typeof ApiPublicClonesRotateKeyRoute
   '/api/public/edge/status': typeof ApiPublicEdgeStatusRoute
@@ -1370,8 +1370,8 @@ export interface FileRouteTypes {
     | '/crm/accounts/$accountId'
     | '/crm/accounts/'
     | '/api/public/billing/handoff'
-    | '/api/public/billing/invoices'
     | '/api/public/billing/invoice-pdf'
+    | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
     | '/api/public/clones/rotate-key'
     | '/api/public/edge/status'
@@ -1507,8 +1507,8 @@ export interface FileRouteTypes {
     | '/crm/accounts/$accountId'
     | '/crm/accounts'
     | '/api/public/billing/handoff'
-    | '/api/public/billing/invoices'
     | '/api/public/billing/invoice-pdf'
+    | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
     | '/api/public/clones/rotate-key'
     | '/api/public/edge/status'
@@ -1645,8 +1645,8 @@ export interface FileRouteTypes {
     | '/crm/accounts/$accountId'
     | '/crm/accounts/'
     | '/api/public/billing/handoff'
-    | '/api/public/billing/invoices'
     | '/api/public/billing/invoice-pdf'
+    | '/api/public/billing/invoices'
     | '/api/public/billing/payment-methods'
     | '/api/public/clones/rotate-key'
     | '/api/public/edge/status'
@@ -1763,8 +1763,8 @@ export interface RootRouteChildren {
   CrmAccountsAccountIdRoute: typeof CrmAccountsAccountIdRoute
   CrmAccountsIndexRoute: typeof CrmAccountsIndexRoute
   ApiPublicBillingHandoffRoute: typeof ApiPublicBillingHandoffRoute
-  ApiPublicBillingInvoicesRoute: typeof ApiPublicBillingInvoicesRoute
   ApiPublicBillingInvoicePdfRoute: typeof ApiPublicBillingInvoicePdfRoute
+  ApiPublicBillingInvoicesRoute: typeof ApiPublicBillingInvoicesRoute
   ApiPublicBillingPaymentMethodsRoute: typeof ApiPublicBillingPaymentMethodsRoute
   ApiPublicClonesRotateKeyRoute: typeof ApiPublicClonesRotateKeyRoute
   ApiPublicEdgeStatusRoute: typeof ApiPublicEdgeStatusRoute
@@ -2942,8 +2942,8 @@ const rootRouteChildren: RootRouteChildren = {
   CrmAccountsAccountIdRoute: CrmAccountsAccountIdRoute,
   CrmAccountsIndexRoute: CrmAccountsIndexRoute,
   ApiPublicBillingHandoffRoute: ApiPublicBillingHandoffRoute,
-  ApiPublicBillingInvoicesRoute: ApiPublicBillingInvoicesRoute,
   ApiPublicBillingInvoicePdfRoute: ApiPublicBillingInvoicePdfRoute,
+  ApiPublicBillingInvoicesRoute: ApiPublicBillingInvoicesRoute,
   ApiPublicBillingPaymentMethodsRoute: ApiPublicBillingPaymentMethodsRoute,
   ApiPublicClonesRotateKeyRoute: ApiPublicClonesRotateKeyRoute,
   ApiPublicEdgeStatusRoute: ApiPublicEdgeStatusRoute,
@@ -2987,3 +2987,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
