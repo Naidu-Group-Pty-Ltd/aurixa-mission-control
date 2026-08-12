@@ -39,6 +39,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SecurityIndexRouteImport } from './routes/security.index'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as SupportTicketsRouteImport } from './routes/support.tickets'
 import { Route as SettingsRolesRouteImport } from './routes/settings.roles'
 import { Route as SettingsRoleAuditRouteImport } from './routes/settings.role-audit'
 import { Route as SettingsProvisioningPreviewRouteImport } from './routes/settings.provisioning-preview'
@@ -60,6 +61,7 @@ import { Route as ModulesSlugRouteImport } from './routes/modules.$slug'
 import { Route as JoinTokenRouteImport } from './routes/join.$token'
 import { Route as HooksWarmHealthRouteImport } from './routes/hooks.warm-health'
 import { Route as HooksTokenAlertsRouteImport } from './routes/hooks.token-alerts'
+import { Route as HooksSupportRemediationDrainRouteImport } from './routes/hooks.support-remediation-drain'
 import { Route as HooksRunSchedulesRouteImport } from './routes/hooks.run-schedules'
 import { Route as HooksHandoffParityRefreshRouteImport } from './routes/hooks.handoff-parity-refresh'
 import { Route as HooksHandoffObservabilityPollRouteImport } from './routes/hooks.handoff-observability-poll'
@@ -110,6 +112,7 @@ import { Route as ApiPublicTokensFeedbackPromptRouteImport } from './routes/api.
 import { Route as ApiPublicTokensCommitRouteImport } from './routes/api.public.tokens.commit'
 import { Route as ApiPublicTokensCancelRouteImport } from './routes/api.public.tokens.cancel'
 import { Route as ApiPublicTokensBalanceRouteImport } from './routes/api.public.tokens.balance'
+import { Route as ApiPublicSupportTicketsRouteImport } from './routes/api.public.support.tickets'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api.public.stripe.webhook'
 import { Route as ApiPublicStorefrontWalletRouteImport } from './routes/api.public.storefront.wallet'
 import { Route as ApiPublicStorefrontSetupRouteImport } from './routes/api.public.storefront.setup'
@@ -296,6 +299,11 @@ const CrmIndexRoute = CrmIndexRouteImport.update({
   path: '/crm/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SupportTicketsRoute = SupportTicketsRouteImport.update({
+  id: '/support/tickets',
+  path: '/support/tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRolesRoute = SettingsRolesRouteImport.update({
   id: '/roles',
   path: '/roles',
@@ -403,6 +411,12 @@ const HooksTokenAlertsRoute = HooksTokenAlertsRouteImport.update({
   path: '/hooks/token-alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HooksSupportRemediationDrainRoute =
+  HooksSupportRemediationDrainRouteImport.update({
+    id: '/hooks/support-remediation-drain',
+    path: '/hooks/support-remediation-drain',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const HooksRunSchedulesRoute = HooksRunSchedulesRouteImport.update({
   id: '/hooks/run-schedules',
   path: '/hooks/run-schedules',
@@ -657,6 +671,11 @@ const ApiPublicTokensCancelRoute = ApiPublicTokensCancelRouteImport.update({
 const ApiPublicTokensBalanceRoute = ApiPublicTokensBalanceRouteImport.update({
   id: '/api/public/tokens/balance',
   path: '/api/public/tokens/balance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSupportTicketsRoute = ApiPublicSupportTicketsRouteImport.update({
+  id: '/api/public/support/tickets',
+  path: '/api/public/support/tickets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
@@ -924,6 +943,7 @@ export interface FileRoutesByFullPath {
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
+  '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
@@ -945,6 +965,7 @@ export interface FileRoutesByFullPath {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/support/tickets': typeof SupportTicketsRoute
   '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -983,6 +1004,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
+  '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
@@ -1061,6 +1083,7 @@ export interface FileRoutesByTo {
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
+  '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
@@ -1082,6 +1105,7 @@ export interface FileRoutesByTo {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/support/tickets': typeof SupportTicketsRoute
   '/crm': typeof CrmIndexRoute
   '/security': typeof SecurityIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -1120,6 +1144,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
+  '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
@@ -1200,6 +1225,7 @@ export interface FileRoutesById {
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
+  '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
@@ -1221,6 +1247,7 @@ export interface FileRoutesById {
   '/settings/provisioning-preview': typeof SettingsProvisioningPreviewRoute
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
+  '/support/tickets': typeof SupportTicketsRoute
   '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1259,6 +1286,7 @@ export interface FileRoutesById {
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
+  '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
@@ -1340,6 +1368,7 @@ export interface FileRouteTypes {
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
     | '/hooks/run-schedules'
+    | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
     | '/hooks/warm-health'
     | '/join/$token'
@@ -1361,6 +1390,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/support/tickets'
     | '/crm/'
     | '/security/'
     | '/settings/'
@@ -1399,6 +1429,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
     | '/api/public/stripe/webhook'
+    | '/api/public/support/tickets'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
@@ -1477,6 +1508,7 @@ export interface FileRouteTypes {
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
     | '/hooks/run-schedules'
+    | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
     | '/hooks/warm-health'
     | '/join/$token'
@@ -1498,6 +1530,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/support/tickets'
     | '/crm'
     | '/security'
     | '/settings'
@@ -1536,6 +1569,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
     | '/api/public/stripe/webhook'
+    | '/api/public/support/tickets'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
@@ -1615,6 +1649,7 @@ export interface FileRouteTypes {
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
     | '/hooks/run-schedules'
+    | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
     | '/hooks/warm-health'
     | '/join/$token'
@@ -1636,6 +1671,7 @@ export interface FileRouteTypes {
     | '/settings/provisioning-preview'
     | '/settings/role-audit'
     | '/settings/roles'
+    | '/support/tickets'
     | '/crm/'
     | '/security/'
     | '/settings/'
@@ -1674,6 +1710,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
     | '/api/public/stripe/webhook'
+    | '/api/public/support/tickets'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
@@ -1751,11 +1788,13 @@ export interface RootRouteChildren {
   HooksHandoffObservabilityPollRoute: typeof HooksHandoffObservabilityPollRoute
   HooksHandoffParityRefreshRoute: typeof HooksHandoffParityRefreshRoute
   HooksRunSchedulesRoute: typeof HooksRunSchedulesRoute
+  HooksSupportRemediationDrainRoute: typeof HooksSupportRemediationDrainRoute
   HooksTokenAlertsRoute: typeof HooksTokenAlertsRoute
   HooksWarmHealthRoute: typeof HooksWarmHealthRoute
   JoinTokenRoute: typeof JoinTokenRoute
   SecurityIntakeRoute: typeof SecurityIntakeRoute
   SecurityScansRoute: typeof SecurityScansRoute
+  SupportTicketsRoute: typeof SupportTicketsRoute
   CrmIndexRoute: typeof CrmIndexRoute
   SecurityIndexRoute: typeof SecurityIndexRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
@@ -1792,6 +1831,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontSetupRoute: typeof ApiPublicStorefrontSetupRoute
   ApiPublicStorefrontWalletRoute: typeof ApiPublicStorefrontWalletRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRouteWithChildren
+  ApiPublicSupportTicketsRoute: typeof ApiPublicSupportTicketsRoute
   ApiPublicTokensBalanceRoute: typeof ApiPublicTokensBalanceRoute
   ApiPublicTokensCancelRoute: typeof ApiPublicTokensCancelRoute
   ApiPublicTokensCommitRoute: typeof ApiPublicTokensCommitRoute
@@ -2018,6 +2058,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/support/tickets': {
+      id: '/support/tickets'
+      path: '/support/tickets'
+      fullPath: '/support/tickets'
+      preLoaderRoute: typeof SupportTicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/roles': {
       id: '/settings/roles'
       path: '/roles'
@@ -2163,6 +2210,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/token-alerts'
       fullPath: '/hooks/token-alerts'
       preLoaderRoute: typeof HooksTokenAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/support-remediation-drain': {
+      id: '/hooks/support-remediation-drain'
+      path: '/hooks/support-remediation-drain'
+      fullPath: '/hooks/support-remediation-drain'
+      preLoaderRoute: typeof HooksSupportRemediationDrainRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/run-schedules': {
@@ -2513,6 +2567,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/tokens/balance'
       fullPath: '/api/public/tokens/balance'
       preLoaderRoute: typeof ApiPublicTokensBalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/support/tickets': {
+      id: '/api/public/support/tickets'
+      path: '/api/public/support/tickets'
+      fullPath: '/api/public/support/tickets'
+      preLoaderRoute: typeof ApiPublicSupportTicketsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/stripe/webhook': {
@@ -2930,11 +2991,13 @@ const rootRouteChildren: RootRouteChildren = {
   HooksHandoffObservabilityPollRoute: HooksHandoffObservabilityPollRoute,
   HooksHandoffParityRefreshRoute: HooksHandoffParityRefreshRoute,
   HooksRunSchedulesRoute: HooksRunSchedulesRoute,
+  HooksSupportRemediationDrainRoute: HooksSupportRemediationDrainRoute,
   HooksTokenAlertsRoute: HooksTokenAlertsRoute,
   HooksWarmHealthRoute: HooksWarmHealthRoute,
   JoinTokenRoute: JoinTokenRoute,
   SecurityIntakeRoute: SecurityIntakeRoute,
   SecurityScansRoute: SecurityScansRoute,
+  SupportTicketsRoute: SupportTicketsRoute,
   CrmIndexRoute: CrmIndexRoute,
   SecurityIndexRoute: SecurityIndexRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
@@ -2971,6 +3034,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontSetupRoute: ApiPublicStorefrontSetupRoute,
   ApiPublicStorefrontWalletRoute: ApiPublicStorefrontWalletRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRouteWithChildren,
+  ApiPublicSupportTicketsRoute: ApiPublicSupportTicketsRoute,
   ApiPublicTokensBalanceRoute: ApiPublicTokensBalanceRoute,
   ApiPublicTokensCancelRoute: ApiPublicTokensCancelRoute,
   ApiPublicTokensCommitRoute: ApiPublicTokensCommitRoute,

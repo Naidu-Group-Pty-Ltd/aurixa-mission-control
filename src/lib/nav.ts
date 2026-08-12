@@ -19,14 +19,12 @@ import {
   Building2,
   CalendarClock,
   LifeBuoy,
-
   CheckCircle2,
   Cloud,
   Crown,
   Coins,
   Gauge,
   GitFork,
-
   Handshake,
   KeyRound,
   LayoutDashboard,
@@ -166,6 +164,13 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "queue review merge two-key",
       },
       {
+        to: "/support/tickets",
+        label: "Support Ops",
+        icon: LifeBuoy,
+        shortcut: "t",
+        keywords: "tickets p0 p1 p2 sla self-healing remediation validation portal",
+      },
+      {
         to: "/security/intake",
         label: "Intake Sources",
         icon: Shield,
@@ -203,7 +208,12 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Building2,
         keywords: "clients organisations companies",
       },
-      { to: "/crm/deals", label: "Deals", icon: Target, keywords: "pipeline opportunities forecast" },
+      {
+        to: "/crm/deals",
+        label: "Deals",
+        icon: Target,
+        keywords: "pipeline opportunities forecast",
+      },
       {
         to: "/crm/fit",
         label: "Fit Analysis",
