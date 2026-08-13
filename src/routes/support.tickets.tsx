@@ -30,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   approveRemediationRun,
   getSupportTicketDetail,
+  listAssistantActivity,
   listAwaitingValidation,
   listSupportTickets,
   overrideTicketPriority,
@@ -37,7 +38,7 @@ import {
   resolveSupportTicket,
 } from "@/lib/support-tickets.functions";
 import { formatDistanceToNow } from "@/lib/format";
-import { LifeBuoy, ShieldCheck, Wrench } from "lucide-react";
+import { Bot, LifeBuoy, ShieldCheck, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/support/tickets")({
@@ -121,6 +122,12 @@ function SupportOpsPage() {
     refetchInterval: 15000,
   });
 
+  const activityQuery = useQuery({
+    queryKey: ["support", "assistant-activity"],
+    queryFn: () => listAssistantActivity({ data: {} }),
+    refetchInterval: 30000,
+  });
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["support"] });
   };
@@ -174,6 +181,9 @@ function SupportOpsPage() {
                 {awaitingCount}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="assistant">
+            <Bot className="mr-1.5 h-4 w-4" /> Assistant
           </TabsTrigger>
         </TabsList>
 
@@ -263,6 +273,41 @@ function SupportOpsPage() {
           )}
           {(validationQuery.data?.runs ?? []).map((run: any) => (
             <ValidationRow key={run.id} run={run} onDone={refresh} />
+          ))}
+        </TabsContent>
+
+        <TabsContent value="assistant" className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {activityQuery.data
+              ? `${activityQuery.data.askedLast7d} questions in the last 7 days · ${activityQuery.data.escalatedLast7d} escalated to a ticket`
+              : "Loading assistant activity…"}
+          </p>
+          {(activityQuery.data?.activity ?? []).length === 0 && !activityQuery.isLoading && (
+            <p className="text-sm text-muted-foreground">
+              No assistant activity yet — rows appear here as the Support Portal's screening
+              assistant answers questions.
+            </p>
+          )}
+          {(activityQuery.data?.activity ?? []).map((a: any) => (
+            <Card key={a.id}>
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{a.question}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {a.workspace_id ?? "unknown workspace"}
+                    {a.clones?.name ? ` (${a.clones.name})` : ""}
+                    {a.user_external_id ? ` · user ${a.user_external_id}` : ""}
+                    {a.source ? ` · via ${a.source}` : ""} ·{" "}
+                    {formatDistanceToNow(a.asked_at ?? a.created_at)}
+                    {a.latency_ms != null ? ` · ${a.latency_ms} ms` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {a.escalated && <Badge variant="destructive">escalated</Badge>}
+                  <Badge variant="secondary">{a.mode}</Badge>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </TabsContent>
       </Tabs>
