@@ -289,3 +289,48 @@ export const getSupportVocabulary = createServerFn({ method: "GET" })
     priorities: TICKET_PRIORITIES,
     breakageVectors: BREAKAGE_VECTORS,
   }));
+
+const ActivityListInput = z.object({
+  workspace: z.string().max(120).optional(),
+  limit: z.number().int().min(1).max(200).default(100),
+});
+
+/**
+ * The Support Portal assistant's activity feed: what each workspace's users
+ * asked, how the assistant handled it, and which conversations escalated —
+ * the deflection story that precedes (or replaces) a ticket.
+ */
+export const listAssistantActivity = createServerFn({ method: "POST" })
+  .middleware([requireOperator])
+  .inputValidator((d) => ActivityListInput.parse(d ?? {}))
+  .handler(async ({ data, context }) => {
+    let query = context.supabase
+      .from("support_assistant_activity")
+      .select(
+        "id, workspace_id, clone_id, user_external_id, question, mode, escalated, escalate_reason, latency_ms, source, asked_at, created_at, clones(name, slug)",
+      )
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.workspace) query = query.eq("workspace_id", data.workspace);
+    const { data: rows, error } = await query;
+    if (error) throw error;
+
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
+    const [{ count: askedWeek }, { count: escalatedWeek }] = await Promise.all([
+      context.supabase
+        .from("support_assistant_activity")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", weekAgo),
+      context.supabase
+        .from("support_assistant_activity")
+        .select("id", { count: "exact", head: true })
+        .eq("escalated", true)
+        .gte("created_at", weekAgo),
+    ]);
+
+    return {
+      activity: rows ?? [],
+      askedLast7d: askedWeek ?? 0,
+      escalatedLast7d: escalatedWeek ?? 0,
+    };
+  });

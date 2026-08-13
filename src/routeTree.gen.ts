@@ -113,6 +113,7 @@ import { Route as ApiPublicTokensCommitRouteImport } from './routes/api.public.t
 import { Route as ApiPublicTokensCancelRouteImport } from './routes/api.public.tokens.cancel'
 import { Route as ApiPublicTokensBalanceRouteImport } from './routes/api.public.tokens.balance'
 import { Route as ApiPublicSupportTicketsRouteImport } from './routes/api.public.support.tickets'
+import { Route as ApiPublicSupportAssistantActivityRouteImport } from './routes/api.public.support.assistant-activity'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api.public.stripe.webhook'
 import { Route as ApiPublicStorefrontWalletRouteImport } from './routes/api.public.storefront.wallet'
 import { Route as ApiPublicStorefrontSetupRouteImport } from './routes/api.public.storefront.setup'
@@ -678,6 +679,12 @@ const ApiPublicSupportTicketsRoute = ApiPublicSupportTicketsRouteImport.update({
   path: '/api/public/support/tickets',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSupportAssistantActivityRoute =
+  ApiPublicSupportAssistantActivityRouteImport.update({
+    id: '/api/public/support/assistant-activity',
+    path: '/api/public/support/assistant-activity',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
   id: '/api/public/stripe/webhook',
   path: '/api/public/stripe/webhook',
@@ -1004,6 +1011,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
+  '/api/public/support/assistant-activity': typeof ApiPublicSupportAssistantActivityRoute
   '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
@@ -1144,6 +1152,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
+  '/api/public/support/assistant-activity': typeof ApiPublicSupportAssistantActivityRoute
   '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
@@ -1286,6 +1295,7 @@ export interface FileRoutesById {
   '/api/public/storefront/setup': typeof ApiPublicStorefrontSetupRoute
   '/api/public/storefront/wallet': typeof ApiPublicStorefrontWalletRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
+  '/api/public/support/assistant-activity': typeof ApiPublicSupportAssistantActivityRoute
   '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
@@ -1429,6 +1439,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
     | '/api/public/stripe/webhook'
+    | '/api/public/support/assistant-activity'
     | '/api/public/support/tickets'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
@@ -1569,6 +1580,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
     | '/api/public/stripe/webhook'
+    | '/api/public/support/assistant-activity'
     | '/api/public/support/tickets'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
@@ -1710,6 +1722,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/setup'
     | '/api/public/storefront/wallet'
     | '/api/public/stripe/webhook'
+    | '/api/public/support/assistant-activity'
     | '/api/public/support/tickets'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
@@ -1831,6 +1844,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontSetupRoute: typeof ApiPublicStorefrontSetupRoute
   ApiPublicStorefrontWalletRoute: typeof ApiPublicStorefrontWalletRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRouteWithChildren
+  ApiPublicSupportAssistantActivityRoute: typeof ApiPublicSupportAssistantActivityRoute
   ApiPublicSupportTicketsRoute: typeof ApiPublicSupportTicketsRoute
   ApiPublicTokensBalanceRoute: typeof ApiPublicTokensBalanceRoute
   ApiPublicTokensCancelRoute: typeof ApiPublicTokensCancelRoute
@@ -2576,6 +2590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSupportTicketsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/support/assistant-activity': {
+      id: '/api/public/support/assistant-activity'
+      path: '/api/public/support/assistant-activity'
+      fullPath: '/api/public/support/assistant-activity'
+      preLoaderRoute: typeof ApiPublicSupportAssistantActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/stripe/webhook': {
       id: '/api/public/stripe/webhook'
       path: '/api/public/stripe/webhook'
@@ -3034,6 +3055,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontSetupRoute: ApiPublicStorefrontSetupRoute,
   ApiPublicStorefrontWalletRoute: ApiPublicStorefrontWalletRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRouteWithChildren,
+  ApiPublicSupportAssistantActivityRoute:
+    ApiPublicSupportAssistantActivityRoute,
   ApiPublicSupportTicketsRoute: ApiPublicSupportTicketsRoute,
   ApiPublicTokensBalanceRoute: ApiPublicTokensBalanceRoute,
   ApiPublicTokensCancelRoute: ApiPublicTokensCancelRoute,

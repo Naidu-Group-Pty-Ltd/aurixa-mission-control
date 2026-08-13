@@ -416,3 +416,101 @@ export async function getTicketStatus(
   if (!ticket) return { status: 404, body: { ok: false, error: "not_found" } };
   return { status: 200, body: { ok: true, ticket } };
 }
+
+// ── Assistant activity feed ──────────────────────────────────────────────
+
+const AssistantActivitySchema = z.object({
+  version: z.union([z.literal(1), z.literal("1")]).default(1),
+  workspace_id: z.string().trim().max(120).optional().nullable(),
+  user_id: z.string().trim().max(120).optional().nullable(),
+  question: z.string().trim().min(1).max(500),
+  mode: z.enum(["model", "retrieval", "no_match", "escalate"]),
+  escalated: z.boolean().default(false),
+  escalate_reason: z.string().trim().max(300).optional().nullable(),
+  latency_ms: z.number().int().min(0).max(600_000).optional().nullable(),
+  source: z.string().trim().max(40).optional().nullable(),
+  asked_at: z.string().datetime({ offset: true }).optional().nullable(),
+});
+
+// The forwarder retries nothing and drops are fine — this cap only stops a
+// compromised or looping sender from flooding the table.
+const ACTIVITY_WINDOW_MINUTES = 15;
+const ACTIVITY_WINDOW_LIMIT = 120;
+
+/**
+ * POST /api/public/support/assistant-activity — one row per question the
+ * Support Portal's screening assistant handled, carrying the workspace and
+ * user identity the portal took from the dashboard.
+ *
+ * Machine-to-machine only: unlike ticket ingest there is no open mode —
+ * a valid per-source HMAC signature or the shared secret is REQUIRED,
+ * because nothing interactive ever calls this.
+ */
+export async function ingestAssistantActivity(request: Request): Promise<IngestOutcome> {
+  const raw = await request.text();
+  if (raw.length > 32 * 1024) {
+    return { status: 413, body: { ok: false, error: "payload_too_large" } };
+  }
+
+  const auth = await verifySupportAuth(raw, request.headers);
+  if (!auth.ok) return { status: auth.status, body: { ok: false, error: auth.error } };
+  if (!auth.verified) {
+    return { status: 401, body: { ok: false, error: "signature required" } };
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    return { status: 400, body: { ok: false, error: "invalid_json" } };
+  }
+  const parsed = AssistantActivitySchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    return {
+      status: 400,
+      body: { ok: false, error: "validation_failed", fields: zodFieldErrors(parsed.error) },
+    };
+  }
+  const payload = parsed.data;
+  const admin = supabaseAdmin as any;
+
+  const workspaceId = payload.workspace_id ?? null;
+  if (workspaceId) {
+    const { count } = await admin
+      .from("support_assistant_activity")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .gte(
+        "created_at",
+        new Date(Date.now() - ACTIVITY_WINDOW_MINUTES * 60_000).toISOString(),
+      );
+    if ((count ?? 0) >= ACTIVITY_WINDOW_LIMIT) {
+      return { status: 202, body: { ok: true, dropped: true, reason: "workspace_flood_cap" } };
+    }
+  }
+
+  const workspace = workspaceId
+    ? await resolveWorkspace(workspaceId)
+    : { cloneId: null, tenantId: null, resolution: "absent" };
+
+  const { error } = await admin.from("support_assistant_activity").insert({
+    workspace_id: workspaceId,
+    clone_id: workspace.cloneId,
+    tenant_id: workspace.tenantId,
+    user_external_id: payload.user_id ?? null,
+    question: payload.question,
+    mode: payload.mode,
+    escalated: payload.escalated,
+    escalate_reason: payload.escalate_reason ?? null,
+    latency_ms: payload.latency_ms ?? null,
+    source: payload.source ?? null,
+    verified_source: auth.verified,
+    asked_at: payload.asked_at ?? null,
+  });
+  if (error) {
+    console.error("assistant activity insert failed:", error.message);
+    return { status: 500, body: { ok: false, error: "ingest_failed" } };
+  }
+
+  return { status: 202, body: { ok: true } };
+}
