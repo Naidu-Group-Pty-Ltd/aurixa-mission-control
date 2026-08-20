@@ -37,7 +37,6 @@ import {
   type RealtimePublicationTable,
 } from "./backend-provisioning.server";
 
-
 type Row = Record<string, unknown>;
 
 function rows(raw: unknown): Row[] {
@@ -126,10 +125,88 @@ const TRIGGERS_SQL = `
    order by table_name, trigger_name, event_manipulation
 `;
 
+/**
+ * Schemas a clone must reproduce. `public` alone was the whole of parity, and
+ * this prime keeps 106 tables in `aml` that nothing here could see.
+ */
+const PARITY_SCHEMAS = ["public", "aml"] as const;
+const SCHEMA_LIST = PARITY_SCHEMAS.map((s) => `'${s}'`).join(", ");
+
+/**
+ * Constraints, keyed schema.table.conname.
+ *
+ * Parity had no notion of these, and a clone can match on every table and
+ * column while having no primary keys, no foreign keys and no uniqueness at
+ * all — which is exactly what a half-finished schema transfer produces. The
+ * observed case: 2 constraints against the prime's 2,560, reported as sound.
+ */
+const CONSTRAINTS_SQL = `
+  select n.nspname as schema, rel.relname as table_name, con.conname as name,
+         con.contype::text as kind
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace n on n.oid = rel.relnamespace
+   where n.nspname in (${SCHEMA_LIST})
+   order by schema, table_name, name
+`;
+
+/**
+ * Indexes, keyed schema.indexname. Constraint-backed indexes are included:
+ * the point is what the database HAS, and excluding them here would hide a
+ * primary key's index going missing.
+ */
+const INDEXES_SQL = `
+  select schemaname as schema, tablename as table_name, indexname as name
+    from pg_indexes
+   where schemaname in (${SCHEMA_LIST})
+   order by schema, name
+`;
+
+/**
+ * Materialized views. `relkind = 'm'`, so every table query in this file
+ * misses them — including the one that would notice an index failing to
+ * create against a relation that "does not exist".
+ */
+const MATVIEWS_SQL = `
+  select n.nspname as schema, c.relname as name
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where c.relkind = 'm' and n.nspname in (${SCHEMA_LIST})
+   order by schema, name
+`;
+
+/** Sequences — a missing one breaks every insert that defaults from it. */
+const SEQUENCES_SQL = `
+  select n.nspname as schema, c.relname as name
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where c.relkind = 'S' and n.nspname in (${SCHEMA_LIST})
+   order by schema, name
+`;
+
 // ── Fetch snapshots ───────────────────────────────────────────────────
 
 async function snapshotProject(ref: string) {
-  const [t, r, p, f, e, buckets, cron, edgeFns, secretNames, authCfg, realtimeTables, gr, en, tr] = await Promise.all([
+  const [
+    t,
+    r,
+    p,
+    f,
+    e,
+    buckets,
+    cron,
+    edgeFns,
+    secretNames,
+    authCfg,
+    realtimeTables,
+    gr,
+    en,
+    tr,
+    cons,
+    idx,
+    mv,
+    seq,
+  ] = await Promise.all([
     runSqlOnProject(ref, TABLES_SQL).then(rows),
     runSqlOnProject(ref, RLS_SQL).then(rows),
     runSqlOnProject(ref, POLICIES_SQL).then(rows),
@@ -141,11 +218,28 @@ async function snapshotProject(ref: string) {
     listProjectSecretNames(ref),
     getProjectAuthConfig(ref),
     fetchRealtimePublicationTables(ref).catch(() => [] as RealtimePublicationTable[]),
-    runSqlOnProject(ref, GRANTS_SQL).then(rows).catch(() => [] as Row[]),
-    runSqlOnProject(ref, ENUMS_SQL).then(rows).catch(() => [] as Row[]),
-    runSqlOnProject(ref, TRIGGERS_SQL).then(rows).catch(() => [] as Row[]),
+    runSqlOnProject(ref, GRANTS_SQL)
+      .then(rows)
+      .catch(() => [] as Row[]),
+    runSqlOnProject(ref, ENUMS_SQL)
+      .then(rows)
+      .catch(() => [] as Row[]),
+    runSqlOnProject(ref, TRIGGERS_SQL)
+      .then(rows)
+      .catch(() => [] as Row[]),
+    runSqlOnProject(ref, CONSTRAINTS_SQL)
+      .then(rows)
+      .catch(() => [] as Row[]),
+    runSqlOnProject(ref, INDEXES_SQL)
+      .then(rows)
+      .catch(() => [] as Row[]),
+    runSqlOnProject(ref, MATVIEWS_SQL)
+      .then(rows)
+      .catch(() => [] as Row[]),
+    runSqlOnProject(ref, SEQUENCES_SQL)
+      .then(rows)
+      .catch(() => [] as Row[]),
   ]);
-
 
   const columnsByTable = new Map<string, Map<string, Row>>();
   for (const row of t) {
@@ -179,9 +273,7 @@ async function snapshotProject(ref: string) {
   const edgeFnSet = new Set<string>(edgeFns);
   const secretSet = new Set<string>(secretNames);
 
-  const realtimeSet = new Set<string>(
-    (realtimeTables ?? []).map((t) => `${t.schema}.${t.table}`),
-  );
+  const realtimeSet = new Set<string>((realtimeTables ?? []).map((t) => `${t.schema}.${t.table}`));
 
   // G5 — grants: Map<table, Map<role, Set<privilege>>>
   const grantsByTable = new Map<string, Map<string, Set<string>>>();
@@ -225,10 +317,15 @@ async function snapshotProject(ref: string) {
     grantsByTable,
     enumsByName,
     triggerKeys,
+    // Keyed so a rename shows as one missing + one extra rather than a
+    // count that happens to match.
+    constraintKeys: new Set(cons.map((r) => `${r.schema}.${r.table_name}.${r.name}`)),
+    indexKeys: new Set(idx.map((r) => `${r.schema}.${r.name}`)),
+    matviewKeys: new Set(mv.map((r) => `${r.schema}.${r.name}`)),
+    sequenceKeys: new Set(seq.map((r) => `${r.schema}.${r.name}`)),
     authCfg: authCfg ?? {},
   };
 }
-
 
 type Snapshot = Awaited<ReturnType<typeof snapshotProject>>;
 
@@ -262,7 +359,11 @@ function diffTables(prime: Snapshot, target: Snapshot) {
       else {
         const td = targetCols.get(name)!;
         if (String(def.data_type) !== String(td.data_type)) {
-          typeChanges.push({ column: name, prime: String(def.data_type), target: String(td.data_type) });
+          typeChanges.push({
+            column: name,
+            prime: String(def.data_type),
+            target: String(td.data_type),
+          });
         }
       }
     }
@@ -292,7 +393,9 @@ function diffPolicies(prime: Snapshot, target: Snapshot) {
   }
 
   for (const [tbl, primePolicies] of prime.policiesByTable) {
-    const targetSet = new Set((target.policiesByTable.get(tbl) ?? []).map((r) => String(r.policyname)));
+    const targetSet = new Set(
+      (target.policiesByTable.get(tbl) ?? []).map((r) => String(r.policyname)),
+    );
     const missing = primePolicies.map((r) => String(r.policyname)).filter((n) => !targetSet.has(n));
     if (missing.length) missingPolicies.push({ table: tbl, policies: missing });
   }
@@ -341,12 +444,22 @@ function diffBuckets(prime: Snapshot, target: Snapshot) {
       configDrift.push({ id, field: "public", prime: pb.public, target: tb.public });
     }
     if ((pb.file_size_limit ?? null) !== (tb.file_size_limit ?? null)) {
-      configDrift.push({ id, field: "file_size_limit", prime: pb.file_size_limit, target: tb.file_size_limit });
+      configDrift.push({
+        id,
+        field: "file_size_limit",
+        prime: pb.file_size_limit,
+        target: tb.file_size_limit,
+      });
     }
     const pm = JSON.stringify((pb.allowed_mime_types ?? []).slice().sort());
     const tm = JSON.stringify((tb.allowed_mime_types ?? []).slice().sort());
     if (pm !== tm) {
-      configDrift.push({ id, field: "allowed_mime_types", prime: pb.allowed_mime_types, target: tb.allowed_mime_types });
+      configDrift.push({
+        id,
+        field: "allowed_mime_types",
+        prime: pb.allowed_mime_types,
+        target: tb.allowed_mime_types,
+      });
     }
   }
   for (const id of target.bucketsById.keys()) if (!prime.bucketsById.has(id)) extra.push(id);
@@ -534,6 +647,40 @@ function diffTriggers(prime: Snapshot, target: Snapshot) {
 
 // ── Public entry ──────────────────────────────────────────────────────
 
+/**
+ * Set-difference helper for the object classes that are just names. Reporting
+ * both directions matters: a rename is a missing plus an extra, and a count
+ * comparison would call it equal.
+ */
+function diffKeySets(prime: Set<string>, target: Set<string>) {
+  const missing: string[] = [];
+  const extra: string[] = [];
+  for (const k of prime) if (!target.has(k)) missing.push(k);
+  for (const k of target) if (!prime.has(k)) extra.push(k);
+  return {
+    prime_count: prime.size,
+    target_count: target.size,
+    missing_in_target: missing.sort(),
+    extra_in_target: extra.sort(),
+  };
+}
+
+function diffConstraints(prime: Snapshot, target: Snapshot) {
+  return diffKeySets(prime.constraintKeys, target.constraintKeys);
+}
+
+function diffIndexes(prime: Snapshot, target: Snapshot) {
+  return diffKeySets(prime.indexKeys, target.indexKeys);
+}
+
+function diffMatviews(prime: Snapshot, target: Snapshot) {
+  return diffKeySets(prime.matviewKeys, target.matviewKeys);
+}
+
+function diffSequences(prime: Snapshot, target: Snapshot) {
+  return diffKeySets(prime.sequenceKeys, target.sequenceKeys);
+}
+
 export type ParityResult = {
   prime_ref: string;
   target_ref: string;
@@ -551,13 +698,20 @@ export type ParityResult = {
   grants_diff: ReturnType<typeof diffGrants>;
   enums_diff: ReturnType<typeof diffEnums>;
   triggers_diff: ReturnType<typeof diffTriggers>;
+  constraints_diff: ReturnType<typeof diffConstraints>;
+  indexes_diff: ReturnType<typeof diffIndexes>;
+  matviews_diff: ReturnType<typeof diffMatviews>;
+  sequences_diff: ReturnType<typeof diffSequences>;
   blocking_issues: string[];
   risk_level: "low" | "medium" | "high" | "blocking";
   summary: string;
 };
 
 export async function computeParity(primeRef: string, targetRef: string): Promise<ParityResult> {
-  const [prime, target] = await Promise.all([snapshotProject(primeRef), snapshotProject(targetRef)]);
+  const [prime, target] = await Promise.all([
+    snapshotProject(primeRef),
+    snapshotProject(targetRef),
+  ]);
 
   const tables = diffTables(prime, target);
   const policies = diffPolicies(prime, target);
@@ -573,26 +727,52 @@ export async function computeParity(primeRef: string, targetRef: string): Promis
   const grants = diffGrants(prime, target);
   const enums = diffEnums(prime, target);
   const triggers = diffTriggers(prime, target);
+  const constraints = diffConstraints(prime, target);
+  const indexes = diffIndexes(prime, target);
+  const matviews = diffMatviews(prime, target);
+  const sequences = diffSequences(prime, target);
 
   const blocking: string[] = [];
-  if (tables.missing_in_target.length) blocking.push(`missing_tables:${tables.missing_in_target.length}`);
-  if (tables.column_drift.some((c) => c.missing.length || c.typeChanges.length)) blocking.push("column_drift");
-  if (policies.rls_disabled_in_target.length) blocking.push(`rls_disabled:${policies.rls_disabled_in_target.length}`);
-  if (policies.missing_policies.length) blocking.push(`missing_policies:${policies.missing_policies.length}`);
-  if (functions.missing_in_target.length) blocking.push(`missing_functions:${functions.missing_in_target.length}`);
-  if (extensions.missing_in_target.length) blocking.push(`missing_extensions:${extensions.missing_in_target.length}`);
-  if (buckets.missing_in_target.length) blocking.push(`missing_buckets:${buckets.missing_in_target.length}`);
-  if (secrets.missing_in_target.length) blocking.push(`missing_secrets:${secrets.missing_in_target.length}`);
-  if (edgeFns.missing_in_target.length) blocking.push(`missing_edge_functions:${edgeFns.missing_in_target.length}`);
-  if (requiredExt.missing_in_target.length) blocking.push(`missing_required_extensions:${requiredExt.missing_in_target.length}`);
-  if (realtime.missing_in_target.length) blocking.push(`missing_realtime_tables:${realtime.missing_in_target.length}`);
+  if (tables.missing_in_target.length)
+    blocking.push(`missing_tables:${tables.missing_in_target.length}`);
+  if (tables.column_drift.some((c) => c.missing.length || c.typeChanges.length))
+    blocking.push("column_drift");
+  if (policies.rls_disabled_in_target.length)
+    blocking.push(`rls_disabled:${policies.rls_disabled_in_target.length}`);
+  if (policies.missing_policies.length)
+    blocking.push(`missing_policies:${policies.missing_policies.length}`);
+  if (functions.missing_in_target.length)
+    blocking.push(`missing_functions:${functions.missing_in_target.length}`);
+  if (extensions.missing_in_target.length)
+    blocking.push(`missing_extensions:${extensions.missing_in_target.length}`);
+  if (buckets.missing_in_target.length)
+    blocking.push(`missing_buckets:${buckets.missing_in_target.length}`);
+  if (secrets.missing_in_target.length)
+    blocking.push(`missing_secrets:${secrets.missing_in_target.length}`);
+  if (edgeFns.missing_in_target.length)
+    blocking.push(`missing_edge_functions:${edgeFns.missing_in_target.length}`);
+  if (requiredExt.missing_in_target.length)
+    blocking.push(`missing_required_extensions:${requiredExt.missing_in_target.length}`);
+  if (realtime.missing_in_target.length)
+    blocking.push(`missing_realtime_tables:${realtime.missing_in_target.length}`);
   // G5 blockers — GRANT gaps break PostgREST reachability; enum drift breaks
   // shared-column inserts; missing triggers break cascade/audit invariants.
-  if (grants.missing_grantees.length) blocking.push(`missing_grantees:${grants.missing_grantees.length}`);
-  if (enums.missing_in_target.length) blocking.push(`missing_enums:${enums.missing_in_target.length}`);
+  if (grants.missing_grantees.length)
+    blocking.push(`missing_grantees:${grants.missing_grantees.length}`);
+  if (enums.missing_in_target.length)
+    blocking.push(`missing_enums:${enums.missing_in_target.length}`);
   if (enums.label_drift.length) blocking.push(`enum_label_drift:${enums.label_drift.length}`);
-  if (triggers.missing_in_target.length) blocking.push(`missing_triggers:${triggers.missing_in_target.length}`);
-
+  if (triggers.missing_in_target.length)
+    blocking.push(`missing_triggers:${triggers.missing_in_target.length}`);
+  // A clone can match on every table and column while holding no keys at all.
+  if (constraints.missing_in_target.length)
+    blocking.push(`missing_constraints:${constraints.missing_in_target.length}`);
+  if (indexes.missing_in_target.length)
+    blocking.push(`missing_indexes:${indexes.missing_in_target.length}`);
+  if (matviews.missing_in_target.length)
+    blocking.push(`missing_matviews:${matviews.missing_in_target.length}`);
+  if (sequences.missing_in_target.length)
+    blocking.push(`missing_sequences:${sequences.missing_in_target.length}`);
 
   let risk: ParityResult["risk_level"] = "low";
   if (
@@ -636,6 +816,10 @@ export async function computeParity(primeRef: string, targetRef: string): Promis
     grants_diff: grants,
     enums_diff: enums,
     triggers_diff: triggers,
+    constraints_diff: constraints,
+    indexes_diff: indexes,
+    matviews_diff: matviews,
+    sequences_diff: sequences,
     blocking_issues: blocking,
     risk_level: risk,
     summary,
