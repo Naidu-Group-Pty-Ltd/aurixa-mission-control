@@ -11,7 +11,7 @@ import { asJson } from "@/lib/json-cast";
 /** jsonb columns come back as `Json`; spreading needs a real object. */
 function metaRecord(value: unknown): Record<string, Json> {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? ({ ...(value as Record<string, Json>) })
+    ? { ...(value as Record<string, Json>) }
     : {};
 }
 

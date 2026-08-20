@@ -59,6 +59,14 @@ jobs:
       - name: Cron coverage
         run: npm run check:cron
 
+      # Two failures with no runtime signal, on the deployment path: a secret
+      # given a `VITE_` name is inlined into the client bundle and served to the
+      # public with nothing logging it, and a deployment status the column
+      # refuses makes an update fail with an error this codebase has a habit of
+      # discarding — so the row simply never advances.
+      - name: Hosting env policy and deployment state parity
+        run: npm run check:hosting
+
       - name: Typecheck
         run: npm run typecheck
 

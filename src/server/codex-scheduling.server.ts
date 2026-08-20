@@ -96,11 +96,7 @@ export async function resolveRemediationWebhookSecret(): Promise<string> {
   return resolveScanWebhookSecret();
 }
 
-async function recordEvent(
-  jobId: string,
-  eventType: string,
-  payload: Json = {},
-) {
+async function recordEvent(jobId: string, eventType: string, payload: Json = {}) {
   try {
     await admin.from("codex_scan_events").insert({ job_id: jobId, event_type: eventType, payload });
   } catch {

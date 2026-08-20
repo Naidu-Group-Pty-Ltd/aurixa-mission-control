@@ -24,6 +24,12 @@ const ROUTES = "src/routes";
 // Hooks that are correctly NOT on a timer, and what drives them instead.
 const NOT_SCHEDULED = new Map([
   ["github", "GitHub webhook receiver — fires on repository events."],
+  [
+    "vercel",
+    "Vercel webhook receiver — fires on deployment events. The reconciliation " +
+      "sweep it backs up lives inside /hooks/deployment-drain, which IS scheduled, " +
+      "because a webhook that was never delivered leaves no trace anywhere.",
+  ],
 ]);
 
 const hooks = readdirSync(ROUTES)
@@ -31,19 +37,30 @@ const hooks = readdirSync(ROUTES)
   .map((f) => f.replace(/^hooks\./, "").replace(/\.tsx?$/, ""))
   .sort();
 
-const sql = readdirSync(MIGRATIONS)
+const migrationFiles = readdirSync(MIGRATIONS)
   .filter((f) => f.endsWith(".sql"))
   .sort()
-  .map((f) => readFileSync(join(MIGRATIONS, f), "utf8"))
-  .join("\n");
+  .map((f) => ({ name: f, body: readFileSync(join(MIGRATIONS, f), "utf8") }));
 
-// A hook counts as scheduled when a migration names its path. That covers a
-// literal URL and the `v_base || '/hooks/' || j.hook` form, where the hook name
-// appears as a bare string in the job table the loop reads.
+// A hook counts as scheduled when a migration names its path.
+//
+// Two forms, and the second is scanned PER FILE rather than across the joined
+// corpus. `20260820140000_schedule_orphan_hook_workers.sql` builds its URL as
+// `v_base || '/hooks/' || j.hook`, so the hook name only ever appears as a bare
+// quoted string in a VALUES row — which means the scan has to accept bare
+// strings, which means it will also accept any other quoted string in any other
+// migration. Scoping it to files that actually construct a `/hooks/` URL is what
+// keeps `coalesce(v_dep.provider_slug, 'vercel')` in an unrelated trigger from
+// declaring /hooks/vercel scheduled by a migration that says nothing about it —
+// a guard that reports a contradiction on correct code is one people learn to
+// silence.
 const scheduled = new Set();
-for (const m of sql.matchAll(/\/hooks\/([a-z0-9-]+)/g)) scheduled.add(m[1]);
-for (const m of sql.matchAll(/'([a-z0-9-]+)'\s*\)\s*(?:,|\n)/g)) {
-  if (hooks.includes(m[1])) scheduled.add(m[1]);
+for (const { body } of migrationFiles) {
+  for (const m of body.matchAll(/\/hooks\/([a-z0-9-]+)/g)) scheduled.add(m[1]);
+  if (!body.includes("'/hooks/'")) continue;
+  for (const m of body.matchAll(/'([a-z0-9-]+)'\s*\)/g)) {
+    if (hooks.includes(m[1])) scheduled.add(m[1]);
+  }
 }
 
 const orphans = hooks.filter((h) => !scheduled.has(h) && !NOT_SCHEDULED.has(h));

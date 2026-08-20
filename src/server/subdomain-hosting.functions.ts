@@ -9,22 +9,15 @@
 // worker action handlers).
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import crypto from "crypto";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { cloudflareApi, CloudflareError } from "@/server/cloudflare/client";
+import { enqueueSubdomainJob, payloadHash } from "@/server/hosting/subdomainJobs.server";
 
 const admin = supabaseAdmin as any;
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-
-function payloadHash(p: unknown): string {
-  return crypto
-    .createHash("sha256")
-    .update(JSON.stringify(p ?? {}))
-    .digest("hex");
-}
 
 async function loadPlatformConfig() {
   const { data } = await admin
@@ -40,10 +33,19 @@ export const getPlatformHostingConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth, requireAdmin])
   .handler(async () => {
     const cfg = await loadPlatformConfig();
+    const { isVercelConfigured, defaultTeamId } = await import("@/server/hosting/vercel-client");
     return {
       config: cfg ?? null,
       cloudflareTokenConfigured: Boolean(process.env.CLOUDFLARE_API_TOKEN),
       ready: Boolean(cfg?.cloudflare_zone_id && process.env.CLOUDFLARE_API_TOKEN),
+      // Hosting is a SEPARATE readiness question from DNS. A zone with a valid
+      // token and no hosting provider is a fleet whose names resolve to an
+      // origin that serves nobody; reporting one number for both is how an
+      // operator concludes the wrong half is broken.
+      hostingProviderSlug: cfg?.hosting_provider_slug ?? "manual",
+      hostingTokenConfigured: isVercelConfigured(),
+      hostingTeamId: defaultTeamId(),
+      hostingReady: cfg?.hosting_provider_slug === "manual" ? true : isVercelConfigured(),
     };
   });
 
@@ -62,6 +64,10 @@ export const updatePlatformHostingConfig = createServerFn({ method: "POST" })
         auto_provision: z.boolean().optional(),
         subdomain_pattern: z.string().optional(),
         reserved_slugs: z.array(z.string()).optional(),
+        hosting_provider_slug: z.enum(["vercel", "manual"]).optional(),
+        vercel_team_id: z.string().nullable().optional(),
+        vercel_project_prefix: z.string().max(40).optional(),
+        auto_deploy: z.boolean().optional(),
       })
       .parse(d),
   )
@@ -141,33 +147,50 @@ export const requestCloneSubdomain = createServerFn({ method: "POST" })
       return { ok: true as const, status: "pending_platform" as const, fqdn };
     }
 
-    const payload = {
-      subdomain: slug,
+    // The record content is resolved from the clone's own DEPLOYMENT first,
+    // falling back to the fleet default. `cfg.target_value` is one A record for
+    // the whole fleet, which is only correct where one origin serves every clone
+    // by Host header — see resolveDnsTarget.
+    const { data: deployment } = await admin
+      .from("clone_deployments")
+      .select("dns_target_type, dns_target_value, status")
+      .eq("clone_id", data.cloneId)
+      .maybeSingle();
+
+    const enqueued = await enqueueSubdomainJob({
+      cloneId: data.cloneId,
+      slug,
       fqdn,
       zoneId: cfg.cloudflare_zone_id,
-      recordType: cfg.target_type === "cname" ? "CNAME" : "A",
-      recordContent: cfg.target_value,
-      proxied: cfg.proxied,
+      fleet: cfg,
+      deployment,
+      createdBy: context.userId,
+    });
+    if (!enqueued.ok) {
+      // `no_target` is the ORDINARY path on a provider-managed fleet, not an
+      // error: the name is reserved and the platform is configured, and the
+      // clone's Vercel project simply has not attached the domain yet. The
+      // deployment drain enqueues the record itself at `attaching_domain`, with
+      // the CNAME Vercel issued.
+      //
+      // Throwing here would fail the wizard's submit for a clone that is
+      // progressing exactly as designed.
+      if (enqueued.reason === "no_target") {
+        await admin
+          .from("clones")
+          .update({ subdomain_status: "awaiting_deployment" })
+          .eq("id", data.cloneId);
+        return { ok: true as const, status: "awaiting_deployment" as const, fqdn };
+      }
+      throw new Error(`subdomain_enqueue_failed:${enqueued.reason}`);
+    }
+    return {
+      ok: true as const,
+      status: "queued" as const,
+      fqdn,
+      jobId: enqueued.jobId,
+      target: enqueued.source,
     };
-    const hash = payloadHash(payload);
-    const { data: job, error } = await admin
-      .from("edge_provisioning_jobs")
-      .upsert(
-        {
-          clone_id: data.cloneId,
-          provider_slug: "cloudflare",
-          action: "provision_subdomain",
-          payload,
-          payload_hash: hash,
-          status: "queued",
-          created_by: context.userId,
-        },
-        { onConflict: "clone_id,provider_slug,action,payload_hash" },
-      )
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    return { ok: true as const, status: "queued" as const, fqdn, jobId: job?.id };
   });
 
 // ── Detach subdomain ────────────────────────────────────────────────────────
@@ -219,31 +242,48 @@ export const reconcilePendingSubdomains = createServerFn({ method: "POST" })
       .select("id, subdomain, subdomain_fqdn")
       .eq("subdomain_status", "pending_platform");
     let enqueued = 0;
+    let skipped = 0;
+    let awaiting = 0;
     for (const row of pending ?? []) {
-      const payload = {
-        subdomain: row.subdomain,
+      const { data: deployment } = await admin
+        .from("clone_deployments")
+        .select("dns_target_type, dns_target_value, status")
+        .eq("clone_id", row.id)
+        .maybeSingle();
+      const result = await enqueueSubdomainJob({
+        cloneId: row.id,
+        slug: row.subdomain,
         fqdn: row.subdomain_fqdn ?? `${row.subdomain}.${cfg.primary_domain}`,
         zoneId: cfg.cloudflare_zone_id,
-        recordType: cfg.target_type === "cname" ? "CNAME" : "A",
-        recordContent: cfg.target_value,
-        proxied: cfg.proxied,
-      };
-      await admin.from("edge_provisioning_jobs").upsert(
-        {
-          clone_id: row.id,
-          provider_slug: "cloudflare",
-          action: "provision_subdomain",
-          payload,
-          payload_hash: payloadHash(payload),
-          status: "queued",
-          created_by: context.userId,
-        },
-        { onConflict: "clone_id,provider_slug,action,payload_hash" },
-      );
+        fleet: cfg,
+        deployment,
+        createdBy: context.userId,
+      });
+      if (!result.ok) {
+        // Leave the clone dormant rather than marking it queued for a job that
+        // was never created — a `queued` row with no job is the state nobody
+        // can diagnose from the UI.
+        //
+        // `no_target` is separated out because it is not the platform's fault:
+        // leaving such a clone in `pending_platform` makes every future
+        // reconcile retry it and tells the operator the platform is
+        // misconfigured when the only thing outstanding is the clone's own
+        // build.
+        if (result.reason === "no_target") {
+          await admin
+            .from("clones")
+            .update({ subdomain_status: "awaiting_deployment" })
+            .eq("id", row.id);
+          awaiting++;
+          continue;
+        }
+        skipped++;
+        continue;
+      }
       await admin.from("clones").update({ subdomain_status: "queued" }).eq("id", row.id);
       enqueued++;
     }
-    return { ok: true as const, enqueued };
+    return { ok: true as const, awaitingDeployment: awaiting, enqueued, skipped };
   });
 
 export const listCloneSubdomains = createServerFn({ method: "GET" })

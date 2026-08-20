@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useModules, usePrimeConfig } from "@/lib/queries";
 import { TierModulePicker, type TierSelection } from "@/components/tier-module-picker";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GitFork, Copy, Layers, Info, Shield, Check, Database } from "lucide-react";
+import { GitFork, Copy, Layers, Info, Shield, Check, Database, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -89,6 +89,11 @@ function NewClone() {
   const [edgePreset, setEdgePreset] = useState("balanced");
   const [subdomainEnabled, setSubdomainEnabled] = useState(true);
   const [subdomainSlug, setSubdomainSlug] = useState("");
+  // "platform" defers to Settings → Domains rather than hardcoding a choice
+  // here, so changing the fleet's provider does not mean editing the wizard.
+  const [deploymentProvider, setDeploymentProvider] = useState<
+    "platform" | "vercel" | "manual" | "none"
+  >("platform");
   const requestSubdomainFn = useServerFn(requestCloneSubdomain);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [tierSelection, setTierSelection] = useState<TierSelection>({
@@ -267,6 +272,7 @@ function NewClone() {
           isolatedTenant,
           billingUserId: billingUserId.trim() || null,
           billingStripeCustomerId: billingStripeCustomerId.trim() || null,
+          deploymentProvider: deploymentProvider === "platform" ? undefined : deploymentProvider,
           idempotencyKey,
         },
       });
@@ -776,6 +782,76 @@ function NewClone() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Rocket className="h-4 w-4 text-info" /> 6c · Deployment
+          </CardTitle>
+          <CardDescription>
+            Who builds this clone and serves it. The repository and the backend are provisioned
+            above; this is the step that turns them into a running site and gives the clone a real
+            URL — which clone health, penetration-test scoping and the backend&apos;s own sign-in
+            allow-list all read.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-2 md:grid-cols-2">
+            {(
+              [
+                {
+                  value: "platform",
+                  title: "Platform default",
+                  detail: "Use whatever Settings → Domains is set to.",
+                },
+                {
+                  value: "vercel",
+                  title: "Vercel",
+                  detail: "Create a project, push the env, build, and attach the subdomain.",
+                },
+                {
+                  value: "manual",
+                  title: "Manual target",
+                  detail: "A person configures the host. DNS still points at the fleet default.",
+                },
+                {
+                  value: "none",
+                  title: "Don't deploy",
+                  detail: "Recorded as declined — not as a failure.",
+                },
+              ] as const
+            ).map((option) => (
+              <label
+                key={option.value}
+                className={`flex cursor-pointer gap-3 border p-3 transition-colors ${
+                  deploymentProvider === option.value
+                    ? "border-primary bg-primary/[0.06]"
+                    : "border-border hover:bg-foreground/[0.03]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="deployment-provider"
+                  className="mt-1"
+                  checked={deploymentProvider === option.value}
+                  onChange={() => setDeploymentProvider(option.value)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{option.title}</span>
+                  <span className="block text-xs text-muted-foreground">{option.detail}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Dormant if no hosting token is configured: the request is recorded and fans out from{" "}
+            <a href="/settings/domains" className="underline">
+              Settings → Domains
+            </a>{" "}
+            once it lands. Nothing here blocks the wizard.
+          </p>
         </CardContent>
       </Card>
 

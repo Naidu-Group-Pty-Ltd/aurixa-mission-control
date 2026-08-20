@@ -115,18 +115,29 @@ export const cloudflareApi = {
   createDnsRecord: (
     zoneId: string,
     body: {
-      type: "A" | "AAAA" | "CNAME";
+      type: "A" | "AAAA" | "CNAME" | "TXT";
       name: string;
       content: string;
       proxied?: boolean;
       ttl?: number;
       comment?: string;
     },
-  ) =>
-    cf<{ id: string; name: string; type: string; content: string; proxied: boolean }>(
+  ) => {
+    // `proxied` is not a property a TXT record can have, and Cloudflare rejects
+    // the whole request rather than ignoring the field. The default below used
+    // to be applied unconditionally, so the first TXT record this client was
+    // ever asked to write would have failed with a validation error that names
+    // the field rather than the record type — and a domain-ownership challenge
+    // that never lands looks exactly like DNS that has not propagated yet.
+    const proxyable = body.type !== "TXT";
+    const payload = proxyable
+      ? { ttl: 1, proxied: true, ...body }
+      : { ttl: 1, ...body, proxied: undefined };
+    return cf<{ id: string; name: string; type: string; content: string; proxied: boolean }>(
       `/zones/${zoneId}/dns_records`,
-      { method: "POST", body: JSON.stringify({ ttl: 1, proxied: true, ...body }) },
-    ),
+      { method: "POST", body: JSON.stringify(payload) },
+    );
+  },
   updateDnsRecord: (
     zoneId: string,
     recordId: string,

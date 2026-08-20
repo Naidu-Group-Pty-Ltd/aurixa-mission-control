@@ -37,6 +37,7 @@ import {
   verifyCloudflareSetup,
   countPendingSubdomains,
 } from "@/server/subdomain-hosting.functions";
+import { reconcilePendingDeployments } from "@/server/deployment-provisioning.functions";
 
 export const Route = createFileRoute("/settings/domains")({
   // Renders inside the /settings layout, which already provides ProtectedRoute
@@ -76,6 +77,7 @@ function DomainsSettings() {
   const reconcileFn = useServerFn(reconcilePendingSubdomains);
   const verifyFn = useServerFn(verifyCloudflareSetup);
   const countFn = useServerFn(countPendingSubdomains);
+  const reconcileDeploymentsFn = useServerFn(reconcilePendingDeployments);
 
   const cfgQ = useQuery({ queryKey: ["platform-hosting-config"], queryFn: () => cfgFn() });
   const listQ = useQuery({ queryKey: ["clone-subdomains"], queryFn: () => listFn() });
@@ -90,6 +92,7 @@ function DomainsSettings() {
   const [reconciling, setReconciling] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [reconcilingDeployments, setReconcilingDeployments] = useState(false);
 
   useEffect(() => {
     if (cfgQ.data?.config && !form) setForm({ ...cfgQ.data.config });
@@ -112,6 +115,10 @@ function DomainsSettings() {
           target_value: form.target_value,
           proxied: form.proxied,
           auto_provision: form.auto_provision,
+          hosting_provider_slug: form.hosting_provider_slug,
+          vercel_team_id: form.vercel_team_id || null,
+          vercel_project_prefix: form.vercel_project_prefix ?? "",
+          auto_deploy: form.auto_deploy,
         },
       });
       toast.success("Hosting configuration saved");
@@ -402,6 +409,103 @@ function DomainsSettings() {
             <Button onClick={onSave} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Hosting</CardTitle>
+          <CardDescription>
+            Who builds a clone and serves it. This is a different question from DNS: a zone with a
+            valid token and no hosting provider is a fleet whose names resolve to an origin that
+            serves nobody. The DNS target above is the FLEET DEFAULT — a clone with its own
+            deployment overrides it with the record its provider issued.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label>Hosting provider</Label>
+              <Select
+                value={form.hosting_provider_slug ?? "manual"}
+                onValueChange={(v) => setForm({ ...form, hosting_provider_slug: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vercel">Vercel</SelectItem>
+                  <SelectItem value="manual">Manual target (current)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="pt-1 text-xs text-muted-foreground">
+                {cfgQ.data?.hostingTokenConfigured
+                  ? "VERCEL_API_TOKEN is configured."
+                  : "VERCEL_API_TOKEN is not set — new deployments record as pending and fan out once it lands."}
+              </p>
+            </div>
+            <div>
+              <Label>Vercel team ID</Label>
+              <Input
+                value={form.vercel_team_id ?? ""}
+                onChange={(e) => setForm({ ...form, vercel_team_id: e.target.value })}
+                placeholder={cfgQ.data?.hostingTeamId ?? "team_… (blank for a personal account)"}
+              />
+              <p className="pt-1 text-xs text-muted-foreground">
+                Omitting this on a team account operates on the personal account instead, which is
+                how a project ends up somewhere nobody on the team can see it.
+              </p>
+            </div>
+            <div>
+              <Label>Project name prefix</Label>
+              <Input
+                value={form.vercel_project_prefix ?? ""}
+                onChange={(e) => setForm({ ...form, vercel_project_prefix: e.target.value })}
+                placeholder="aurixa-"
+              />
+              <p className="pt-1 text-xs text-muted-foreground">
+                Prepended to the clone slug. A project name is a namespace — two clones cannot share
+                one.
+              </p>
+            </div>
+            <div className="self-end">
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={!!form.auto_deploy}
+                  onCheckedChange={(v) => setForm({ ...form, auto_deploy: v })}
+                />
+                Deploy automatically on clone creation
+              </label>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button onClick={onSave} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
+            {/* The way OUT of the dormant posture. Recording a request while no
+                token exists is only honest if there is a way to fan the backlog
+                out that does not mean touching every clone by hand. */}
+            <Button
+              variant="outline"
+              disabled={reconcilingDeployments || !cfgQ.data?.hostingTokenConfigured}
+              onClick={async () => {
+                setReconcilingDeployments(true);
+                try {
+                  const res = await reconcileDeploymentsFn();
+                  if (res.ok) toast.success(`Queued ${res.enqueued} deployment(s)`);
+                  else toast.error("Hosting provider is not configured");
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Reconcile failed");
+                } finally {
+                  setReconcilingDeployments(false);
+                }
+              }}
+            >
+              {reconcilingDeployments && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reconcile pending deployments
             </Button>
           </div>
         </CardContent>

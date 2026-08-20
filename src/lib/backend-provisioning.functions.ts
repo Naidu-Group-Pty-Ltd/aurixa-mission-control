@@ -87,23 +87,60 @@ async function runBackendProvisioning(
 
     // G8: Collect the clone's own frontend origins so applyAuthConfig can
     // whitelist them on the new backend instead of copying prime's URLs.
+    //
+    // This runs minutes BEFORE any deployment exists, and it used to read
+    // `deploy_url ?? lovable_project_url` — two columns nothing in this
+    // codebase writes. Both are always null, so the only entry that ever landed
+    // was a hostname CONSTRUCTED from the slug against a hardcoded
+    // `aurixasystems.com.au`: an allow-list for a host nothing served, on a
+    // domain the platform config may not even use. A redirect allow-list fails
+    // at sign-in rather than at write time, which is why nothing reported it.
+    //
+    // Two changes. The domain comes from `platform_hosting_config` rather than
+    // from a literal, and the clone's deployment contributes its real origins
+    // when it has any. The deployment worker re-applies this on reaching `live`
+    // (see hooks.deployment-drain), because at THIS point in the pipeline the
+    // honest answer is still usually "we do not know yet".
     const { data: cloneRow } = await supabase
       .from("clones")
       .select("slug, deploy_url, lovable_project_url, github_owner, github_repo, default_branch")
       .eq("id", input.cloneId)
       .maybeSingle();
-    const { data: cfRow } = await supabase
-      .from("cloudflare_clone_config")
-      .select("zone_name")
-      .eq("clone_id", input.cloneId)
-      .maybeSingle();
+    const [{ data: cfRow }, { data: deploymentRow }, { data: hostingCfg }] = await Promise.all([
+      supabase
+        .from("cloudflare_clone_config")
+        .select("zone_name")
+        .eq("clone_id", input.cloneId)
+        .maybeSingle(),
+      supabase
+        .from("clone_deployments")
+        .select("domain, provider_origin, status")
+        .eq("clone_id", input.cloneId)
+        .maybeSingle(),
+      supabase
+        .from("platform_hosting_config")
+        .select("primary_domain")
+        .eq("singleton", true)
+        .maybeSingle(),
+    ]);
+
+    const { cloneFqdn, resolveCloneOrigin } = await import("@/server/hosting/dnsTarget.pure");
+    const deploymentOrigin = resolveCloneOrigin({
+      domain: deploymentRow?.domain,
+      providerOrigin: deploymentRow?.provider_origin,
+      deploymentStatus: deploymentRow?.status,
+    });
+    const plannedFqdn = cloneFqdn(cloneRow?.slug, hostingCfg?.primary_domain);
+
     const cloneOrigins = {
-      siteUrl: cloneRow?.deploy_url ?? cloneRow?.lovable_project_url ?? null,
+      siteUrl: cloneRow?.deploy_url ?? deploymentOrigin ?? cloneRow?.lovable_project_url ?? null,
       additionalRedirectUrls: [
         cloneRow?.deploy_url ?? null,
+        deploymentOrigin,
+        deploymentRow?.provider_origin ?? null,
         cloneRow?.lovable_project_url ?? null,
         cfRow?.zone_name ? `https://${cfRow.zone_name}` : null,
-        cloneRow?.slug ? `https://${cloneRow.slug}.aurixasystems.com.au` : null,
+        plannedFqdn ? `https://${plannedFqdn}` : null,
       ],
     };
 

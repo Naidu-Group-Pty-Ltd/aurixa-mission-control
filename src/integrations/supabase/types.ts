@@ -1599,6 +1599,123 @@ export type Database = {
           },
         ]
       }
+      clone_deployments: {
+        Row: {
+          attempts: number
+          clone_id: string
+          created_at: string
+          dns_target_type: string | null
+          dns_target_value: string | null
+          domain: string | null
+          domain_verification: Json
+          domain_verified_at: string | null
+          env_digest: string | null
+          env_synced_at: string | null
+          error_message: string | null
+          last_deployed_at: string | null
+          build_checked_at: string | null
+          last_build_at: string | null
+          last_build_deployment_id: string | null
+          last_build_error: string | null
+          last_build_state: string | null
+          latest_deployment_id: string | null
+          max_attempts: number
+          next_attempt_at: string
+          project_id: string | null
+          project_name: string | null
+          provider_origin: string | null
+          provider_slug: string
+          requested_by: string | null
+          status: string
+          status_detail: string | null
+          team_id: string | null
+          updated_at: string
+          worker_finished_at: string | null
+          worker_started_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          clone_id: string
+          created_at?: string
+          dns_target_type?: string | null
+          dns_target_value?: string | null
+          domain?: string | null
+          domain_verification?: Json
+          domain_verified_at?: string | null
+          env_digest?: string | null
+          env_synced_at?: string | null
+          error_message?: string | null
+          last_deployed_at?: string | null
+          build_checked_at?: string | null
+          last_build_at?: string | null
+          last_build_deployment_id?: string | null
+          last_build_error?: string | null
+          last_build_state?: string | null
+          latest_deployment_id?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          project_id?: string | null
+          project_name?: string | null
+          provider_origin?: string | null
+          provider_slug?: string
+          requested_by?: string | null
+          status?: string
+          status_detail?: string | null
+          team_id?: string | null
+          updated_at?: string
+          worker_finished_at?: string | null
+          worker_started_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          clone_id?: string
+          created_at?: string
+          dns_target_type?: string | null
+          dns_target_value?: string | null
+          domain?: string | null
+          domain_verification?: Json
+          domain_verified_at?: string | null
+          env_digest?: string | null
+          env_synced_at?: string | null
+          error_message?: string | null
+          last_deployed_at?: string | null
+          build_checked_at?: string | null
+          last_build_at?: string | null
+          last_build_deployment_id?: string | null
+          last_build_error?: string | null
+          last_build_state?: string | null
+          latest_deployment_id?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          project_id?: string | null
+          project_name?: string | null
+          provider_origin?: string | null
+          provider_slug?: string
+          requested_by?: string | null
+          status?: string
+          status_detail?: string | null
+          team_id?: string | null
+          updated_at?: string
+          worker_finished_at?: string | null
+          worker_started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clone_deployments_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: true
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_deployments_provider_slug_fkey"
+            columns: ["provider_slug"]
+            isOneToOne: false
+            referencedRelation: "hosting_providers"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       clone_drift_policies: {
         Row: {
           auto_apply_severity: Database["public"]["Enums"]["drift_severity"]
@@ -4376,6 +4493,59 @@ export type Database = {
           },
         ]
       }
+      deployment_events: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          clone_id: string
+          created_at: string
+          error_message: string | null
+          from_status: string | null
+          id: string
+          payload: Json
+          provider_slug: string
+          result: Json
+          success: boolean
+          to_status: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          clone_id: string
+          created_at?: string
+          error_message?: string | null
+          from_status?: string | null
+          id?: string
+          payload?: Json
+          provider_slug: string
+          result?: Json
+          success?: boolean
+          to_status?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          clone_id?: string
+          created_at?: string
+          error_message?: string | null
+          from_status?: string | null
+          id?: string
+          payload?: Json
+          provider_slug?: string
+          result?: Json
+          success?: boolean
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deployment_events_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       edge_audit: {
         Row: {
           action: string
@@ -5665,6 +5835,116 @@ export type Database = {
         }
         Relationships: []
       }
+      hosting_providers: {
+        Row: {
+          capabilities: Json
+          created_at: string
+          display_name: string
+          slug: string
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          capabilities?: Json
+          created_at?: string
+          display_name: string
+          slug: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          capabilities?: Json
+          created_at?: string
+          display_name?: string
+          slug?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hosting_teardowns: {
+        Row: {
+          attempts: number
+          clone_id: string | null
+          clone_name: string | null
+          clone_slug: string | null
+          completed_at: string | null
+          created_at: string
+          dns_record_ids: string[]
+          domain: string | null
+          error_message: string | null
+          id: string
+          max_attempts: number
+          next_attempt_at: string
+          project_id: string | null
+          project_name: string | null
+          provider_slug: string
+          requested_by: string | null
+          result: Json
+          status: string
+          team_id: string | null
+          worker_started_at: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          clone_id?: string | null
+          clone_name?: string | null
+          clone_slug?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dns_record_ids?: string[]
+          domain?: string | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number
+          next_attempt_at?: string
+          project_id?: string | null
+          project_name?: string | null
+          provider_slug?: string
+          requested_by?: string | null
+          result?: Json
+          status?: string
+          team_id?: string | null
+          worker_started_at?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          clone_id?: string | null
+          clone_name?: string | null
+          clone_slug?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dns_record_ids?: string[]
+          domain?: string | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number
+          next_attempt_at?: string
+          project_id?: string | null
+          project_name?: string | null
+          provider_slug?: string
+          requested_by?: string | null
+          result?: Json
+          status?: string
+          team_id?: string | null
+          worker_started_at?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hosting_teardowns_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount_due_cents: number | null
@@ -6645,11 +6925,13 @@ export type Database = {
       }
       platform_hosting_config: {
         Row: {
+          auto_deploy: boolean
           auto_provision: boolean
           cloudflare_account_id: string | null
           cloudflare_zone_id: string | null
           cloudflare_zone_name: string | null
           created_at: string
+          hosting_provider_slug: string
           id: string
           primary_domain: string
           provider_slug: string
@@ -6661,13 +6943,17 @@ export type Database = {
           target_value: string
           updated_at: string
           updated_by: string | null
+          vercel_project_prefix: string
+          vercel_team_id: string | null
         }
         Insert: {
+          auto_deploy?: boolean
           auto_provision?: boolean
           cloudflare_account_id?: string | null
           cloudflare_zone_id?: string | null
           cloudflare_zone_name?: string | null
           created_at?: string
+          hosting_provider_slug?: string
           id?: string
           primary_domain?: string
           provider_slug?: string
@@ -6679,13 +6965,17 @@ export type Database = {
           target_value?: string
           updated_at?: string
           updated_by?: string | null
+          vercel_project_prefix?: string
+          vercel_team_id?: string | null
         }
         Update: {
+          auto_deploy?: boolean
           auto_provision?: boolean
           cloudflare_account_id?: string | null
           cloudflare_zone_id?: string | null
           cloudflare_zone_name?: string | null
           created_at?: string
+          hosting_provider_slug?: string
           id?: string
           primary_domain?: string
           provider_slug?: string
@@ -6697,6 +6987,8 @@ export type Database = {
           target_value?: string
           updated_at?: string
           updated_by?: string | null
+          vercel_project_prefix?: string
+          vercel_team_id?: string | null
         }
         Relationships: []
       }
@@ -9934,6 +10226,7 @@ export type Database = {
       module_status: "proposed" | "approved" | "archived" | "rejected"
       notification_kind:
         | "cascade_completed"
+        | "deployment_build_failed"
         | "cascade_failed"
         | "cascade_partial"
         | "cascade_started"
@@ -9974,6 +10267,9 @@ export type Database = {
         | "handoff_consent_received"
         | "github_app_access_drift"
         | "api_usage_settlement_failed"
+        | "deployment_live"
+        | "deployment_failed"
+        | "deployment_domain_pending"
         | "security_assessment_created"
         | "security_report_submitted"
         | "security_finding_created"
@@ -10361,6 +10657,7 @@ export const Constants = {
       module_status: ["proposed", "approved", "archived", "rejected"],
       notification_kind: [
         "cascade_completed",
+        "deployment_build_failed",
         "cascade_failed",
         "cascade_partial",
         "cascade_started",
@@ -10401,6 +10698,9 @@ export const Constants = {
         "handoff_consent_received",
         "github_app_access_drift",
         "api_usage_settlement_failed",
+        "deployment_live",
+        "deployment_failed",
+        "deployment_domain_pending",
         "security_assessment_created",
         "security_report_submitted",
         "security_finding_created",

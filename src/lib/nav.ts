@@ -8,6 +8,7 @@ import type { LinkProps } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  Rocket,
   AlertTriangle,
   ShieldAlert,
   ArrowRightLeft,
@@ -77,6 +78,12 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "New Clone",
         icon: GitFork,
         keywords: "create provision fork template",
+      },
+      {
+        to: "/fleet/deployments",
+        label: "Deployments",
+        icon: Rocket,
+        keywords: "vercel hosting domains build live subdomain",
       },
       { to: "/modules", label: "Modules", icon: Boxes, shortcut: "m" },
       {
