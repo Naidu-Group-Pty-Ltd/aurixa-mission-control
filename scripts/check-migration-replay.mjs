@@ -1,20 +1,29 @@
 #!/usr/bin/env node
-// Keep the migration corpus replayable from an empty database.
+// Keep this repository's migration corpus replayable from an empty database.
 //
-// This is not hygiene. `applyPrimeMigrations` (backend-provisioning.server.ts)
-// replays this corpus onto every clone backend Mission Control provisions, in
-// filename order, and HALTS on the first failure — "schema state beyond this
-// point is undefined". So one migration that cannot run twice, or that collides
-// with an earlier one, silently truncates every clone's schema from that point
-// on. Measured: the corpus halted at migration 69 of 192, and a freshly
-// provisioned clone received 75 of 153 tables. Nothing reported it, because a
-// halted replay looks exactly like a completed one from outside.
+// WHAT THIS PROTECTS, precisely — an earlier version of this comment got it
+// wrong and the correction is the useful part.
+//
+// It does NOT protect clone backends. `applyPrimeMigrations` replays the
+// migrations of the repo named in `prime_config` — the prime PRODUCT repo,
+// fetched over the GitHub API by `fetchPrimeMigrations` — and never reads
+// `supabase/migrations/` from this repository at all. Clone backends receive a
+// different corpus entirely, and this check says nothing about it.
+//
+// What it protects is Mission Control's OWN database, in the one situation
+// that matters: rebuilding it. `supabase db reset`, standing up a staging
+// copy, restoring after a loss, or any tooling that replays from zero. That
+// path was broken — executed against a real PostgreSQL 16 from empty, the
+// corpus halted at migration 69 of 192 and produced 75 tables instead of 153.
+// It had been in that state since 2026-07-10 and nothing reported it, because
+// the live database was built incrementally by applying each migration as it
+// was written; a corpus that cannot replay looks identical from there.
 //
 // Postgres gives `CREATE POLICY` and `CREATE TRIGGER` no `IF NOT EXISTS`, so
-// they are the two statements that cannot be written idempotently by accident.
-// Everything else in this corpus (TABLE, INDEX, TYPE, FUNCTION) either has the
-// clause or uses OR REPLACE. That makes this check complete for the class, not
-// a sample of it.
+// they are the two statements here that cannot be written idempotently by
+// accident. Everything else in this corpus (TABLE, INDEX, TYPE, FUNCTION)
+// either has the clause or uses OR REPLACE. That makes this check complete for
+// the class rather than a sample of it.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -82,9 +91,11 @@ if (findings.length > 0) {
     console.error(`    first created in ${f.firstIn}`);
     console.error(`    add before it:  ${f.fix}\n`);
   }
-  console.error("applyPrimeMigrations replays this corpus onto every clone backend and");
-  console.error("halts on the first failure, so a collision here truncates the schema of");
-  console.error("every clone provisioned after it — with no error anywhere.\n");
+  console.error("A replay halts on the first failure, so a collision here truncates every");
+  console.error("rebuild of this database from that point on — `supabase db reset`, a");
+  console.error("staging copy, a restore. The live database is built incrementally and");
+  console.error("looks fine regardless, which is why this needs a check rather than a\n" +
+                "runtime signal.\n");
   process.exit(1);
 }
 
