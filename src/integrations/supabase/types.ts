@@ -9959,6 +9959,7 @@ export type Database = {
         | "handoff_consent_received"
         | "github_app_access_drift"
         | "api_usage_settlement_failed"
+        | "security_assessment_created"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -10381,6 +10382,7 @@ export const Constants = {
         "handoff_consent_received",
         "github_app_access_drift",
         "api_usage_settlement_failed",
+        "security_assessment_created",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
