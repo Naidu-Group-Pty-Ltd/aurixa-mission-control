@@ -1,4 +1,3 @@
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // CRM spine — accounts, contacts, timeline activities and tasks.
 //
 // Everything in the client lifecycle hangs off `crm_accounts`. Billing truth
@@ -6,6 +5,7 @@
 // live from the existing tables by `getAccount`.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { Json } from "@/integrations/supabase/types";
 import { requireOperator } from "@/integrations/supabase/role-middleware";
 
 const uuid = z.string().uuid();
@@ -360,7 +360,7 @@ export const pipelineSummary = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.rpc("crm_pipeline_summary");
     if (error) throw error;
-    return data as Record<string, unknown>;
+    return data as Json;
   });
 
 export const convertLead = createServerFn({ method: "POST" })

@@ -1,4 +1,3 @@
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createServerFn } from "@tanstack/react-start";
 import { notifyOperators, writeAuditLog } from "@/server/audit.server";
 import { z } from "zod";
@@ -182,7 +181,7 @@ export const createBulkSecurityAssessments = createServerFn({ method: "POST" })
       .in("id", data.cloneIds);
     if (clonesError) throw new Error(clonesError.message);
 
-    const created: unknown[] = [];
+    const created: Array<{ id: string; clone_id: string | null }> = [];
     const skipped: Array<{ cloneId: string; reason: string }> = [];
 
     for (const clone of clones ?? []) {
@@ -253,7 +252,7 @@ export const createBulkSecurityAssessments = createServerFn({ method: "POST" })
         .single();
       if (assessmentRes.error) throw new Error(assessmentRes.error.message);
 
-      created.push(assessmentRes.data);
+      created.push({ id: assessmentRes.data.id, clone_id: assessmentRes.data.clone_id });
       await writeSecurityEvent({
         assessmentId: assessmentRes.data.id,
         partnerId: data.partnerId,
