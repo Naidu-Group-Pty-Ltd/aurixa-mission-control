@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Shared Stripe checkout engine (user-attributed pricing workflow).
 //

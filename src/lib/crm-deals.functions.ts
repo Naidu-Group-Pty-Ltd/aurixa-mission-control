@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // CRM deal pipeline — opportunities, line items priced from the live catalog,
 // and the won → contract + onboarding transition.
