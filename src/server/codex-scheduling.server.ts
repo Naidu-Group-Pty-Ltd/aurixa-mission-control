@@ -1,4 +1,3 @@
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Server-only orchestration for Codex Security scans without a user context
 // (pg_cron nightly job, the GitHub webhook receiver, and the sweeper).
 //
@@ -12,6 +11,7 @@
 // on Cloudflare Workers the isolate can be reclaimed as soon as the response
 // is written, so jobs were routinely left stranded at `queued` with no event
 // row at all — a large part of why the pipeline looked dead.
+import type { Json } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import {
@@ -99,7 +99,7 @@ export async function resolveRemediationWebhookSecret(): Promise<string> {
 async function recordEvent(
   jobId: string,
   eventType: string,
-  payload: Record<string, unknown> = {},
+  payload: Json = {},
 ) {
   try {
     await admin.from("codex_scan_events").insert({ job_id: jobId, event_type: eventType, payload });
@@ -202,7 +202,7 @@ export async function resolveDispatchTarget(opts: {
 async function dispatchJob(job: {
   id: string;
   kind: ScanKind;
-  target_kind: "prime" | "clone";
+  target_kind: string;
   clone_id: string | null;
   repo_full_name: string;
   ref: string | null;

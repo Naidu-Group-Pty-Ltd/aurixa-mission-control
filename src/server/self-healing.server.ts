@@ -1,4 +1,3 @@
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // The self-healing engine: plans and executes remediation runs for support
 // tickets and verified security-scan remediations.
 //
@@ -23,6 +22,7 @@
 //   rescan               — enqueue a codex security scan; findings then
 //                          flow the normal scan → remediation pipeline.
 
+import type { Database } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assessSqlDestructiveness } from "@/lib/destructive-sql";
 import { decideRemediation } from "@/lib/remediation-policy";
@@ -67,7 +67,12 @@ export async function planTicketRemediation(ticketId: string): Promise<PlanResul
     .eq("ticket_id", ticket.id);
   if ((existing ?? 0) > 0) return { runsPlanned: 0, notes: ["runs already planned"] };
 
-  const runs: Array<Record<string, unknown>> = [];
+  type PlannedRun = Record<string, unknown> & {
+    action_type: Database["public"]["Enums"]["remediation_action_type"];
+    priority?: string | null;
+    _policyInput?: Record<string, unknown>;
+  };
+  const runs: PlannedRun[] = [];
   const base = { ticket_id: ticket.id, clone_id: ticket.clone_id, priority: ticket.priority };
 
   switch (ticket.remediation_lane) {
@@ -170,7 +175,12 @@ async function planVerifiedMergesForScope(
   query = cloneId ? query.eq("clone_id", cloneId) : query.is("clone_id", null);
   const { data: candidates } = await query;
 
-  const runs: Array<Record<string, unknown>> = [];
+  type PlannedRun = Record<string, unknown> & {
+    action_type: Database["public"]["Enums"]["remediation_action_type"];
+    priority?: string | null;
+    _policyInput?: Record<string, unknown>;
+  };
+  const runs: PlannedRun[] = [];
   for (const rem of candidates ?? []) {
     const severity = rem.codex_findings?.severity ?? "medium";
     const findingPriority = severityToPriority(severity);
