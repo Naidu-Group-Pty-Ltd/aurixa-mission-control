@@ -375,7 +375,7 @@ type PrimeConfigClient = {
   from: (table: string) => {
     select: (cols: string) => {
       limit: (n: number) => {
-        maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>;
+        maybeSingle: () => PromiseLike<{ data: Record<string, unknown> | null }>;
       };
     };
   };
