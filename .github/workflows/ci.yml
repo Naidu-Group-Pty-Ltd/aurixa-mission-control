@@ -23,11 +23,41 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # The repository currently carries both bun.lockb and package-lock.json, and
-        # the npm lockfile lags the package manifest. Resolve from package.json so
-        # PR verification can run typecheck/lint/test/build instead of failing at
-        # dependency installation before project code is exercised.
-        run: npm install
+        # `npm ci` rather than `npm install`: it installs exactly what the
+        # lockfile pins and FAILS when package.json and package-lock.json
+        # disagree, instead of quietly resolving a different tree than the one
+        # anyone tested. The comment this replaces said the lockfile lagged the
+        # manifest and that `npm install` was the workaround; that is no longer
+        # true — `npm ci` completes cleanly in 37s against the committed
+        # lockfile, and every other workflow in this repository already prefers
+        # it.
+        #
+        # Note the repo also carries `bun.lock` and `bun.lockb`. No workflow
+        # uses them and `bun.lockb` predates the support-ticketing dependencies
+        # by three weeks, so anyone running `bun install` gets a tree that is
+        # missing packages the app now imports. Left in place because the
+        # generating platform's own toolchain was not verified from here.
+        run: npm ci --no-audit --no-fund
+
+      # Runs before the typecheck it protects: a table missing from the
+      # generated types makes every query against it resolve to `never`, so the
+      # typecheck goes green precisely because nothing is being checked.
+      - name: Supabase types match migrations
+        run: npm run check:supabase-types
+
+      # The typecheck is only as good as the files it is allowed to see.
+      - name: '@ts-nocheck budget'
+        run: npm run check:ts-nocheck
+
+      # A table with RLS on and no policy is closed, and closed reads answer
+      # with an empty array rather than an error — so nothing at runtime says so.
+      - name: RLS policy coverage
+        run: npm run check:rls
+
+      # A worker nobody schedules produces no error anywhere — the queue simply
+      # never drains. Six were in that state, each documenting its own cadence.
+      - name: Cron coverage
+        run: npm run check:cron
 
       - name: Typecheck
         run: npm run typecheck

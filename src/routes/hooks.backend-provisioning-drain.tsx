@@ -19,7 +19,7 @@ import { verifyCronAuth } from "@/server/cron-auth.server";
 import { decryptSecret } from "@/server/crypto.server";
 import { runQueuedBackendProvisioning } from "@/lib/backend-provisioning.functions";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 const STALL_MINUTES = 15;
 const MAX_JOBS_PER_RUN = 2;
 const MAX_ATTEMPTS = 3;

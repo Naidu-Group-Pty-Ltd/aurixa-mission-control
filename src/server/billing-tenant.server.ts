@@ -16,10 +16,11 @@
 // has over inventing one. Only a clone with no tenant at all falls through to
 // provisioning, which is the original behaviour for a genuinely new clone.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { ensureTenant } from "@/server/clone-api-keys.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 export type TenantCandidate = {
   id: string;
@@ -120,18 +121,39 @@ export async function resolveCloneBillingTenant(
   return { ok: true, tenantId: ranked[0].id, provisioned: false };
 }
 
-/** Which of these tenants have token ledger rows? */
+/**
+ * Which of these tenants have token ledger rows?
+ *
+ * Asked one tenant at a time, deliberately. The previous form was a single
+ * `.in("tenant_id", ids) … .limit(1000)`, which is a membership question
+ * answered with a capped scan: `token_ledger` has no retention and grows
+ * without bound, PostgREST returns rows in no defined order, so once a busy
+ * tenant's rows fill the cap the others come back absent — and absent here
+ * means "no ledger activity", which is the decisive signal for WHICH TENANT A
+ * CLONE BILLS TO. Getting it wrong attributes a purchase to the wrong tenant.
+ *
+ * This path only runs when one clone has several tenants — the split it exists
+ * to heal — so the list is a handful, and a `limit(1)` existence probe each is
+ * both exact and cheaper than the scan it replaces.
+ */
 async function tenantsWithLedgerActivity(tenantIds: string[]): Promise<Set<string>> {
   const found = new Set<string>();
   if (tenantIds.length === 0) return found;
   try {
-    const { data } = await adminAny
-      .from("token_ledger")
-      .select("tenant_id")
-      .in("tenant_id", tenantIds)
-      .in("kind", ["reserve", "debit", "release"])
-      .limit(1000);
-    for (const row of data ?? []) found.add((row as { tenant_id: string }).tenant_id);
+    const results = await mapWithConcurrency(tenantIds, 4, async (id) => {
+      const { data, error } = await adminAny
+        .from("token_ledger")
+        .select("tenant_id")
+        .eq("tenant_id", id)
+        .in("kind", ["reserve", "debit", "release"])
+        .limit(1);
+      // A read that FAILED is not a tenant with no activity. Throwing here puts
+      // it on the shared catch below, which leaves the whole set empty rather
+      // than quietly reporting one tenant as inactive.
+      if (error) throw new Error(error.message);
+      return { id, active: (data ?? []).length > 0 };
+    });
+    for (const r of results) if (r.active) found.add(r.id);
   } catch (err) {
     console.warn("[billing-tenant] ledger activity lookup failed", err);
   }

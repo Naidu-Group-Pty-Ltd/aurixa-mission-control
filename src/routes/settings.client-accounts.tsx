@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G12 — Client Supabase Accounts admin UI. Capture, verify, rotate, and
 // revoke the per-client org credentials used by the handoff orchestrator.
 import { createFileRoute } from "@tanstack/react-router";

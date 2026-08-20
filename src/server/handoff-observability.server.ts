@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G20 — Post-handoff observability engine.
 // Uses the client-org PAT stored in `client_supabase_accounts` to hit the
 // Supabase Management API and snapshot the target project's health into
@@ -23,7 +22,7 @@ export async function pollClientBackendHealth(handoffId: string): Promise<{
   detail?: string;
 }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
 
   const { data: cfg } = await admin
     .from("handoff_observability_configs")
@@ -66,8 +65,8 @@ export async function pollClientBackendHealth(handoffId: string): Promise<{
 
   let pat: string;
   try {
-    const { decryptSecret } = await import("@/server/crypto.server");
-    pat = decryptSecret(String(acct.pat_ciphertext));
+    const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+    pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
   } catch (e: any) {
     return { ok: false, error: "pat_decrypt_failed", detail: String(e?.message ?? e) };
   }
@@ -150,7 +149,7 @@ export async function drainDueObservabilityPolls(limit = 20): Promise<{
   results: Array<{ handoff_id: string; ok: boolean; error?: string; status?: string }>;
 }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
 
   const { data: due } = await admin
     .from("handoff_observability_configs")

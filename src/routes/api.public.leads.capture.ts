@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import crypto from "crypto";
+import { timingSafeEqualStr } from "@/server/cron-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import {
@@ -83,13 +83,6 @@ function json(body: unknown, status: number, origin: string | null): Response {
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders(origin) },
   });
-}
-
-function timingSafeEqualStr(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ab.length !== bb.length) return false;
-  return crypto.timingSafeEqual(ab, bb);
 }
 
 function hasValidSecret(request: Request): boolean {

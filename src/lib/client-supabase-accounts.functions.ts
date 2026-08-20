@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 7 unresolved type errors (assignability ×6, argument types ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // E3 — Client-owned Supabase account records. Stores the client's org id
 // and (encrypted) Personal Access Token so the handoff orchestrator can
 // provision a twin project in *their* org (round 2). PAT is encrypted at
@@ -37,7 +38,7 @@ export const createClientSupabaseAccount = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((input) => createSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { encryptSecret } = await import("@/server/crypto.server");
+    const { encryptSecret, encodeBytea } = await import("@/server/crypto.server");
     const patEnc = data.pat ? encryptSecret(data.pat) : null;
     const last4 = data.pat ? data.pat.slice(-4) : null;
     const { data: row, error } = await context.supabase
@@ -65,10 +66,20 @@ export const createClientSupabaseAccount = createServerFn({ method: "POST" })
       // Stash encrypted PAT via a service-role write to avoid RLS quirks
       // with bytea. Because BYTEA needs an admin path.
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin
+      const { error: patErr } = await supabaseAdmin
         .from("client_supabase_accounts")
-        .update({ pat_ciphertext: Buffer.from(patEnc, "utf8") })
+        .update({ pat_ciphertext: encodeBytea(patEnc) })
         .eq("id", row.id);
+      // The account row is already written at this point, so a silent failure
+      // here leaves a client account that LOOKS captured and has no credential
+      // behind it — which is exactly what the caller must not be told.
+      if (patErr) {
+        return {
+          ok: false as const,
+          id: row.id,
+          error: `account_saved_pat_not_stored: ${patErr.message}`,
+        };
+      }
     }
     return { ok: true as const, id: row.id };
   });
@@ -103,8 +114,8 @@ export const verifyClientSupabaseAccount = createServerFn({ method: "POST" })
     if (!acct) throw new Error("Client Supabase account not found");
     if (!acct.pat_ciphertext) throw new Error("No PAT stored — capture one first");
 
-    const { decryptSecret } = await import("@/server/crypto.server");
-    const pat = decryptSecret(String(acct.pat_ciphertext));
+    const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+    const pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
 
     const res = await fetch("https://api.supabase.com/v1/organizations", {
       headers: { Authorization: `Bearer ${pat}` },
@@ -126,7 +137,7 @@ export const verifyClientSupabaseAccount = createServerFn({ method: "POST" })
 
     // Prefer explicit slug/id match; otherwise fall back to the first org if only one exists.
     const wanted = acct.org_slug ?? acct.org_id ?? null;
-    let match =
+    const match =
       wanted != null
         ? orgs.find((o) => o.id === wanted || o.slug === wanted)
         : orgs.length === 1
@@ -149,9 +160,7 @@ export const verifyClientSupabaseAccount = createServerFn({ method: "POST" })
     }
 
     const plan =
-      typeof match.plan === "string"
-        ? match.plan
-        : (match.plan?.name ?? match.plan?.id ?? null);
+      typeof match.plan === "string" ? match.plan : (match.plan?.name ?? match.plan?.id ?? null);
 
     await supabaseAdmin
       .from("client_supabase_accounts")
@@ -217,14 +226,14 @@ export const rotateClientSupabasePat = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), pat: z.string().min(20) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { encryptSecret } = await import("@/server/crypto.server");
+    const { encryptSecret, encodeBytea } = await import("@/server/crypto.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const enc = encryptSecret(data.pat);
     const last4 = data.pat.slice(-4);
     const { error } = await supabaseAdmin
       .from("client_supabase_accounts")
       .update({
-        pat_ciphertext: Buffer.from(enc, "utf8"),
+        pat_ciphertext: encodeBytea(enc),
         pat_last4: last4,
         verified_at: null,
       })

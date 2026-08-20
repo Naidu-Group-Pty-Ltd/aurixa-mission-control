@@ -1,4 +1,3 @@
-// @ts-nocheck
 // /security/intake — admin UI for the provider-neutral security intake system.
 // Manage upstream sources (Codex, manual, ticketing, generic), rotate their
 // HMAC secrets, and view the endpoint contract vendors POST to.

@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 3 unresolved type errors (assignability ×2, argument types ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G21 — Billing split.
 // Records which invoices stay with Aurixa (seats, tokens, AI) versus what
 // the client is now billed for directly by Supabase after handoff.

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Waitlist lead capture console.
 //
 // Every lead captured by the Aurixa Systems landing-page waitlist form lands

@@ -51,3 +51,40 @@ export function decryptSecret(value: string | null): string | null {
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
 }
+
+// ── bytea ────────────────────────────────────────────────────────────────────
+//
+// `client_supabase_accounts.pat_ciphertext` is BYTEA, and `encryptSecret`
+// returns an ASCII string. Getting a string into and back out of a bytea column
+// over PostgREST is not symmetric, and this repository had three different
+// answers to it at once:
+//
+//   • `/api/public/handoffs/consent` wrote the bare `enc:v1:…` string. Postgres
+//     accepted it (escape format) and stored those bytes — but every read then
+//     came back as `\x656e633a…`, the hex rendering, so `decryptSecret` saw no
+//     `enc:v1:` prefix, returned the hex untouched, and the caller used it as
+//     the PAT.
+//   • `client-supabase-accounts.functions.ts` wrote a Node `Buffer`, which
+//     supabase-js JSON-encodes as `{"type":"Buffer","data":[…]}` — not a bytea
+//     literal at all. One of those two writes discarded its error.
+//   • Every read did `String(acct.pat_ciphertext)`, which is correct for none
+//     of the above.
+//
+// So the stored client PAT was unreadable no matter which path wrote it. These
+// two functions are the single answer: encode on the way in, decode on the way
+// out. `decodeBytea` passes a value that is already plain text straight
+// through, so anything a legacy row does hold still resolves.
+
+/** Encode a UTF-8 string as a PostgREST-safe bytea literal (`\x…` hex form). */
+export function encodeBytea(value: string): string {
+  return "\\x" + Buffer.from(value, "utf8").toString("hex");
+}
+
+/** Decode what PostgREST returns for a bytea column back to its UTF-8 string. */
+export function decodeBytea(value: unknown): string {
+  if (value == null) return "";
+  const s = typeof value === "string" ? value : String(value);
+  // Postgres renders bytea as `\x<hex>` under the default `bytea_output = hex`.
+  if (/^\\x(?:[0-9a-f]{2})*$/i.test(s)) return Buffer.from(s.slice(2), "hex").toString("utf8");
+  return s;
+}

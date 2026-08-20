@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 2 unresolved type errors (assignability ×2).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G19 — Handoff parity refresh worker.
 //
 // Cron-invoked endpoint that keeps `handoff_parity_reports` fresh for every
@@ -39,9 +40,7 @@ async function resolveTargetRef(handoff: any): Promise<string | null> {
     .not("status", "in", "(failed,deleted,destroyed)")
     .order("created_at", { ascending: false })
     .limit(1);
-  q = handoff.backend_id
-    ? q.eq("id", handoff.backend_id)
-    : q.eq("clone_id", handoff.clone_id);
+  q = handoff.backend_id ? q.eq("id", handoff.backend_id) : q.eq("clone_id", handoff.clone_id);
   const { data } = await q.maybeSingle();
   return data?.supabase_project_ref ?? null;
 }
@@ -63,29 +62,40 @@ export const Route = createFileRoute("/hooks/handoff-parity-refresh")({
           .order("updated_at", { ascending: true })
           .limit(50);
         if (hErr) {
-          return new Response(
-            JSON.stringify({ success: false, error: hErr.message }),
-            { status: 500, headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ success: false, error: hErr.message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
         }
 
         const cutoff = new Date(Date.now() - STALE_MS).toISOString();
         const stale: any[] = [];
         for (const h of handoffs ?? []) {
-          const { data: latest } = await supabaseAdmin
+          // The column is `generated_at`. `computed_at` does not exist on this
+          // table and never has, so PostgREST answered 42703 to every one of
+          // these reads — and because the error was discarded, `latest` came
+          // back null and EVERY handoff looked stale. This loop was refreshing
+          // parity for the whole fleet on every run, up to MAX_PER_RUN, and
+          // reporting that as normal operation.
+          const { data: latest, error: latestErr } = await supabaseAdmin
             .from("handoff_parity_reports")
-            .select("id, computed_at")
+            .select("id, generated_at")
             .eq("handoff_id", h.id)
-            .order("computed_at", { ascending: false })
+            .order("generated_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-          if (!latest || latest.computed_at < cutoff) stale.push(h);
+          // A read that FAILED is not a report that is ABSENT. Refreshing on a
+          // failed read is how the bug above stayed invisible; skip instead.
+          if (latestErr) {
+            console.warn("[parity-refresh] staleness read failed", h.id, latestErr.message);
+            continue;
+          }
+          if (!latest || latest.generated_at < cutoff) stale.push(h);
           if (stale.length >= MAX_PER_RUN) break;
         }
 
-        const { computeParity, getPrimeProjectRef } = await import(
-          "@/server/handoff-parity.server"
-        );
+        const { computeParity, getPrimeProjectRef } =
+          await import("@/server/handoff-parity.server");
         const primeRef = getPrimeProjectRef();
 
         const results = { refreshed: 0, skipped: 0, failed: 0, details: [] as any[] };

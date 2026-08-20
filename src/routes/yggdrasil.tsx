@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";

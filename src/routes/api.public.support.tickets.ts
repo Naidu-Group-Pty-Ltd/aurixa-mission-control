@@ -1,4 +1,3 @@
-// @ts-nocheck
 // POST /api/public/support/tickets — Support Portal ticket ingestion.
 // GET  /api/public/support/tickets?reference=&workspace_id= — status lookup.
 //

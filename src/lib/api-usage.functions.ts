@@ -276,7 +276,9 @@ export const closeApiUsagePeriodFn = createServerFn({ method: "POST" })
       metadata: { ...result, period_start: data.period_start, manual: true },
     });
     void supabase;
-    return { ok: true as const, ...result };
+    // `result` carries its own `ok`, which wins over the spread — so the
+    // `ok: true as const` this replaces was a claim the runtime never made.
+    return { ...result };
   });
 
 /** Push one closed charge to Stripe without waiting for the nightly sweep. */

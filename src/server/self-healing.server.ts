@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 2 unresolved type errors (assignability ×1, argument types ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // The self-healing engine: plans and executes remediation runs for support
 // tickets and verified security-scan remediations.
 //
@@ -27,6 +28,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assessSqlDestructiveness } from "@/lib/destructive-sql";
 import { decideRemediation } from "@/lib/remediation-policy";
 import { severityToPriority, priorityAtOrBelow } from "@/lib/ticket-classification";
+
+// Per-run caps. Ordered queries, so a backlog above these drains in order.
+const TICKET_ROLLUP_BATCH = 100;
+const SLA_ESCALATION_BATCH = 50;
 
 const DRAIN_BATCH = 10;
 const MONITOR_RETRY_MINUTES = 5;
@@ -775,7 +780,9 @@ async function rollUpTicketStatuses(): Promise<number> {
     .from("support_tickets")
     .select("id, status, reference, priority, clone_id")
     .in("status", ["remediating", "awaiting_validation"])
-    .limit(100);
+    // Oldest first, so a backlog above the cap drains instead of starving.
+    .order("updated_at", { ascending: true })
+    .limit(TICKET_ROLLUP_BATCH);
 
   let changed = 0;
   for (const ticket of tickets ?? []) {
@@ -841,7 +848,10 @@ async function escalateSlaBreaches(): Promise<number> {
     .not("sla_due_at", "is", null)
     .lt("sla_due_at", new Date().toISOString())
     .not("status", "in", "(resolved,closed)")
-    .limit(50);
+    // Longest-breached first. Unordered, the ticket that has been in breach
+    // longest is exactly as likely to be skipped as one that just tipped over.
+    .order("sla_due_at", { ascending: true })
+    .limit(SLA_ESCALATION_BATCH);
 
   for (const ticket of breached ?? []) {
     await admin

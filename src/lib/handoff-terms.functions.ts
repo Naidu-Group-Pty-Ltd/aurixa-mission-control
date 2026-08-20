@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G13 — Canonical terms-versions registry for signed handoff records.
 // Admin-only CRUD. Exactly one active version at a time (enforced by a
 // partial unique index on the underlying table).

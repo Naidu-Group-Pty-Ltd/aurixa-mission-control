@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Audit log detail drawer — gives a structured view of a single audit entry:
 // actor profile, entity link, action, timestamp, and pretty-printed metadata.
 import { useEffect, useState } from "react";

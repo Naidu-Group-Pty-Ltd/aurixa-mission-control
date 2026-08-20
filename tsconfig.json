@@ -16,6 +16,16 @@
     /* Linting */
     "skipLibCheck": true,
     "strict": false,
+    // strictNullChecks is NOT here for null-safety alone — it is load-bearing for
+    // TanStack Start. `ServerFnBuilder` starts with `TMiddlewares = undefined`, and
+    // `AppendMiddlewares` asks `undefined extends ReadonlyArray<any>`. With
+    // strictNullChecks off that is TRUE, so `.middleware([requireSupabaseAuth])`
+    // produced `readonly [...any[], M]`; `AssignAllMiddleware` cannot walk a tuple
+    // with a leading rest element and bails to `undefined`; and every server
+    // function's `context` was therefore typed `undefined`. That single fact
+    // accounted for 679 of the 1,038 errors the repo was hiding under @ts-nocheck.
+    // Turning it on REMOVES errors here. Do not turn it off.
+    "strictNullChecks": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,

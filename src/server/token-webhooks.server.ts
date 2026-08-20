@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+// How many due deliveries one retry pass takes.
+const DELIVERY_RETRY_BATCH = 50;
+
 export type TokenWebhookEvent =
   | "tokens.balance.updated"
   | "tokens.key.revoked"
@@ -102,7 +105,10 @@ export async function retryDueDeliveries(): Promise<{ retried: number; delivered
     .in("status", ["pending", "failed"])
     .lte("next_attempt_at", new Date().toISOString())
     .lt("attempts", 6)
-    .limit(50);
+    // Due-longest first, so a backlog drains in order rather than leaving the
+    // same deliveries permanently behind an arbitrary window of newer ones.
+    .order("next_attempt_at", { ascending: true })
+    .limit(DELIVERY_RETRY_BATCH);
   if (!due || due.length === 0) return { retried: 0, delivered: 0 };
 
   let delivered = 0;

@@ -118,12 +118,18 @@ export const Route = createFileRoute("/api/public/usage/report")({
           // would let a crash between insert and rollup silently lose revenue.
           const { data: result, error } = await supabaseAdmin.rpc("record_api_usage_event", {
             _tenant_id: tenant.tenantId,
-            _clone_id: key.clone_id,
+            // `record_api_usage_event(_clone_id uuid, ...)` accepts NULL — a
+            // platform-level API key has no clone — but the generated types call the
+            // parameter required and non-null, because the generator reads "no SQL
+            // default" as "not nullable". NULL has to reach the function.
+            _clone_id: key.clone_id as unknown as string,
             _secret_name: e.secret_name,
             _quantity: e.quantity,
             _idempotency_key: e.idempotency_key,
-            _model: e.model,
-            _feature: e.feature,
+            // DEFAULT NULL on both: omitting the key and sending null are the same
+            // row, and only omission typechecks.
+            _model: e.model ?? undefined,
+            _feature: e.feature ?? undefined,
             _call_status: e.status,
             _occurred_at: e.occurred_at,
             _metadata: e.metadata as never,

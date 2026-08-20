@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
@@ -410,11 +409,12 @@ export const getModuleBackend = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     let query = context.supabase
       .from("modules")
-      .select(
-        "id, name, slug, layer, edge_functions, database_tables, database_rpcs, storage_buckets, " +
-          "cron_jobs, required_secrets, required_migrations, backend_file_globs, external_hosts, " +
-          "backend_manifest, file_globs",
-      );
+      // One literal, deliberately: supabase-js parses the column list at the
+      // type level, and a concatenated string is just `string` — which degrades
+      // the row to `GenericStringError` and silently un-checks every field read
+      // off it.
+      // prettier-ignore
+      .select("id, name, slug, layer, edge_functions, database_tables, database_rpcs, storage_buckets, cron_jobs, required_secrets, required_migrations, backend_file_globs, external_hosts, backend_manifest, file_globs");
     query = data.moduleId ? query.eq("id", data.moduleId) : query.eq("slug", data.slug!);
 
     const { data: module, error } = await query.maybeSingle();

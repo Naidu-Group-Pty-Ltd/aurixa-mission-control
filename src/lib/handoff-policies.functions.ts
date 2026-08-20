@@ -1,4 +1,3 @@
-// @ts-nocheck
 // E6 — Region + plan policy per client. Admin-managed allowlists that gate
 // which target regions and plan tiers a handoff may specify. Consumed by
 // the handoff wizard preflight (round 2) and enforced server-side.

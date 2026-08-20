@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Server-only ingest core for the Support Portal ticket pipeline.
 //
 // The public route (/api/public/support/tickets) hands the raw request in
@@ -86,7 +85,7 @@ type AuthResult =
   | { ok: false; status: number; error: string };
 
 async function verifySupportAuth(rawBody: string, headers: Headers): Promise<AuthResult> {
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
   const { data: source } = await admin
     .from("security_intake_sources")
     .select("slug, active, hmac_secret")
@@ -125,7 +124,7 @@ async function checkRateLimit(
   ipHash: string,
   workspaceId: string | null,
 ): Promise<RateLimitResult> {
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
   try {
     // Record first so failed validations count against the window too.
     await admin
@@ -176,7 +175,7 @@ async function resolveWorkspace(workspaceId: string): Promise<{
   tenantId: string | null;
   resolution: string;
 }> {
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
   const { data: clone } = await admin
     .from("clones")
     .select("id")
@@ -256,7 +255,7 @@ export async function ingestSupportTicket(request: Request): Promise<IngestOutco
   }
   const payload = parsed.data;
 
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
   const workspace = await resolveWorkspace(payload.workspace_id);
   const classification = classifyTicket({
     category: payload.category,
@@ -405,7 +404,7 @@ export async function getTicketStatus(
     };
   }
 
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
   const { data: ticket } = await admin
     .from("support_tickets")
     .select("reference, status, priority, created_at, resolved_at")
@@ -472,7 +471,7 @@ export async function ingestAssistantActivity(request: Request): Promise<IngestO
     };
   }
   const payload = parsed.data;
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
 
   const workspaceId = payload.workspace_id ?? null;
   if (workspaceId) {

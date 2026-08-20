@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Provider-neutral security intake adapters.
 //
 // Each adapter converts an upstream vendor payload into a normalized finding

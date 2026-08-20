@@ -18,7 +18,14 @@ function jsonResponse(body: unknown, status: number): Response {
 
 // Constant-time string comparison; a length mismatch returns false up front
 // (timingSafeEqual requires equal-length buffers).
-function timingSafeEqualStr(a: string, b: string): boolean {
+/**
+ * Constant-time string comparison for shared secrets.
+ *
+ * Exported because `api.public.leads.capture.ts` carried a byte-identical
+ * private copy, and a comparison that has to be constant-time is exactly the
+ * kind of thing that should not exist twice.
+ */
+export function timingSafeEqualStr(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);
   if (ab.length !== bb.length) return false;
@@ -27,8 +34,10 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 
 // `response` is present on both members (optional on success) so call sites can
 // read `auth.response` after an `if (!auth.ok)` guard without relying on
-// discriminated-union narrowing — which this project's non-strict tsconfig does
-// not perform. On success it is simply absent.
+// discriminated-union narrowing. That was written when the project compiled
+// without strictNullChecks and narrowing did not hold; the flag is on now, so
+// this shape is belt-and-braces rather than load-bearing. On success it is
+// simply absent.
 export type CronAuthResult = { ok: true; response?: undefined } | { ok: false; response: Response };
 
 /**

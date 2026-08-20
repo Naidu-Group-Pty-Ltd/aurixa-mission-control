@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G11 — Public client onboarding wizard. Unauthenticated. Redeems a
 // handoff invite token, walks the client through creating a Supabase
 // project, minting a PAT, signing the DPA, and submitting everything

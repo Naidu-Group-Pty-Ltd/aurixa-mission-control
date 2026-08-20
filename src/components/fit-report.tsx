@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Fit analysis report card — score dial, dimension bars, correlation map,
 // risks, validation table. Shared by /crm/fit and the account hub Fit tab.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 4 unresolved type errors (argument types ×3, assignability ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Client Fit Analysis — server functions.
 //
 // A fit analysis is an immutable, versioned record. Re-running never mutates

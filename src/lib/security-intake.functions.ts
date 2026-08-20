@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Admin server functions for the provider-neutral security intake system:
 // - list/create/update/delete intake sources
 // - manually link an external ticket to a Codex finding

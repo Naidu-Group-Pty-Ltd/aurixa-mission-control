@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 1 unresolved type error (argument types ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Shared Stripe checkout engine (user-attributed pricing workflow).
 //
 // Callers: the operator RPC fns in src/lib/stripe.functions.ts, and the

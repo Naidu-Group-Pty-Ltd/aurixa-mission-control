@@ -1,4 +1,3 @@
-// @ts-nocheck
 // The Client Fit analyst's knowledge base — server functions.
 //
 // The engine reads the pricing catalog live, so it always knows what Aurixa

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * YggdrasilNodePanel — a slide-in panel showing details about a
  * selected clone node on the tree, with visual lineage breadcrumb.

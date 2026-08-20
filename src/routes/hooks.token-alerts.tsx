@@ -3,6 +3,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { fireTokenWebhook, retryDueDeliveries } from "@/server/token-webhooks.server";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 
+// How many active tenants one run alerts on. Reported back as `truncated`
+// when the batch comes back full.
+const TENANT_BATCH = 500;
+
 // Cron-invoked. Scans tenants for allowance thresholds and cancel-rate spikes,
 // fans notifications, fires webhooks, and retries failed webhook deliveries.
 // Auth: requires Bearer DRIFT_REFRESH_TOKEN.
@@ -15,6 +19,9 @@ export const Route = createFileRoute("/hooks/token-alerts")({
 
         const out = {
           tenants_checked: 0,
+          // True when the batch came back full — past that, some active tenants
+          // were not looked at this run.
+          truncated: false,
           allowance_alerts: 0,
           cancel_spike_alerts: 0,
           webhook_retries: 0,
@@ -24,7 +31,13 @@ export const Route = createFileRoute("/hooks/token-alerts")({
           .from("tenants")
           .select("id, clone_id, external_ref, display_name, status")
           .eq("status", "active")
-          .limit(500);
+          // Oldest first. Unordered, the cap silently picks an arbitrary 500
+          // active tenants — so past that count some tenants would simply never
+          // be alerted, and which ones would change run to run.
+          .order("created_at", { ascending: true })
+          .limit(TENANT_BATCH);
+
+        out.truncated = (tenants ?? []).length >= TENANT_BATCH;
 
         for (const t of tenants ?? []) {
           out.tenants_checked += 1;

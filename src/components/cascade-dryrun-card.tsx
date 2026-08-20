@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";

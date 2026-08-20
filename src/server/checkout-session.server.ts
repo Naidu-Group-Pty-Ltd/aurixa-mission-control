@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Checkout-session summary + fulfilment-status helpers, shared by the
 // operator server fns (src/lib/checkout-session.functions.ts) and the
 // storefront REST endpoint (api/public/storefront/session) that powers the
@@ -6,7 +5,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
 
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /**
  * Proves a session belongs to a handoff: the purchases row (or, as fallback

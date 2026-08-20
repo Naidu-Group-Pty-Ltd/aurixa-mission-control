@@ -81,7 +81,7 @@ export const Route = createFileRoute("/api/public/purchases")({
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- item_name postdates the generated DB types
-        const adminAny = supabaseAdmin as any;
+        const adminAny = supabaseAdmin;
         let q = adminAny
           .from("purchases")
           .select(

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Subdomain hosting server functions.
 // Runs dormant until platform_hosting_config.cloudflare_zone_id and
 // CLOUDFLARE_API_TOKEN are populated: enqueue calls still succeed and mark

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Preflight validation for the Aurixa GitHub App used by the clone wizard.
 // Answers: (1) Are the GITHUB_APP_* secrets configured? (2) Is the App
 // installed on the target owner (org or user)? (3) Does the installation

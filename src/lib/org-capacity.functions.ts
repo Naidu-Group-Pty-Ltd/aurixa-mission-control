@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 1 unresolved type error (assignability ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G10 — Org capacity preflight surface.
 // Exposes the `checkOrgCapacity` helper as an admin-only server function so
 // operators can inspect Supabase org headroom before starting provisioning
@@ -30,8 +31,8 @@ export const getClientOrgCapacity = createServerFn({ method: "POST" })
     if (!acct) throw new Error("Client Supabase account not found");
     if (!acct.pat_ciphertext) throw new Error("Client account has no PAT captured yet");
 
-    const { decryptSecret } = await import("@/server/crypto.server");
-    const pat = decryptSecret(String(acct.pat_ciphertext));
+    const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+    const pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
     const { checkOrgCapacity } = await import("@/server/backend-provisioning.server");
     return checkOrgCapacity({
       token: pat,

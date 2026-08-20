@@ -164,7 +164,7 @@ function periodLabel(period: InvoiceSourceLine["period"]): string | null {
   return `${shortDate(start, !sameYear)} – ${shortDate(end, true)}`;
 }
 
-function addressLines(address: InvoiceAddress): string[] {
+function addressLines(address: InvoiceAddress | undefined): string[] {
   if (!address) return [];
   // city/state/postcode belong on one line the way an envelope is written;
   // everything else is its own.

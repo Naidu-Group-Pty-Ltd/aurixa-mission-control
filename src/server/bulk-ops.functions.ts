@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Cross-domain bulk CRUD operations.
 // Each handler validates input with Zod, performs the operation as the caller
 // (RLS still enforces authorisation), and writes a single audit_log entry.

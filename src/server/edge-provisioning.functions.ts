@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Phase 2 — Edge provisioning server functions.
 // Enqueue/read jobs and per-clone edge config. All mutations require admin.
 // The actual work (calling Cloudflare, updating clone_edge_config) is done
@@ -12,7 +11,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { EdgeProviderSlug, EdgePosture } from "./edge";
 
 // Any-cast helper until types.ts is regenerated after Phase 1 migration.
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 function hashPayload(payload: unknown): string {
   return crypto.createHash("sha256").update(JSON.stringify(payload ?? {})).digest("hex");

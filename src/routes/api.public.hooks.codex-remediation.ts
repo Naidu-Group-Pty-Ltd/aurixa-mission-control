@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Codex remediation callback: receives lifecycle events from the GitHub
 // Actions workflow that produces draft fix PRs. Signature is HMAC over the
 // raw body using CODEX_REMEDIATION_WEBHOOK_SECRET (falling back to the

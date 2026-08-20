@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 3 unresolved type errors (argument types ×2, assignability ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Server-only orchestration for Codex Security scans without a user context
 // (pg_cron nightly job, the GitHub webhook receiver, and the sweeper).
 //
@@ -13,13 +14,14 @@
 // is written, so jobs were routinely left stranded at `queued` with no event
 // row at all — a large part of why the pipeline looked dead.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import {
   dispatchCodexScan,
   resolveScanEngine,
   scanCallbackUrl,
 } from "@/server/codex-security-client.server";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 export type ScanKind =
   | "manual"
@@ -327,24 +329,6 @@ export async function enqueueScanNoAuth(opts: EnqueueOpts): Promise<EnqueueResul
     // the dispatch bounced, rather than watching a job sit at `queued`.
     ...(result.ok ? {} : { dispatchError: result.error }),
   };
-}
-
-/** Run `worker` over `items` with a bounded number of in-flight promises. */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++;
-      results[index] = await worker(items[index]);
-    }
-  });
-  await Promise.all(runners);
-  return results;
 }
 
 export type NightlyResult = {

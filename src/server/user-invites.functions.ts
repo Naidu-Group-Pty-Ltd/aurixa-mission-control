@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Closed-system membership invites.
 //
 // Self-serve sign-up is deprecated: the only way into Mission Control is an

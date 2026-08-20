@@ -1,5 +1,7 @@
-// @ts-nocheck
+// @ts-nocheck — 1 unresolved type error (argument types ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createServerFn } from "@tanstack/react-start";
+import { notifyOperators, writeAuditLog } from "@/server/audit.server";
 import { z } from "zod";
 import { requireAdmin, requireOperator } from "@/integrations/supabase/role-middleware";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -22,7 +24,12 @@ type SecurityAssessmentRow = {
   retest_required: boolean;
   client_release_approved: boolean;
   security_partners?: { id: string; name: string; slug: string } | null;
-  security_findings?: Array<{ id: string; severity: string; status: string; retest_status: string }>;
+  security_findings?: Array<{
+    id: string;
+    severity: string;
+    status: string;
+    retest_status: string;
+  }>;
   security_reports?: Array<{
     id: string;
     label?: string;
@@ -62,42 +69,6 @@ async function writeSecurityEvent(input: {
   });
 }
 
-async function writeAudit(input: {
-  actorUserId?: string | null;
-  action: string;
-  entityType: string;
-  entityId?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  await admin.from("audit_log").insert({
-    action: input.action,
-    entity_type: input.entityType,
-    entity_id: input.entityId ?? null,
-    actor_user_id: input.actorUserId ?? null,
-    metadata: input.metadata ?? {},
-  });
-}
-
-async function notify(input: {
-  kind: string;
-  severity?: "info" | "success" | "warning" | "error";
-  title: string;
-  body?: string | null;
-  cloneId?: string | null;
-  url?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  await admin.from("notifications").insert({
-    kind: input.kind,
-    severity: input.severity ?? "info",
-    title: input.title,
-    body: input.body ?? null,
-    clone_id: input.cloneId ?? null,
-    url: input.url ?? null,
-    metadata: input.metadata ?? {},
-  });
-}
-
 function summarise(row: SecurityAssessmentRow) {
   const findings = row.security_findings ?? [];
   const reports = row.security_reports ?? [];
@@ -112,12 +83,20 @@ function summarise(row: SecurityAssessmentRow) {
     retest_required: row.retest_required,
     client_release_approved: row.client_release_approved,
     partner: row.security_partners ?? null,
-    open_findings: findings.filter((f) => f.status === "open" || f.status === "remediation_review").length,
+    open_findings: findings.filter((f) => f.status === "open" || f.status === "remediation_review")
+      .length,
     critical_findings: findings.filter((f) => f.severity === "critical").length,
     high_findings: findings.filter((f) => f.severity === "high").length,
-    pending_retests: findings.filter((f) => f.retest_status === "pending" || f.retest_status === "failed").length,
+    pending_retests: findings.filter(
+      (f) => f.retest_status === "pending" || f.retest_status === "failed",
+    ).length,
     report_count: reports.length,
-    latest_report_at: reports.map((r) => r.submitted_at).filter(Boolean).sort().at(-1) ?? null,
+    latest_report_at:
+      reports
+        .map((r) => r.submitted_at)
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? null,
   };
 }
 
@@ -142,7 +121,9 @@ export const listSecurityDashboardSummaries = createServerFn({ method: "POST" })
 
 export const getCloneSecurityAssessments = createServerFn({ method: "GET" })
   .middleware([requireOperator])
-  .inputValidator((input: { cloneId: string }) => z.object({ cloneId: z.string().uuid() }).parse(input))
+  .inputValidator((input: { cloneId: string }) =>
+    z.object({ cloneId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data }) => {
     const { data: rows, error } = await admin
       .from("security_assessments")
@@ -153,7 +134,10 @@ export const getCloneSecurityAssessments = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
-    return { assessments: rows ?? [], summaries: ((rows ?? []) as SecurityAssessmentRow[]).map(summarise) };
+    return {
+      assessments: rows ?? [],
+      summaries: ((rows ?? []) as SecurityAssessmentRow[]).map(summarise),
+    };
   });
 
 export const listSecurityPartnersForAssignment = createServerFn({ method: "GET" })
@@ -208,7 +192,15 @@ export const createBulkSecurityAssessments = createServerFn({ method: "POST" })
         .select("id")
         .eq("clone_id", clone.id)
         .eq("partner_id", data.partnerId)
-        .in("status", ["pending", "scheduled", "in_progress", "reporting", "remediation_review", "retesting", "blocked"])
+        .in("status", [
+          "pending",
+          "scheduled",
+          "in_progress",
+          "reporting",
+          "remediation_review",
+          "retesting",
+          "blocked",
+        ])
         .maybeSingle();
 
       if (active.data?.id) {
@@ -273,14 +265,14 @@ export const createBulkSecurityAssessments = createServerFn({ method: "POST" })
         body: `Aurixa activated ${partner.name} partner testing access for this client cycle.`,
         metadata: { source: "dashboard_bulk_activation", cycle: data.cycle },
       });
-      await writeAudit({
+      await writeAuditLog({
         actorUserId: context.userId,
         action: "security.assessment.bulk_created",
         entityType: "security_assessment",
         entityId: assessmentRes.data.id,
         metadata: { partner_id: data.partnerId, clone_id: clone.id, cycle: data.cycle },
       });
-      await notify({
+      await notifyOperators({
         kind: "security_assessment_created",
         severity: "info",
         title: `Security testing activated: ${clone.name}`,
@@ -297,7 +289,12 @@ export const createBulkSecurityAssessments = createServerFn({ method: "POST" })
 export const getSecurityReportDownloadUrl = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { reportId: string; expiresIn?: number }) =>
-    z.object({ reportId: z.string().uuid(), expiresIn: z.number().int().min(60).max(3600).default(600) }).parse(input),
+    z
+      .object({
+        reportId: z.string().uuid(),
+        expiresIn: z.number().int().min(60).max(3600).default(600),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { data: report, error } = await admin
@@ -323,7 +320,14 @@ export const getSecurityReportDownloadUrl = createServerFn({ method: "GET" })
     if (report.file_url) return { url: report.file_url, label: report.label, external: true };
     if (!report.file_path) throw new Error("report_has_no_file");
 
-    const signed = await admin.storage.from(REPORT_BUCKET).createSignedUrl(report.file_path, data.expiresIn);
+    const signed = await admin.storage
+      .from(REPORT_BUCKET)
+      .createSignedUrl(report.file_path, data.expiresIn);
     if (signed.error) throw new Error(signed.error.message);
-    return { url: signed.data.signedUrl, label: report.label, external: false, expiresIn: data.expiresIn };
+    return {
+      url: signed.data.signedUrl,
+      label: report.label,
+      external: false,
+      expiresIn: data.expiresIn,
+    };
   });

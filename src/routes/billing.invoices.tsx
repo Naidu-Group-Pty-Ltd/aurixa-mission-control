@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Operator invoices explorer + fleet wallet overview (billing & usage
 // workflow): every Stripe invoice mirrored by the webhook — subscription
 // cycles and one-time purchases alike — with hosted/PDF links, plus the

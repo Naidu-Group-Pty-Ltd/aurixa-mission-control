@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { History, RotateCcw, GitBranch, Dot, Loader2 } from "lucide-react";

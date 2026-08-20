@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Server-only helpers for dispatching a Codex Security remediation PR
 // workflow. Uses the Aurixa GitHub App to trigger a `workflow_dispatch`
 // event on the target repository (Prime or a clone). The workflow itself

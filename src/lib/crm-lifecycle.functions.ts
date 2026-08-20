@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Contracts, onboarding, feedback requests, churn and offboarding —
 // the "contracted through exit" half of the client lifecycle.
 import { createServerFn } from "@tanstack/react-start";

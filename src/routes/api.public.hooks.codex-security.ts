@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Codex Security webhook receiver.
 //
 // Verifies the HMAC signature, transitions the scan job, and persists

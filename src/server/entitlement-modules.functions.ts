@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
@@ -194,10 +193,10 @@ export const getCloneEntitlements = createServerFn({ method: "POST" })
     const [{ data: clone }, { data: history }, plan] = await Promise.all([
       context.supabase
         .from("clones")
-        .select(
-          "id, name, entitled_plan_slug, entitled_module_slugs, revoked_module_slugs, " +
-            "purchased_addon_slugs, entitlement_keys, entitlements_synced_at",
-        )
+        // One literal — a concatenated select list is `string` to supabase-js,
+        // which degrades the row to `GenericStringError`.
+        // prettier-ignore
+        .select("id, name, entitled_plan_slug, entitled_module_slugs, revoked_module_slugs, purchased_addon_slugs, entitlement_keys, entitlements_synced_at")
         .eq("id", data.cloneId)
         .maybeSingle(),
       context.supabase

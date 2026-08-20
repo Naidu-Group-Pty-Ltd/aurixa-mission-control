@@ -2,6 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 
+// How many due offboarding runs one sweep flags.
+const OFFBOARDING_BATCH = 50;
+
 // Cron-invoked CRM sweep: raises SLA-breach notifications, opens renewal
 // tasks inside each contract's notice window, recomputes account health
 // scores, and flags exports whose retention clock has expired.
@@ -28,7 +31,10 @@ export const Route = createFileRoute("/hooks/crm-sweep")({
           .select("id, account_id, destroy_after")
           .is("destroyed_at", null)
           .lt("destroy_after", new Date().toISOString())
-          .limit(50);
+          // Longest-overdue first; a retention clock that has already run out
+          // must not queue behind one that just did.
+          .order("destroy_after", { ascending: true })
+          .limit(OFFBOARDING_BATCH);
 
         let retentionAlerts = 0;
         for (const run of due ?? []) {
@@ -52,7 +58,11 @@ export const Route = createFileRoute("/hooks/crm-sweep")({
         }
 
         return new Response(
-          JSON.stringify({ success: true, ...(sweep as object), retention_alerts: retentionAlerts }),
+          JSON.stringify({
+            success: true,
+            ...(sweep as object),
+            retention_alerts: retentionAlerts,
+          }),
           { headers: { "Content-Type": "application/json" } },
         );
       },

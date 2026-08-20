@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G17 — Storage objects replication.
 //
 // Bulk-copies every object in every storage bucket from the clone's

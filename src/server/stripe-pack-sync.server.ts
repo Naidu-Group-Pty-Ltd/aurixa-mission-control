@@ -27,7 +27,7 @@ import {
 } from "@/lib/pricing/aurixa-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 export type PackRow = {
   id: string;
