@@ -22,11 +22,14 @@ export function BulkActionBar({
   return (
     <div
       className={cn(
-        "sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-surface/95 px-3 py-2 shadow-md backdrop-blur",
+        // `glass-strong` rather than a tinted panel: this bar floats over the
+        // list it acts on, and the list has to stay legible behind it. The
+        // primary spine is the only colour — a filled bar reads as an alert.
+        "glass-strong spine spine-live sticky top-2 z-20 flex flex-wrap items-center gap-2 px-3 py-2",
         className,
       )}
     >
-      <span className="font-mono text-xs text-muted-foreground">
+      <span className="label-mono">
         {count} {noun}
         {count === 1 ? "" : "s"} selected
       </span>
