@@ -24,7 +24,7 @@ function NotFoundComponent() {
         <div className="mt-6">
           <Link
             to="/dashboard"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Return to base
           </Link>
@@ -73,7 +73,12 @@ export const Route = createRootRoute({
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+        // Archivo as a VARIABLE font, both axes as ranges. Google answers this with
+        // `font-weight: 400 700; font-stretch: 62% 125%`, which is what lets
+        // `.font-display` reach for 125% width. Naming individual widths instead
+        // (`@100;125,400;500`) is invalid multi-axis syntax — Google answers 400 and
+        // the whole page silently falls back to the system sans.
+        href: "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&family=JetBrains+Mono:wght@400;500;600;700&display=swap",
       },
     ],
   }),

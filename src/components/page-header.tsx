@@ -44,20 +44,25 @@ export function PageHeader({
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           {eyebrow && (
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+            <p className="label-mono flex items-center gap-2">
+              {/* A hard rule rather than a bullet — the eyebrow is a division
+                  marker, and the line says so without adding an object. */}
+              <span aria-hidden className="inline-block h-px w-6 bg-border-strong" />
               {eyebrow}
             </p>
           )}
           <h1
             className={cn(
-              "mt-1 text-3xl font-semibold tracking-tight",
+              "font-display mt-2 text-[2.125rem] leading-[1.05]",
               icon && "flex items-center gap-2",
             )}
           >
             {icon}
             {title}
           </h1>
-          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+          {description && (
+            <p className="mt-2 max-w-prose text-sm text-muted-foreground">{description}</p>
+          )}
         </div>
         {actions && <div className="flex flex-wrap gap-2 md:justify-end">{actions}</div>}
       </div>
