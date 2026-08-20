@@ -270,8 +270,14 @@ async function step(row: DeploymentRow): Promise<StepOutcome> {
     // ── Domain ───────────────────────────────────────────────────────────
     case "attaching_domain": {
       if (!row.project_id) return { kind: "error", error: "no project_id", retryable: false };
-      const fqdn =
-        clone.subdomain_fqdn ?? cloneFqdn(clone.subdomain ?? clone.slug, config?.primary_domain);
+      // The clone's RESERVED name, never its raw slug.
+      //
+      // Falling back to `clone.slug` is what bypassed `reserved_slugs` — a clone
+      // slugged `admin` would attach `admin.aurixasystems.com.au`, a name the
+      // platform expects to own — and it also skipped the collision check, so
+      // two clones would race for one domain and Vercel would 409 the second.
+      // Allocation happens once, at provisioning, in `reserveCloneSubdomain`.
+      const fqdn = clone.subdomain_fqdn ?? cloneFqdn(clone.subdomain, config?.primary_domain);
       if (!fqdn) {
         // No domain to attach. That is a complete, correct outcome — the clone
         // is live on the provider's own origin — and must not read as a failure.
@@ -279,7 +285,7 @@ async function step(row: DeploymentRow): Promise<StepOutcome> {
           kind: "done",
           patch: {
             status: "live",
-            status_detail: "Live on the provider origin. No custom domain configured.",
+            status_detail: "Live on the provider origin. No subdomain is reserved for this clone.",
           },
         };
       }
@@ -301,6 +307,14 @@ async function step(row: DeploymentRow): Promise<StepOutcome> {
         zoneId: config?.cloudflare_zone_id,
         challenges: attached.challenges,
       });
+      // Keep `clones.subdomain_status` in step. It is what the Subdomains
+      // registry renders, and leaving it at `awaiting_deployment` after the DNS
+      // job has been queued tells an operator nothing is happening while the
+      // record is being written.
+      if (dns.ok) {
+        await admin.from("clones").update({ subdomain_status: "queued" }).eq("id", row.clone_id);
+      }
+
       return {
         kind: "advance",
         patch: {
@@ -353,7 +367,14 @@ async function step(row: DeploymentRow): Promise<StepOutcome> {
 async function onLive(row: DeploymentRow, origin: string | null) {
   if (!origin) return;
 
-  await admin.from("clones").update({ deploy_url: origin }).eq("id", row.clone_id);
+  // `subdomain_status` moves to `active` alongside `deploy_url` because they
+  // become true at the same instant, and only here: the domain has been observed
+  // resolving to this project. Setting it earlier — at `attaching_domain`, when
+  // the record was merely queued — is how the Subdomains registry came to show
+  // `active` for names that did not resolve.
+  const patch: Record<string, unknown> = { deploy_url: origin };
+  if (row.domain) patch.subdomain_status = "active";
+  await admin.from("clones").update(patch).eq("id", row.clone_id);
 
   const { data: clone } = await admin
     .from("clones")
@@ -510,6 +531,238 @@ async function runOne(row: DeploymentRow) {
   }
 }
 
+/**
+ * Hosting left behind by a deleted clone.
+ *
+ * The queue is filled by a BEFORE DELETE trigger on `clones`, because every
+ * table holding the provider references cascades on that same delete — by the
+ * time application code could react, the project id and the DNS record ids are
+ * gone. See 20260820200000_hosting_teardown.sql.
+ *
+ * The order matters and is the reverse of provisioning: DNS first, then the
+ * project. Removing the project while the CNAME still points at it leaves the
+ * domain resolving to a Vercel edge that no longer knows it, which serves
+ * DEPLOYMENT_NOT_FOUND on our own domain until DNS is cleaned up. Removing DNS
+ * first makes the name stop resolving immediately, which is what "deleted"
+ * should look like.
+ *
+ * `absent` is success at every step. A record somebody already deleted by hand
+ * and a project that was never created are both the state we are trying to
+ * reach, and treating either as an error means a teardown that can never finish.
+ */
+const TEARDOWN_ROWS_PER_RUN = 3;
+
+async function processTeardowns() {
+  const nowIso = new Date().toISOString();
+  const { data: rows } = await admin
+    .from("hosting_teardowns")
+    .select("*")
+    .eq("status", "queued")
+    .lte("next_attempt_at", nowIso)
+    .order("created_at", { ascending: true })
+    .limit(TEARDOWN_ROWS_PER_RUN);
+
+  let done = 0;
+  let failed = 0;
+  for (const row of rows ?? []) {
+    const result: Record<string, unknown> = { dns_deleted: 0, dns_absent: 0, project: "skipped" };
+    try {
+      // 1. DNS first.
+      const { cloudflareApi } = await import("@/server/cloudflare/client");
+      if (row.zone_id && process.env.CLOUDFLARE_API_TOKEN) {
+        for (const recordId of row.dns_record_ids ?? []) {
+          try {
+            await cloudflareApi.deleteDnsRecord(row.zone_id, recordId);
+            result.dns_deleted = (result.dns_deleted as number) + 1;
+          } catch {
+            // Already gone is the outcome we wanted.
+            result.dns_absent = (result.dns_absent as number) + 1;
+          }
+        }
+      }
+
+      // 2. Then the project.
+      if (row.project_id) {
+        const provider = getHostingProvider(asHostingSlug(row.provider_slug));
+        if (provider.isConfigured()) {
+          try {
+            await provider.removeProject(row.project_id, row.team_id);
+            result.project = "removed";
+          } catch (e) {
+            if (e instanceof VercelError && e.status === 404) {
+              result.project = "absent";
+            } else {
+              throw e;
+            }
+          }
+        } else {
+          // Not a failure and not a success: nothing was attempted. Marking it
+          // done would claim we removed a project that is still running and
+          // still billing.
+          result.project = "provider_unconfigured";
+          throw new Error("provider_unconfigured");
+        }
+      }
+
+      await admin
+        .from("hosting_teardowns")
+        .update({ status: "done", result, completed_at: new Date().toISOString() })
+        .eq("id", row.id);
+      done++;
+    } catch (e) {
+      const attempts = (row.attempts ?? 0) + 1;
+      const willRetry = attempts < (row.max_attempts ?? 5);
+      await admin
+        .from("hosting_teardowns")
+        .update({
+          status: willRetry ? "queued" : "failed",
+          attempts,
+          error_message: e instanceof Error ? e.message : String(e),
+          result,
+          next_attempt_at: new Date(Date.now() + backoffSeconds(attempts) * 1000).toISOString(),
+          completed_at: willRetry ? null : new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      if (!willRetry) {
+        failed++;
+        // A teardown that gave up is a live site nobody owns. It has to be said
+        // out loud — there is no clone page left to show it on.
+        await admin.from("notifications").insert({
+          kind: "deployment_failed",
+          severity: "error",
+          title: `Hosting teardown failed: ${row.clone_name ?? row.clone_id}`,
+          body: `${row.domain ?? row.project_name ?? "A deleted clone"} may still be serving. Remove the project and the DNS record by hand.`,
+          url: `/fleet/deployments`,
+          metadata: { teardown_id: row.id, project_id: row.project_id, domain: row.domain },
+        });
+      }
+    }
+  }
+  return { claimed: rows?.length ?? 0, done, failed };
+}
+
+/**
+ * Rows that are LIVE, checked against the provider rather than against a webhook
+ * that may never have arrived.
+ *
+ * `/hooks/vercel` is the fast path and this is the honest one. A webhook that
+ * was not delivered — a rotated secret, a receiver that 500'd, a webhook nobody
+ * ever created in the Vercel dashboard — leaves NO trace on either side. That is
+ * the same failure `cron_delivery_health` exists for: pg_cron reports on the SQL
+ * that queued the HTTP call, not on the call, so the only honest signal is
+ * asking the far end what it thinks.
+ *
+ * Deliberately slow. One clone's production build state changes when somebody
+ * pushes, which is not often, so this is a low-frequency correctness net and not
+ * a monitor — SWEEP_INTERVAL_MINUTES between checks per clone, and a hard cap on
+ * how many are checked per run so a fifty-clone fleet cannot spend the team's
+ * rate limit on reconciliation.
+ */
+const SWEEP_ROWS_PER_RUN = 4;
+const SWEEP_INTERVAL_MINUTES = 30;
+
+async function sweepLiveBuilds() {
+  const cutoff = new Date(Date.now() - SWEEP_INTERVAL_MINUTES * 60 * 1000).toISOString();
+  const { data: rows } = await admin
+    .from("clone_deployments")
+    .select(
+      "clone_id, provider_slug, project_id, team_id, status, domain, last_build_state, last_build_deployment_id",
+    )
+    .eq("status", "live")
+    .not("project_id", "is", null)
+    .or(`build_checked_at.is.null,build_checked_at.lt.${cutoff}`)
+    .order("build_checked_at", { ascending: true, nullsFirst: true })
+    .limit(SWEEP_ROWS_PER_RUN);
+
+  let checked = 0;
+  let changed = 0;
+  for (const row of rows ?? []) {
+    // Stamp the check FIRST, whatever happens next. A provider call that throws
+    // must still record that we asked, or a permanently failing project is
+    // re-selected every single run and starves every other row out of the cap.
+    await admin
+      .from("clone_deployments")
+      .update({ build_checked_at: new Date().toISOString() })
+      .eq("clone_id", row.clone_id);
+    checked++;
+
+    try {
+      const provider = getHostingProvider(asHostingSlug(row.provider_slug));
+      if (!provider.isConfigured()) continue;
+      const build = await provider.latestProductionBuild(row.project_id, row.team_id);
+      if (!build) continue;
+
+      const state =
+        build.state === "ready"
+          ? "ready"
+          : build.state === "error"
+            ? "error"
+            : build.state === "canceled"
+              ? "canceled"
+              : "building";
+
+      // Nothing new. Recording it anyway would rewrite `last_build_at` on every
+      // sweep and destroy the one signal that says WHEN the build last changed.
+      if (
+        state === row.last_build_state &&
+        (build.deploymentId ?? null) === row.last_build_deployment_id
+      ) {
+        continue;
+      }
+
+      await admin
+        .from("clone_deployments")
+        .update({
+          last_build_state: state,
+          last_build_deployment_id: build.deploymentId || null,
+          last_build_error: state === "error" ? "Build failed (found by sweep)" : null,
+          last_build_at: new Date().toISOString(),
+        })
+        .eq("clone_id", row.clone_id);
+      changed++;
+
+      await admin.from("deployment_events").insert({
+        clone_id: row.clone_id,
+        provider_slug: row.provider_slug,
+        action: "sweep_build",
+        from_status: row.status,
+        to_status: null,
+        success: true,
+        payload: { state, deployment_id: build.deploymentId, found_by: "sweep" },
+      });
+
+      // Only on the transition INTO failure, and only when the webhook did not
+      // already say so. Notifying on every sweep that observes a still-failed
+      // build is how an operator learns to ignore the notification.
+      if (state === "error" && row.last_build_state !== "error") {
+        const { data: clone } = await admin
+          .from("clones")
+          .select("name")
+          .eq("id", row.clone_id)
+          .maybeSingle();
+        await admin.from("notifications").insert({
+          kind: "deployment_build_failed",
+          severity: "warning",
+          title: `Build failed: ${clone?.name ?? row.clone_id}`,
+          body: `${row.domain ?? "The clone"} is still serving the previous build. Found by reconciliation, so the deployment webhook may not be reaching us.`,
+          clone_id: row.clone_id,
+          url: `/clones/${row.clone_id}`,
+          metadata: { found_by: "sweep", deployment_id: build.deploymentId },
+        });
+      }
+    } catch (e) {
+      await admin.from("deployment_events").insert({
+        clone_id: row.clone_id,
+        provider_slug: row.provider_slug,
+        action: "sweep_build",
+        success: false,
+        error_message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  return { checked, changed };
+}
+
 async function drain() {
   await reclaimStalled();
   const rows = await claim(MAX_ROWS_PER_RUN);
@@ -526,7 +779,9 @@ async function drain() {
     else if (outcome.kind === "wait") waiting++;
     else failed++;
   }
-  return { claimed: rows.length, advanced, waiting, failed };
+  const sweep = await sweepLiveBuilds();
+  const teardown = await processTeardowns();
+  return { claimed: rows.length, advanced, waiting, failed, sweep, teardown };
 }
 
 export const Route = createFileRoute("/hooks/deployment-drain")({
