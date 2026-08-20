@@ -2632,6 +2632,8 @@ export async function provisionCloneBackend(
     adminUserId,
     migrationsApplied,
     latestMigration: latestApplied,
+    introspection,
+
     edgeFunctions,
     secretShells,
     storageBuckets,
