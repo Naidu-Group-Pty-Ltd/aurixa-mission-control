@@ -9512,6 +9512,20 @@ export type Database = {
       crm_recompute_health: { Args: { _account_id: string }; Returns: number }
       crm_seed_onboarding: { Args: { _account_id: string }; Returns: Json }
       crm_sweep: { Args: never; Returns: Json }
+      cron_delivery_health: {
+        Args: { _since_hours?: number }
+        Returns: {
+          active: boolean
+          delivered: boolean
+          jobname: string
+          last_http_error: string
+          last_http_status: number
+          last_run_at: string
+          last_run_status: string
+          runs: number
+          schedule: string
+        }[]
+      }
       entitlement_for_subscription: {
         Args: { _sub_id: string }
         Returns: {
