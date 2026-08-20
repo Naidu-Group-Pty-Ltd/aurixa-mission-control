@@ -7073,6 +7073,7 @@ export type Database = {
           github_repo: string
           id: string
           notes: string | null
+          supabase_project_ref: string | null
           updated_at: string
         }
         Insert: {
@@ -7090,6 +7091,7 @@ export type Database = {
           github_repo: string
           id?: string
           notes?: string | null
+          supabase_project_ref?: string | null
           updated_at?: string
         }
         Update: {
@@ -7107,6 +7109,7 @@ export type Database = {
           github_repo?: string
           id?: string
           notes?: string | null
+          supabase_project_ref?: string | null
           updated_at?: string
         }
         Relationships: []

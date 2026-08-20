@@ -19,14 +19,8 @@
  *    the objects on both sides and fails the run when the clone is short.
  */
 
-import {
-  runSqlOnProject,
-  sqlLiteral,
-  getPrimeProjectRef,
-  tryGetPrimeProjectRef,
-} from "./backend-provisioning.server";
-
-export { getPrimeProjectRef, tryGetPrimeProjectRef };
+import { runSqlOnProject, sqlLiteral } from "./backend-provisioning.server";
+import { ownProjectRef } from "./prime-backend.server";
 
 /** Schemas replicated onto a clone. `aml` is not optional — the prime keeps 106 tables there. */
 export const REPLICATED_SCHEMAS = ["public", "aml"] as const;
@@ -556,9 +550,9 @@ async function runStage(
 
 export async function replicateSchemaByIntrospection(
   cloneRef: string,
-  options?: { primeRef?: string; onStatusUpdate?: Notify },
+  options: { primeRef: string; onStatusUpdate?: Notify },
 ): Promise<IntrospectionResult> {
-  const primeRef = options?.primeRef ?? getPrimeProjectRef();
+  const primeRef = options.primeRef;
   const notify = options?.onStatusUpdate;
   const stages: StageResult[] = [];
   const say = async (detail: string) => {
@@ -566,6 +560,22 @@ export async function replicateSchemaByIntrospection(
   };
 
   if (primeRef === cloneRef) throw new Error("Refusing to introspect the prime onto itself");
+
+  // The guard that would have caught the original defect. `primeRef` used to
+  // default to a ref derived from `SUPABASE_URL`, which is this deployment's
+  // OWN project — so the default clone strategy replicated Mission Control's
+  // admin schema (clones, prime_config, cascade_events) onto every new clone
+  // instead of the product's. It is refused here as well as at the resolver,
+  // because this is the last point before 500-odd tables are written and a
+  // wrong source is indistinguishable from a right one once they are.
+  const own = ownProjectRef();
+  if (own && primeRef.toLowerCase() === own) {
+    throw new Error(
+      `Refusing to introspect this deployment's own project (${primeRef}) onto a clone — ` +
+        "that is Mission Control's admin schema, not the product's. " +
+        "Set prime_config.supabase_project_ref to the prime PRODUCT's project.",
+    );
+  }
 
   await ensureApplyHelper(cloneRef);
   await runSqlOnProject(
@@ -909,15 +919,28 @@ export async function verifyCloneIsEmpty(
  */
 export async function stampMigrationLedgerFromPrime(
   cloneRef: string,
-  primeRef?: string,
+  primeRef: string,
 ): Promise<{ stamped: number }> {
-  const ref = primeRef ?? getPrimeProjectRef();
+  const ref = primeRef;
   const rows = await query(
     ref,
     `select version, coalesce(name, version) as name
      from supabase_migrations.schema_migrations order by version`,
   );
-  if (!rows.length) return { stamped: 0 };
+  // An empty prime ledger is not "nothing to do" — it is the condition that
+  // makes the clone permanently unsyncable. Introspection builds the schema
+  // without recording a single version, so `migration-sync` later computes
+  // `corpus − ledger` as the ENTIRE corpus and replays it from #1 against a
+  // populated database. Migration #1 fails on an object that already exists,
+  // `applyPrimeMigrations` halts, and it will halt identically on every future
+  // attempt. Failing here is the only point where an operator can still act.
+  if (!rows.length) {
+    throw new Error(
+      `The prime backend (${ref}) has no rows in supabase_migrations.schema_migrations, ` +
+        "so there is nothing to stamp onto the clone. A clone with a schema and no ledger " +
+        "can never sync migrations — refusing to leave one in that state.",
+    );
+  }
   await runSqlOnProject(
     cloneRef,
     `create schema if not exists supabase_migrations;

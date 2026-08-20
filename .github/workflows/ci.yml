@@ -78,6 +78,9 @@ jobs:
       # public with nothing logging it, and a deployment status the column
       # refuses makes an update fail with an error this codebase has a habit of
       # discarding — so the row simply never advances.
+      - name: Prime backend ref is configured, never derived
+        run: npm run check:prime-backend-ref
+
       - name: Hosting env policy and deployment state parity
         run: npm run check:hosting
 

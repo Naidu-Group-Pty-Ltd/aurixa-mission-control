@@ -42,7 +42,7 @@ async function runBackendProvisioning(
   };
 
   try {
-    const { resolvePrimeSource, fetchPrimeBackendSnapshot } = await import(
+    const { resolvePrimeSource, fetchPrimeBackendSnapshot, resolvePrimeBackendRef } = await import(
       /* @vite-ignore */ "@/lib/_server-shims/prime-backend.server"
     );
     const { getAppOctokit } = await import(
@@ -52,16 +52,20 @@ async function runBackendProvisioning(
       /* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server"
     );
     const { encryptSecret } = await import(/* @vite-ignore */ "@/lib/_server-shims/crypto.server");
-    const { getPrimeProjectRef } = await import(
-      /* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server"
-    );
     const { computeParity } = await import(
       /* @vite-ignore */ "@/lib/_server-shims/handoff-parity.server"
     );
     const { retargetCloneRepo } = await import(
       /* @vite-ignore */ "@/lib/_server-shims/clone-repo-retarget.server"
     );
-    // ── Snapshot the prime's backend architecture from GitHub ──
+    // ── Resolve the prime's two halves ──
+    // The REPO (what the migrations and function bundles come from) and the
+    // BACKEND (the live project whose catalogue, buckets, cron and realtime
+    // publication get replicated) are different questions with different
+    // answers. They were once the same call, and the backend half resolved to
+    // this deployment's own project. Both are resolved up front so a
+    // misconfiguration fails before a Supabase project is created and paid for.
+    const primeBackendRef = await resolvePrimeBackendRef(supabase);
     const source = await resolvePrimeSource(supabase);
     if (!source) {
       throw new Error("Prime not configured — set the prime repo in Settings first");
@@ -167,6 +171,7 @@ async function runBackendProvisioning(
         inheritedSecrets,
         cloneOrigins,
         schemaStrategy: input.schemaStrategy ?? "introspection",
+        primeBackendRef,
       },
       updateStatus,
     );
@@ -216,7 +221,7 @@ async function runBackendProvisioning(
     let parityError: string | null = null;
     try {
       await updateStatus("migrating", "Comparing the new backend with the prime...");
-      parity = await computeParity(getPrimeProjectRef(), result.projectRef);
+      parity = await computeParity(primeBackendRef, result.projectRef);
     } catch (err) {
       parityError = err instanceof Error ? err.message : String(err);
       await updateStatus("migrating", `Parity check could not run: ${parityError}`);

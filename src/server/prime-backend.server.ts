@@ -370,12 +370,23 @@ async function fetchBlobBase64(octokit: Octokit, ref: RepoRef, sha: string): Pro
   return (data.content ?? "").replace(/\n/g, "");
 }
 
-/** Minimal shape of the Supabase query builder chain resolvePrimeSource needs. */
+/**
+ * Minimal shape of the Supabase query builder chain the prime resolvers need.
+ *
+ * `error` is part of the shape deliberately. PostgREST always returns both
+ * halves, and a structural type that names only `data` makes a FAILED read
+ * indistinguishable from an ABSENT row at the type level — the caller cannot
+ * even see the channel it is supposed to check. That is the same class of
+ * defect `scripts/check-discarded-errors.mjs` guards against in call sites.
+ */
 type PrimeConfigClient = {
   from: (table: string) => {
     select: (cols: string) => {
       limit: (n: number) => {
-        maybeSingle: () => PromiseLike<{ data: Record<string, unknown> | null }>;
+        maybeSingle: () => PromiseLike<{
+          data: Record<string, unknown> | null;
+          error?: { message: string } | null;
+        }>;
       };
     };
   };
@@ -384,15 +395,92 @@ type PrimeConfigClient = {
 /**
  * Resolve the prime repo ref (e.g. npc-property-dashbord) from prime_config.
  * Returns null when the prime hasn't been configured yet.
+ *
+ * A read that FAILED is not a prime that is ABSENT. Callers turn `null` into
+ * "Prime not configured — set the prime repo in Settings first", which sends
+ * an operator to a settings page that is already filled in when the real
+ * fault was the database being unreachable. The two are separated here: the
+ * null contract is unchanged for genuinely-unconfigured, and a failed read
+ * throws.
  */
 export async function resolvePrimeSource(supabase: PrimeConfigClient): Promise<RepoRef | null> {
-  const { data: prime } = await supabase.from("prime_config").select("*").limit(1).maybeSingle();
+  const { data: prime, error } = await supabase
+    .from("prime_config")
+    .select("*")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read prime_config: ${error.message}`);
   if (!prime?.github_owner || !prime?.github_repo) return null;
   return {
     owner: prime.github_owner as string,
     repo: prime.github_repo as string,
     branch: (prime.default_branch as string) || "main",
   };
+}
+
+/**
+ * Resolve THIS deployment's own Supabase project ref from `SUPABASE_URL`.
+ *
+ * Exported so the guards below can name it. This is the ref that must never
+ * be used as a replication SOURCE — it is the database holding `clones`,
+ * `prime_config` and `cascade_events`.
+ */
+export function ownProjectRef(): string | null {
+  const url = process.env.SUPABASE_URL;
+  if (!url) return null;
+  const m = /^https?:\/\/([a-z0-9]+)\.supabase\.(co|in|net)/i.exec(url);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/**
+ * Resolve the prime BACKEND's project ref — the Supabase project holding the
+ * prime product's live schema.
+ *
+ * This is a different question from `resolvePrimeSource`, which answers "which
+ * GitHub repo". Both were once answered by the same word, and the backend half
+ * had no configuration at all: the old `getPrimeProjectRef()` derived a ref
+ * from `SUPABASE_URL`, which is THIS deployment's own project. Catalogue
+ * introspection is the default clone strategy, so that substitution would
+ * replicate Mission Control's admin schema onto a clone instead of the
+ * product's, and stamp a ledger of Mission Control migration IDs that no
+ * product migration can ever match.
+ *
+ * Two rules, and both are refusals:
+ *
+ *   1. **Unset is fatal, never a fallback.** A deployment that has not set
+ *      `prime_config.supabase_project_ref` cannot provision a clone backend by
+ *      introspection, and must say so. Substituting a ref that happens to be
+ *      reachable is how the wrong database got copied in the first place.
+ *   2. **Never this deployment's own project.** Even if somebody sets it to
+ *      Mission Control's own ref by hand, it is refused here rather than at
+ *      the point where 533 tables have already been written.
+ */
+export async function resolvePrimeBackendRef(supabase: PrimeConfigClient): Promise<string> {
+  const { data: prime, error } = await supabase
+    .from("prime_config")
+    .select("supabase_project_ref")
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Could not read prime_config to resolve the prime backend: ${error.message}`);
+  }
+  const ref = (prime as { supabase_project_ref?: string | null } | null)?.supabase_project_ref;
+  if (!ref) {
+    throw new Error(
+      "The prime backend's Supabase project is not configured. Set it in " +
+        "Settings → Prime (prime_config.supabase_project_ref) — this is the project " +
+        "holding the PRODUCT's schema, not Mission Control's own.",
+    );
+  }
+  const own = ownProjectRef();
+  if (own && ref.toLowerCase() === own) {
+    throw new Error(
+      `prime_config.supabase_project_ref points at this deployment's own project (${ref}). ` +
+        "That project holds Mission Control's admin schema — clones, prime_config, " +
+        "cascade_events — not the product's. Set it to the prime PRODUCT's project.",
+    );
+  }
+  return ref;
 }
 
 function migrationMetasFromBlobs(blobs: TreeBlob[]): Array<PrimeMigrationMeta & { sha: string }> {
