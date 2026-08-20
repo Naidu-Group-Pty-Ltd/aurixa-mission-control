@@ -15,6 +15,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
+import type { Database } from "@/integrations/supabase/types";
+import { asJson } from "@/lib/json-cast";
 
 function siteOrigin() {
   return (
@@ -79,7 +81,7 @@ export const upsertAuditShipper = createServerFn({ method: "POST" })
     const endpoint = data.endpoint_url || `${siteOrigin()}/api/public/handoff/audit-ingest`;
 
     if (existing) {
-      const patch: Record<string, unknown> = {};
+      const patch: Database["public"]["Tables"]["handoff_audit_shippers"]["Update"] = {};
       if (data.enabled !== undefined) patch.enabled = data.enabled;
       if (data.endpoint_url) patch.endpoint_url = data.endpoint_url;
       if (data.filter) patch.filter = data.filter;
@@ -92,8 +94,8 @@ export const upsertAuditShipper = createServerFn({ method: "POST" })
       if (error) throw error;
       await context.supabase.from("handoff_events").insert({
         handoff_id: data.handoff_id,
-        event_type: "audit_shipper_updated",
-        payload: patch,
+        kind: "audit_shipper_updated",
+        details: asJson(patch),
       });
       return { ok: true, config: row };
     }
@@ -112,8 +114,8 @@ export const upsertAuditShipper = createServerFn({ method: "POST" })
     if (error) throw error;
     await context.supabase.from("handoff_events").insert({
       handoff_id: data.handoff_id,
-      event_type: "audit_shipper_created",
-      payload: { endpoint_url: endpoint },
+      kind: "audit_shipper_created",
+      details: asJson({ endpoint_url: endpoint }),
     });
     return { ok: true, config: row };
   });
@@ -131,8 +133,8 @@ export const rotateAuditSecret = createServerFn({ method: "POST" })
     if (error) throw error;
     await context.supabase.from("handoff_events").insert({
       handoff_id: data.handoff_id,
-      event_type: "audit_shipper_secret_rotated",
-      payload: {},
+      kind: "audit_shipper_secret_rotated",
+      details: asJson({}),
     });
     return { ok: true, config: row };
   });
