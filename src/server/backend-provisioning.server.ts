@@ -11,6 +11,8 @@ import crypto from "node:crypto";
 
 import { classifySecret } from "./prime-backend.server";
 import type { PrimeBackendSnapshot } from "./prime-backend.server";
+import type { StageName, StageResult } from "./schema-introspection.server";
+
 
 const MGMT_API = "https://api.supabase.com/v1";
 
