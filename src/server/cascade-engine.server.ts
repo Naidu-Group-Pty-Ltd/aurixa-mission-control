@@ -201,6 +201,33 @@ export async function executeCascade(
             commits_behind: patch.status === "succeeded" ? 0 : undefined,
           })
           .eq("id", clone.id);
+
+        // Code reached the clone's default branch — rebuild what serves it.
+        //
+        // `succeeded` only, never `pr_opened`: a pull request is a proposal, and
+        // the branch the deployment builds from does not have the change on it
+        // yet. Rebuilding here would produce an identical artefact and tell an
+        // operator the change had shipped.
+        //
+        // Vercel rebuilds on push by itself ONLY where its GitHub App is
+        // installed on the repository. Mission Control forks clones through its
+        // own App and never installs Vercel's, so on this fleet nothing else
+        // asks. `requestRedeployAfterPush` decides whether the clone's state
+        // makes a rebuild appropriate and never throws — a cascade that pushed
+        // correctly must not report as failed because a hosting row could not be
+        // updated.
+        if (patch.status === "succeeded") {
+          try {
+            const { requestRedeployAfterPush } = await import("@/server/hosting/redeploy.server");
+            await requestRedeployAfterPush({
+              cloneId: clone.id,
+              reason: `cascade ${event.id}`,
+              sha: sourceSha,
+            });
+          } catch (e) {
+            console.error("[cascade] redeploy request failed:", e);
+          }
+        }
       } else if (patch.status === "failed") {
         await supabase.from("clones").update({ sync_status: "failed" }).eq("id", clone.id);
       }
