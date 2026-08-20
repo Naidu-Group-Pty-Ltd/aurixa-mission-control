@@ -17,7 +17,6 @@ import type { Json } from "@/integrations/supabase/types";
 
 // `requireSupabaseAuth` does not thread its context into the handler's inferred
 // type. Narrow it here rather than switching the whole file off with
-// @ts-nocheck, which would bury unrelated type errors.
 type AuthContext = { supabase: unknown; user: { id?: string } | null };
 
 // The metering tables post-date the generated DB types.

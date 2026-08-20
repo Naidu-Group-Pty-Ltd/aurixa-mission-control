@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
@@ -49,6 +48,33 @@ const MODE_LABEL: Record<string, string> = {
 const POLL_INTERVAL_MS = 2_500;
 const POLL_MAX_MS = 60_000;
 
+type SessionSummary = {
+  ok: true;
+  mode: string | null;
+  itemSlug: string | null;
+  cloneId: string | null;
+  cloneName: string | null;
+  tenantId: string | null;
+  tenantName: string | null;
+  originUserId: string | null;
+  originUsername: string | null;
+  originSource: string | null;
+  amountTotal: number | null;
+  currency: string | null;
+  paymentStatus: string | null;
+  returnUrl?: string | null;
+};
+type SessionResult = SessionSummary | { ok: false; error: string };
+type FulfillmentResult =
+  | {
+      ok: true;
+      mode: string | null;
+      webhookProcessed: boolean;
+      webhookError: string | null;
+      fulfilled: boolean;
+    }
+  | { ok: false; error: string };
+
 function useStableNow(key: string | undefined) {
   const ref = useRef<{ key: string | undefined; ts: number }>({ key, ts: Date.now() });
   if (ref.current.key !== key) ref.current = { key, ts: Date.now() };
@@ -66,24 +92,24 @@ function SuccessPage() {
   // (session_id, h) pair authorises the lookup instead.
   const viaHandoff = !!h;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<SessionResult>({
     queryKey: ["checkout-session", session_id, h ?? null],
-    queryFn: () =>
-      viaHandoff
-        ? lookupByHandoffFn({ data: { sessionId: session_id!, h: h! } })
-        : lookupFn({ data: { sessionId: session_id! } }),
+    queryFn: async () =>
+      (viaHandoff
+        ? await lookupByHandoffFn({ data: { sessionId: session_id!, h: h! } })
+        : await lookupFn({ data: { sessionId: session_id! } })) as SessionResult,
     enabled: !!session_id,
     staleTime: 60_000,
   });
 
   const startedAt = useStableNow(session_id);
 
-  const fulfillmentQuery = useQuery({
+  const fulfillmentQuery = useQuery<FulfillmentResult>({
     queryKey: ["checkout-fulfillment", session_id, h ?? null],
-    queryFn: () =>
-      viaHandoff
-        ? fulfillmentByHandoffFn({ data: { sessionId: session_id!, h: h! } })
-        : fulfillmentFn({ data: { sessionId: session_id! } }),
+    queryFn: async () =>
+      (viaHandoff
+        ? await fulfillmentByHandoffFn({ data: { sessionId: session_id!, h: h! } })
+        : await fulfillmentFn({ data: { sessionId: session_id! } })) as FulfillmentResult,
     enabled: !!session_id,
     refetchInterval: (q) => {
       const latest = q.state.data;

@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // E1 — Handoff state machine + event log.
 // E2, E4, E5, E7, E8 record scaffolding lives here as thin CRUD; the actual
 // compute (parity diff, snapshot capture, secret rotation execution, cost
@@ -7,6 +5,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
+import type { Json, TablesUpdate } from "@/integrations/supabase/types";
+import { asJson } from "@/lib/json-cast";
+
+/** jsonb columns come back as `Json`; spreading needs a real object. */
+function metaRecord(value: unknown): Record<string, Json> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? ({ ...(value as Record<string, Json>) })
+    : {};
+}
 
 const STATE_ORDER = [
   "draft",
@@ -224,7 +231,7 @@ export const transitionHandoff = createServerFn({ method: "POST" })
       }
     }
 
-    const patch: Record<string, unknown> = { state: data.to_state };
+    const patch: TablesUpdate<"clone_handoffs"> = { state: data.to_state };
 
     if (data.to_state === "twin_provisioning" || data.to_state === "snapshot_pending") {
       patch.initiated_at = new Date().toISOString();
@@ -472,22 +479,18 @@ export const runParityDryRun = createServerFn({ method: "POST" })
     if (!handoff) return { ok: false as const, error: "not_found" };
 
     // Resolve target project ref via clone_backends.
-    let backendQuery = context.supabase
+    const backendBase = context.supabase
       .from("clone_backends")
-      .select("supabase_project_ref, status")
-      .eq("clone_id", handoff.clone_id)
-      .not("supabase_project_ref", "is", null)
-      .not("status", "in", "(failed,deleted,destroyed)")
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (handoff.backend_id) {
-      backendQuery = context.supabase
-        .from("clone_backends")
-        .select("supabase_project_ref, status")
-        .eq("id", handoff.backend_id)
-        .limit(1);
-    }
-    const { data: backend, error: bErr } = await backendQuery.maybeSingle();
+      .select("supabase_project_ref, status");
+    const { data: backend, error: bErr } = handoff.backend_id
+      ? await backendBase.eq("id", handoff.backend_id).limit(1).maybeSingle()
+      : await backendBase
+          .eq("clone_id", handoff.clone_id)
+          .not("supabase_project_ref", "is", null)
+          .not("status", "in", "(failed,deleted,destroyed)")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
     if (bErr) throw bErr;
     if (!backend?.supabase_project_ref) {
       return { ok: false as const, error: "no_target_backend" };
@@ -506,16 +509,16 @@ export const runParityDryRun = createServerFn({ method: "POST" })
         prime_ref: parity.prime_ref,
         target_ref: parity.target_ref,
         risk_level: parity.risk_level,
-        tables_diff: parity.tables_diff,
-        policies_diff: parity.policies_diff,
-        functions_diff: parity.functions_diff,
-        buckets_diff: parity.buckets_diff,
-        cron_diff: parity.cron_diff,
-        edge_functions_diff: parity.edge_functions_diff,
-        secrets_diff: parity.secrets_diff,
-        auth_diff: parity.auth_config_diff,
-        extensions_diff: parity.extensions_diff,
-        blocking_issues: parity.blocking_issues,
+        tables_diff: asJson(parity.tables_diff),
+        policies_diff: asJson(parity.policies_diff),
+        functions_diff: asJson(parity.functions_diff),
+        buckets_diff: asJson(parity.buckets_diff),
+        cron_diff: asJson(parity.cron_diff),
+        edge_functions_diff: asJson(parity.edge_functions_diff),
+        secrets_diff: asJson(parity.secrets_diff),
+        auth_diff: asJson(parity.auth_config_diff),
+        extensions_diff: asJson(parity.extensions_diff),
+        blocking_issues: asJson(parity.blocking_issues),
         summary: parity.summary,
       })
       .select("id")
@@ -625,10 +628,10 @@ export const executeSecretRotation = createServerFn({ method: "POST" })
     const { executeRotation } = await import("@/server/handoff-rotations.server");
     const outcome = await executeRotation(row);
 
-    const patch: Record<string, unknown> = {
+    const patch: TablesUpdate<"handoff_secret_rotations"> = {
       status: outcome.status,
-      metadata: {
-        ...(row.metadata ?? {}),
+      metadata: asJson({
+        ...metaRecord(row.metadata),
         last_execution: {
           at: new Date().toISOString(),
           actor: context.userId,
@@ -636,19 +639,19 @@ export const executeSecretRotation = createServerFn({ method: "POST" })
         },
         // Scrub the raw secret_value once the API call succeeded — never let
         // a plaintext secret loiter in the audit row.
-        ...(outcome.status === "rotated" && (row.metadata as any)?.secret_value
+        ...(outcome.status === "rotated" && metaRecord(row.metadata).secret_value
           ? { secret_value: undefined }
           : {}),
-      },
+      }),
       error: outcome.error ?? null,
     };
     if (outcome.status === "rotated") patch.rotated_at = new Date().toISOString();
     // If secret_value was scrubbed, delete key explicitly.
-    if (outcome.status === "rotated" && (row.metadata as any)?.secret_value) {
-      const cleaned = { ...(row.metadata as any) };
+    if (outcome.status === "rotated" && metaRecord(row.metadata).secret_value) {
+      const cleaned = metaRecord(row.metadata);
       delete cleaned.secret_value;
-      cleaned.last_execution = (patch.metadata as any).last_execution;
-      patch.metadata = cleaned;
+      cleaned.last_execution = metaRecord(patch.metadata).last_execution ?? null;
+      patch.metadata = asJson(cleaned);
     }
     const { error: uErr } = await context.supabase
       .from("handoff_secret_rotations")
@@ -690,18 +693,18 @@ export const markSecretRotation = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw error;
     if (!row) return { ok: false as const, error: "not_found" };
-    const patch: Record<string, unknown> = {
+    const patch: TablesUpdate<"handoff_secret_rotations"> = {
       status: data.status,
       error: data.error ?? null,
-      metadata: {
-        ...(row.metadata ?? {}),
+      metadata: asJson({
+        ...metaRecord(row.metadata),
         manual_ack: {
           at: new Date().toISOString(),
           actor: context.userId,
           evidence: data.evidence ?? null,
           status: data.status,
         },
-      },
+      }),
     };
     if (data.status === "rotated" || data.status === "skipped") {
       patch.rotated_at = new Date().toISOString();
@@ -818,26 +821,26 @@ export const runCutoverOrchestrator = createServerFn({ method: "POST" })
         .update({ status: "in_progress" })
         .eq("id", row.id);
       const outcome = await executeRotation(row);
-      const patch: Record<string, unknown> = {
+      const patch: TablesUpdate<"handoff_secret_rotations"> = {
         status: outcome.status,
         error: outcome.error ?? null,
-        metadata: {
-          ...(row.metadata ?? {}),
+        metadata: asJson({
+          ...metaRecord(row.metadata),
           last_execution: {
             at: new Date().toISOString(),
             actor: context.userId,
             via: "orchestrator",
             ...outcome.audit,
           },
-        },
+        }),
       };
       if (outcome.status === "rotated") {
         patch.rotated_at = new Date().toISOString();
-        if ((row.metadata as any)?.secret_value) {
-          const cleaned = { ...(row.metadata as any) };
+        if (metaRecord(row.metadata).secret_value) {
+          const cleaned = metaRecord(row.metadata);
           delete cleaned.secret_value;
-          cleaned.last_execution = (patch.metadata as any).last_execution;
-          patch.metadata = cleaned;
+          cleaned.last_execution = metaRecord(patch.metadata).last_execution ?? null;
+          patch.metadata = asJson(cleaned);
         }
       }
       await context.supabase.from("handoff_secret_rotations").update(patch).eq("id", row.id);
@@ -962,22 +965,18 @@ export const replicateHandoffAuthUsers = createServerFn({ method: "POST" })
     }
 
     // Resolve source project ref — the clone's currently-owned dedicated backend.
-    let sourceQuery = context.supabase
+    const sourceBase = context.supabase
       .from("clone_backends")
-      .select("supabase_project_ref, status")
-      .eq("clone_id", handoff.clone_id)
-      .not("supabase_project_ref", "is", null)
-      .not("status", "in", "(failed,deleted,destroyed)")
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (handoff.backend_id) {
-      sourceQuery = context.supabase
-        .from("clone_backends")
-        .select("supabase_project_ref, status")
-        .eq("id", handoff.backend_id)
-        .limit(1);
-    }
-    const { data: source, error: sErr } = await sourceQuery.maybeSingle();
+      .select("supabase_project_ref, status");
+    const { data: source, error: sErr } = handoff.backend_id
+      ? await sourceBase.eq("id", handoff.backend_id).limit(1).maybeSingle()
+      : await sourceBase
+          .eq("clone_id", handoff.clone_id)
+          .not("supabase_project_ref", "is", null)
+          .not("status", "in", "(failed,deleted,destroyed)")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
     if (sErr) throw sErr;
     if (!source?.supabase_project_ref) {
       return { ok: false as const, error: "no_source_backend" };
@@ -1126,22 +1125,18 @@ export const replicateHandoffStorageObjects = createServerFn({ method: "POST" })
     }
 
     // Resolve source project ref — the clone's currently-owned dedicated backend.
-    let sourceQuery = context.supabase
+    const sourceBase = context.supabase
       .from("clone_backends")
-      .select("supabase_project_ref, status")
-      .eq("clone_id", handoff.clone_id)
-      .not("supabase_project_ref", "is", null)
-      .not("status", "in", "(failed,deleted,destroyed)")
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (handoff.backend_id) {
-      sourceQuery = context.supabase
-        .from("clone_backends")
-        .select("supabase_project_ref, status")
-        .eq("id", handoff.backend_id)
-        .limit(1);
-    }
-    const { data: source, error: sErr } = await sourceQuery.maybeSingle();
+      .select("supabase_project_ref, status");
+    const { data: source, error: sErr } = handoff.backend_id
+      ? await sourceBase.eq("id", handoff.backend_id).limit(1).maybeSingle()
+      : await sourceBase
+          .eq("clone_id", handoff.clone_id)
+          .not("supabase_project_ref", "is", null)
+          .not("status", "in", "(failed,deleted,destroyed)")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
     if (sErr) throw sErr;
     if (!source?.supabase_project_ref) {
       return { ok: false as const, error: "no_source_backend" };
@@ -1415,18 +1410,18 @@ export const rollbackHandoffCutover = createServerFn({ method: "POST" })
           : outcome.status === "manual_required"
             ? "rollback_manual_required"
             : "rollback_failed";
-      const patch: Record<string, unknown> = {
+      const patch: TablesUpdate<"handoff_secret_rotations"> = {
         status: nextStatus,
         error: outcome.error ?? null,
-        metadata: {
-          ...(row.metadata ?? {}),
+        metadata: asJson({
+          ...metaRecord(row.metadata),
           last_rollback: {
             at: new Date().toISOString(),
             actor: context.userId,
             via: "orchestrator",
             ...outcome.audit,
           },
-        },
+        }),
       };
       await context.supabase.from("handoff_secret_rotations").update(patch).eq("id", row.id);
       await context.supabase.from("handoff_events").insert({

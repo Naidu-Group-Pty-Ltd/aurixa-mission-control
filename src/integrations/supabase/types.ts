@@ -9960,6 +9960,10 @@ export type Database = {
         | "github_app_access_drift"
         | "api_usage_settlement_failed"
         | "security_assessment_created"
+        | "security_report_submitted"
+        | "security_finding_created"
+        | "security_retest_requested"
+        | "security_assessment_closed"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -10383,6 +10387,10 @@ export const Constants = {
         "github_app_access_drift",
         "api_usage_settlement_failed",
         "security_assessment_created",
+        "security_report_submitted",
+        "security_finding_created",
+        "security_retest_requested",
+        "security_assessment_closed",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
