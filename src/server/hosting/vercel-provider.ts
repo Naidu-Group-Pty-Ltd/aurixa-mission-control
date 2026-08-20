@@ -167,6 +167,18 @@ export const vercelProvider: HostingProvider = {
     };
   },
 
+  async latestProductionBuild(projectId, teamId) {
+    const d = await vercelApi.latestProductionDeployment(projectId, teamId ?? defaultTeamId());
+    if (!d) return null;
+    const id = d.id ?? d.uid ?? null;
+    return {
+      deploymentId: id ?? "",
+      url: toOrigin(d.url),
+      state: mapState(d.readyState ?? d.status),
+      raw: d,
+    };
+  },
+
   async attachDomain(projectId, domain, teamId): Promise<DomainResult> {
     const team = teamId ?? defaultTeamId();
     let d;

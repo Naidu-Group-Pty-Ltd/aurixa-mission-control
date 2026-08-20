@@ -227,6 +227,25 @@ export const vercelApi = {
     });
   },
 
+  /**
+   * The most recent PRODUCTION deployment for a project.
+   *
+   * `limit=1` with `target=production` rather than fetching a page and filtering
+   * client-side: the endpoint is paginated by time across every target, so a
+   * project with a busy preview branch can push its last production build off
+   * the first page entirely — and the sweep would then report "no production
+   * build" for a clone that has been serving one for months.
+   */
+  latestProductionDeployment(
+    projectId: string,
+    teamId?: string | null,
+  ): Promise<VercelDeployment | null> {
+    const q = new URLSearchParams({ projectId, target: "production", limit: "1" });
+    return vercel<{ deployments?: VercelDeployment[] }>(`/v6/deployments?${q.toString()}`, {
+      teamId,
+    }).then((r) => r.deployments?.[0] ?? null);
+  },
+
   getDeployment(deploymentId: string, teamId?: string | null): Promise<VercelDeployment> {
     return vercel<VercelDeployment>(`/v13/deployments/${encodeURIComponent(deploymentId)}`, {
       teamId,

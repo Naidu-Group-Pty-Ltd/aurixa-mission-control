@@ -54,6 +54,15 @@ export const manualProvider: HostingProvider = {
   getDeployment(): Promise<DeployResult> {
     return unsupported("read a deployment");
   },
+  /**
+   * Null rather than `unsupported()`. The sweep calls this for every live row,
+   * and a manual clone having no provider build is an ordinary fact about it —
+   * throwing would turn one hand-served clone into a sweep that logs an error
+   * every half hour forever.
+   */
+  latestProductionBuild(): Promise<null> {
+    return Promise.resolve(null);
+  },
   attachDomain(): Promise<DomainResult> {
     return unsupported("attach a domain");
   },

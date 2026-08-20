@@ -75,6 +75,15 @@ export interface HostingProvider {
   ): Promise<{ written: number; removed: number }>;
   deploy(projectId: string, opts: { ref: string; teamId?: string | null }): Promise<DeployResult>;
   getDeployment(deploymentId: string, teamId?: string | null): Promise<DeployResult>;
+  /**
+   * The latest production build for a project, or null if there has never been
+   * one. Used by the reconciliation sweep, which cannot rely on a webhook
+   * arriving — an undelivered webhook leaves no trace anywhere.
+   */
+  latestProductionBuild(
+    projectId: string,
+    teamId?: string | null,
+  ): Promise<(DeployResult & { deploymentId: string | null }) | null>;
   attachDomain(projectId: string, domain: string, teamId?: string | null): Promise<DomainResult>;
   getDomain(projectId: string, domain: string, teamId?: string | null): Promise<DomainResult>;
   removeProject(projectId: string, teamId?: string | null): Promise<void>;
