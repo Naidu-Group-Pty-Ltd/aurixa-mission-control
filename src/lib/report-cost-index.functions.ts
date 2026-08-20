@@ -21,7 +21,6 @@ import {
 
 // `requireSupabaseAuth` does not carry its context through to the handler's
 // inferred type, so `context` lands as `undefined`. Most siblings answer that
-// with a file-wide `@ts-nocheck`, which also buries every unrelated type error
 // in the file. Narrow it here instead: one named shape, applied at the two
 // places that read the context, leaving the rest of the file type-checked.
 type AuthContext = { supabase: unknown; user: { id?: string } | null };

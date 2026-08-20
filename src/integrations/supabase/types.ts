@@ -4658,6 +4658,7 @@ export type Database = {
           id: string
           module_ratings: Json
           most_valuable: string | null
+          next_forward_at: string
           origin_source: string | null
           origin_user_id: string | null
           origin_username: string | null
@@ -4680,6 +4681,7 @@ export type Database = {
           id?: string
           module_ratings?: Json
           most_valuable?: string | null
+          next_forward_at?: string
           origin_source?: string | null
           origin_user_id?: string | null
           origin_username?: string | null
@@ -4702,6 +4704,7 @@ export type Database = {
           id?: string
           module_ratings?: Json
           most_valuable?: string | null
+          next_forward_at?: string
           origin_source?: string | null
           origin_user_id?: string | null
           origin_username?: string | null
@@ -9550,10 +9553,22 @@ export type Database = {
         Args: { _at?: string; _tenant_created_at: string }
         Returns: string
       }
+      feedback_delivery_health: { Args: never; Returns: Json }
+      feedback_forward_backoff: { Args: { _attempts: number }; Returns: string }
+      feedback_forward_max_attempts: { Args: never; Returns: number }
+      feedback_pending_forward: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          last_error: string
+          submission_id: string
+        }[]
+      }
       feedback_prompt_due: {
         Args: { _origin_user_id?: string; _tenant_id: string }
         Returns: Json
       }
+      feedback_retry_now: { Args: { _submission_id?: string }; Returns: number }
       grant_tokens: {
         Args: {
           _expires_at?: string
@@ -9960,6 +9975,10 @@ export type Database = {
         | "github_app_access_drift"
         | "api_usage_settlement_failed"
         | "security_assessment_created"
+        | "security_report_submitted"
+        | "security_finding_created"
+        | "security_retest_requested"
+        | "security_assessment_closed"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -10383,6 +10402,10 @@ export const Constants = {
         "github_app_access_drift",
         "api_usage_settlement_failed",
         "security_assessment_created",
+        "security_report_submitted",
+        "security_finding_created",
+        "security_retest_requested",
+        "security_assessment_closed",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],

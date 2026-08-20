@@ -1,2 +1,0 @@
-src/lib/handoffs.functions.ts
-src/routes/billing.success.tsx

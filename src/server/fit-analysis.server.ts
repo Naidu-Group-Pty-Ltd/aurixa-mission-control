@@ -161,7 +161,7 @@ const STOPWORDS = new Set([
 
 function tokenise(value: string): Set<string> {
   return new Set(
-    (value.toLowerCase().match(WORD) ?? []).filter((w) => w.length > 2 && !STOPWORDS.has(w)),
+    (value.toLowerCase().match(WORD) ?? ([] as string[])).filter((w) => w.length > 2 && !STOPWORDS.has(w)),
   );
 }
 
