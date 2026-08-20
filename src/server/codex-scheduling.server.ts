@@ -202,13 +202,13 @@ export async function resolveDispatchTarget(opts: {
 async function dispatchJob(job: {
   id: string;
   kind: ScanKind;
-  target_kind: string;
+  target_kind: "prime" | "clone";
   clone_id: string | null;
   repo_full_name: string;
   ref: string | null;
   path_globs: string[] | null;
   failure_count?: number | null;
-  request_payload?: Record<string, unknown> | null;
+  request_payload?: Json | null;
 }): Promise<{ ok: true } | { ok: false; error: string; terminal: boolean }> {
   const attempt = (job.failure_count ?? 0) + 1;
   const payload = (job.request_payload ?? {}) as Record<string, unknown>;
@@ -315,7 +315,7 @@ export async function enqueueScanNoAuth(opts: EnqueueOpts): Promise<EnqueueResul
   if (error) throw error;
 
   // Awaited on purpose — see the module header.
-  const result = await dispatchJob(job);
+  const result = await dispatchJob({ ...job, target_kind: job.target_kind as "prime" | "clone" });
   if (!result.ok && result.terminal) {
     return { skipped: true, reason: result.error };
   }
@@ -476,7 +476,7 @@ export async function sweepStalledScans(options?: {
     }
 
     await recordEvent(job.id, "sweep_retry", { failureCount: job.failure_count ?? 0 });
-    const r = await dispatchJob(job);
+    const r = await dispatchJob({ ...job, target_kind: job.target_kind as "prime" | "clone" });
     if (r.ok) retried.push(job.id);
     else if (r.terminal) failed.push({ jobId: job.id, reason: r.error });
   }

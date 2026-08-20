@@ -351,7 +351,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   ];
 
   let session;
-  let params = sessionParams;
+  let params: typeof sessionParams = sessionParams as typeof sessionParams;
   const dropped = new Set<string>();
   for (let attempt = 0; ; attempt++) {
     try {

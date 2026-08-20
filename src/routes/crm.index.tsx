@@ -39,14 +39,14 @@ const money = (cents: number) =>
     (cents ?? 0) / 100,
   );
 
-const STAGE_LABELS: Record<string, string> = {
+const STAGE_LABELS = {
   lead: "Leads",
   opportunity: "Opportunities",
   onboarding: "Onboarding",
   active: "Active",
   at_risk: "At risk",
   churned: "Churned",
-};
+} as const;
 
 function Stat({
   label,

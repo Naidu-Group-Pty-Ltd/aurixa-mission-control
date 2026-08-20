@@ -80,7 +80,7 @@ export async function planTicketRemediation(ticketId: string): Promise<PlanResul
       // Verified draft PRs already waiting on findings in this scope are
       // released by the pr_merge lane; otherwise gather fresh evidence.
       const merges = await planVerifiedMergesForScope(ticket.clone_id, ticket.priority, ticket.id);
-      runs.push(...merges);
+      runs.push(...(merges as PlannedRun[]));
       if (merges.length === 0) {
         runs.push({
           ...base,
