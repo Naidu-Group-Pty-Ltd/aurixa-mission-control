@@ -9055,57 +9055,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_invites: {
-        Row: {
-          accepted_at: string | null
-          accepted_user_id: string | null
-          created_at: string
-          email: string | null
-          expires_at: string
-          id: string
-          invited_by: string
-          note: string | null
-          revoked_at: string | null
-          revoked_by: string | null
-          role: Database["public"]["Enums"]["app_role"]
-          token_hash: string
-          token_prefix: string
-          updated_at: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          accepted_user_id?: string | null
-          created_at?: string
-          email?: string | null
-          expires_at: string
-          id?: string
-          invited_by: string
-          note?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          role?: Database["public"]["Enums"]["app_role"]
-          token_hash: string
-          token_prefix: string
-          updated_at?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          accepted_user_id?: string | null
-          created_at?: string
-          email?: string | null
-          expires_at?: string
-          id?: string
-          invited_by?: string
-          note?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          role?: Database["public"]["Enums"]["app_role"]
-          token_hash?: string
-          token_prefix?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       user_preferences: {
         Row: {
           created_at: string
@@ -9512,20 +9461,6 @@ export type Database = {
       crm_recompute_health: { Args: { _account_id: string }; Returns: number }
       crm_seed_onboarding: { Args: { _account_id: string }; Returns: Json }
       crm_sweep: { Args: never; Returns: Json }
-      cron_delivery_health: {
-        Args: { _since_hours?: number }
-        Returns: {
-          active: boolean
-          delivered: boolean
-          jobname: string
-          last_http_error: string
-          last_http_status: number
-          last_run_at: string
-          last_run_status: string
-          runs: number
-          schedule: string
-        }[]
-      }
       entitlement_for_subscription: {
         Args: { _sub_id: string }
         Returns: {
@@ -9540,14 +9475,6 @@ export type Database = {
       feedback_campaign_key: {
         Args: { _at?: string; _tenant_created_at: string }
         Returns: string
-      }
-      feedback_pending_forward: {
-        Args: { _limit?: number }
-        Returns: {
-          attempts: number
-          last_error: string
-          submission_id: string
-        }[]
       }
       feedback_prompt_due: {
         Args: { _origin_user_id?: string; _tenant_id: string }
@@ -9915,52 +9842,44 @@ export type Database = {
       ledger_source: "subscription" | "topup" | "manual" | "system" | "report"
       module_status: "proposed" | "approved" | "archived" | "rejected"
       notification_kind:
-        | "api_usage_settlement_failed"
-        | "cascade_approved"
-        | "cascade_awaiting_approval"
         | "cascade_completed"
         | "cascade_failed"
         | "cascade_partial"
-        | "cascade_rejected"
         | "cascade_started"
-        | "clone_created"
-        | "clone_deleted"
-        | "crm_renewal_due"
-        | "crm_retention_due"
-        | "crm_sla_breach"
-        | "crm_task_assigned"
-        | "device_limit_reached"
-        | "device_registered"
-        | "device_released"
         | "drift_high"
         | "drift_medium"
-        | "github_app_access_drift"
-        | "handoff_consent_received"
-        | "lead_captured"
-        | "lead_stage_three"
-        | "lead_stage_two"
-        | "library_entry_approved"
-        | "library_entry_rejected"
+        | "clone_created"
+        | "clone_deleted"
         | "module_installed"
         | "module_removed"
-        | "purchase_completed"
-        | "remediation_auto_completed"
-        | "remediation_awaiting_validation"
-        | "remediation_failed"
-        | "seat_limit_approaching"
-        | "seat_limit_reached"
-        | "seat_plan_changed"
-        | "security_assessment_closed"
-        | "security_assessment_created"
-        | "security_finding_created"
-        | "security_report_submitted"
-        | "security_retest_requested"
-        | "support_ticket_created"
-        | "support_ticket_escalated"
+        | "cascade_awaiting_approval"
+        | "cascade_approved"
+        | "cascade_rejected"
+        | "library_entry_approved"
+        | "library_entry_rejected"
         | "tokens_alert"
         | "tokens_key_first_use"
         | "tokens_key_issued"
         | "tokens_key_rotated"
+        | "seat_limit_approaching"
+        | "seat_limit_reached"
+        | "seat_plan_changed"
+        | "device_limit_reached"
+        | "device_registered"
+        | "device_released"
+        | "lead_captured"
+        | "purchase_completed"
+        | "crm_sla_breach"
+        | "crm_renewal_due"
+        | "crm_retention_due"
+        | "crm_task_assigned"
+        | "lead_stage_two"
+        | "lead_stage_three"
+        | "support_ticket_created"
+        | "support_ticket_escalated"
+        | "remediation_awaiting_validation"
+        | "remediation_auto_completed"
+        | "remediation_failed"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -10342,52 +10261,44 @@ export const Constants = {
       ledger_source: ["subscription", "topup", "manual", "system", "report"],
       module_status: ["proposed", "approved", "archived", "rejected"],
       notification_kind: [
-        "api_usage_settlement_failed",
-        "cascade_approved",
-        "cascade_awaiting_approval",
         "cascade_completed",
         "cascade_failed",
         "cascade_partial",
-        "cascade_rejected",
         "cascade_started",
-        "clone_created",
-        "clone_deleted",
-        "crm_renewal_due",
-        "crm_retention_due",
-        "crm_sla_breach",
-        "crm_task_assigned",
-        "device_limit_reached",
-        "device_registered",
-        "device_released",
         "drift_high",
         "drift_medium",
-        "github_app_access_drift",
-        "handoff_consent_received",
-        "lead_captured",
-        "lead_stage_three",
-        "lead_stage_two",
-        "library_entry_approved",
-        "library_entry_rejected",
+        "clone_created",
+        "clone_deleted",
         "module_installed",
         "module_removed",
-        "purchase_completed",
-        "remediation_auto_completed",
-        "remediation_awaiting_validation",
-        "remediation_failed",
-        "seat_limit_approaching",
-        "seat_limit_reached",
-        "seat_plan_changed",
-        "security_assessment_closed",
-        "security_assessment_created",
-        "security_finding_created",
-        "security_report_submitted",
-        "security_retest_requested",
-        "support_ticket_created",
-        "support_ticket_escalated",
+        "cascade_awaiting_approval",
+        "cascade_approved",
+        "cascade_rejected",
+        "library_entry_approved",
+        "library_entry_rejected",
         "tokens_alert",
         "tokens_key_first_use",
         "tokens_key_issued",
         "tokens_key_rotated",
+        "seat_limit_approaching",
+        "seat_limit_reached",
+        "seat_plan_changed",
+        "device_limit_reached",
+        "device_registered",
+        "device_released",
+        "lead_captured",
+        "purchase_completed",
+        "crm_sla_breach",
+        "crm_renewal_due",
+        "crm_retention_due",
+        "crm_task_assigned",
+        "lead_stage_two",
+        "lead_stage_three",
+        "support_ticket_created",
+        "support_ticket_escalated",
+        "remediation_awaiting_validation",
+        "remediation_auto_completed",
+        "remediation_failed",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
