@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.feedback_retry_now(UUID) FROM authenticated;
