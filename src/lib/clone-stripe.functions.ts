@@ -12,6 +12,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
+import type { Database } from "@/integrations/supabase/types";
 
 type CloneStripeRow = {
   clone_id: string;
@@ -83,7 +84,7 @@ export const upsertCloneStripeConfig = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {
+    const patch: Database["public"]["Tables"]["clone_stripe_configs"]["Insert"] = {
       clone_id: data.cloneId,
       mode: data.mode,
       stripe_account_id: data.stripe_account_id ?? null,

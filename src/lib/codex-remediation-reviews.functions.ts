@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 
 const ReviewInput = z.object({
   remediationId: z.string().uuid(),
@@ -61,7 +62,9 @@ export const reviewRemediation = createServerFn({ method: "POST" })
     else if (approvals >= rem.approvals_required) newStatus = "approved";
 
     if (newStatus && newStatus !== rem.status) {
-      const patch: Record<string, unknown> = { status: newStatus };
+      const patch: Database["public"]["Tables"]["codex_remediations"]["Update"] = {
+        status: newStatus as Database["public"]["Enums"]["codex_remediation_status"],
+      };
       if (newStatus === "rejected") {
         patch.rejected_by = userId;
         patch.rejected_at = new Date().toISOString();
