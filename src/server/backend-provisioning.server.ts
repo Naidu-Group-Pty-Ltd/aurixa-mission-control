@@ -13,7 +13,6 @@ import { classifySecret } from "./prime-backend.server";
 import type { PrimeBackendSnapshot } from "./prime-backend.server";
 import type { StageName, StageResult } from "./schema-introspection.server";
 
-
 const MGMT_API = "https://api.supabase.com/v1";
 
 function getMgmtToken(): string {
@@ -1339,7 +1338,6 @@ export function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-
 export type PrimeMigrationResult = {
   id: string;
   name: string;
@@ -2301,7 +2299,6 @@ export type ProvisionBackendResult = {
   realtimePublication: RealtimeReplicationResult;
 };
 
-
 /**
  * Full pipeline: create project → wait ready → get keys → replay the prime's
  * migrations → deploy the prime's edge functions → create empty-shell secrets
@@ -2372,11 +2369,8 @@ export async function provisionCloneBackend(
 
   if (strategy === "introspection") {
     await onStatusUpdate?.("migrating", "Introspecting the prime's live catalog...");
-    const {
-      replicateSchemaByIntrospection,
-      stampMigrationLedgerFromPrime,
-      verifyCloneIsEmpty,
-    } = await import("./schema-introspection.server");
+    const { replicateSchemaByIntrospection, stampMigrationLedgerFromPrime, verifyCloneIsEmpty } =
+      await import("./schema-introspection.server");
     const primeRef = getPrimeProjectRef();
     const result = await replicateSchemaByIntrospection(projectRef, {
       primeRef,
@@ -2427,7 +2421,6 @@ export async function provisionCloneBackend(
       );
     }
   }
-
 
   // Step 4b (G4): guarantee required extensions are enabled before anything
   // downstream (edge fns, cron, webhook fanout, vault-backed cron auth) tries

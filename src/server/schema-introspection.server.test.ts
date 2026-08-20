@@ -40,9 +40,9 @@ describe("read-only source-query assertion", () => {
     expect(isReadOnlySourceQuery("with d as (delete from t returning *) select * from d")).toBe(
       false,
     );
-    expect(() => assertReadOnlySourceQuery("with d as (insert into t values (1)) select 1")).toThrow(
-      /non-read-only/,
-    );
+    expect(() =>
+      assertReadOnlySourceQuery("with d as (insert into t values (1)) select 1"),
+    ).toThrow(/non-read-only/);
   });
 
   it("passes the query through when it is a read", () => {
@@ -113,9 +113,9 @@ describe("column drift detector", () => {
   });
 
   it("emits idempotent add-column repairs", () => {
-    expect(buildAddColumnStatements([{ table: "public.a", column: "name", type: "text" }])).toEqual([
-      "alter table public.a add column if not exists name text",
-    ]);
+    expect(buildAddColumnStatements([{ table: "public.a", column: "name", type: "text" }])).toEqual(
+      ["alter table public.a add column if not exists name text"],
+    );
   });
 
   it("detects type drift via the hashed signature even when counts match", () => {

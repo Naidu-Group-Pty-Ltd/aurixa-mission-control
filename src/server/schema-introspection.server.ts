@@ -86,7 +86,11 @@ export function isReadOnlySourceQuery(sql: string): boolean {
     .toLowerCase();
   if (!/^(select|with)\b/.test(stripped)) return false;
   // `with … as ( … ) insert/update/delete` is a write dressed as a read.
-  if (/\b(insert\s+into|update\s+\w|delete\s+from|drop\s+|alter\s+|truncate\b|create\s+)/.test(stripped))
+  if (
+    /\b(insert\s+into|update\s+\w|delete\s+from|drop\s+|alter\s+|truncate\b|create\s+)/.test(
+      stripped,
+    )
+  )
     return false;
   return true;
 }
@@ -177,7 +181,9 @@ export function diffMissingColumns(
 }
 
 export function buildAddColumnStatements(missing: readonly ColumnInfo[]): string[] {
-  return missing.map((c) => `alter table ${c.table} add column if not exists ${c.column} ${c.type}`);
+  return missing.map(
+    (c) => `alter table ${c.table} add column if not exists ${c.column} ${c.type}`,
+  );
 }
 
 /** Per-table signature of `attname + format_type` pairs, for a cheap drift check. */
@@ -193,10 +199,7 @@ export function columnSignature(columns: readonly ColumnInfo[]): Map<string, str
   return out;
 }
 
-export function driftedTables(
-  prime: Map<string, string>,
-  clone: Map<string, string>,
-): string[] {
+export function driftedTables(prime: Map<string, string>, clone: Map<string, string>): string[] {
   const out: string[] = [];
   for (const [table, sig] of prime) if (clone.get(table) !== sig) out.push(table);
   return out.sort();
@@ -239,11 +242,7 @@ export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-export function buildEnumDdl(
-  schema: string,
-  typeName: string,
-  labels: readonly string[],
-): string {
+export function buildEnumDdl(schema: string, typeName: string, labels: readonly string[]): string {
   const values = labels.map((l) => sqlLiteral(l)).join(", ");
   return `do $$ begin create type ${quoteIdent(schema)}.${quoteIdent(typeName)} as enum (${values}); exception when duplicate_object then null; end $$`;
 }
@@ -559,7 +558,8 @@ export async function replicateSchemaByIntrospection(
       primeRef,
       cloneRef,
       seqRows.map(
-        (r) => `create sequence if not exists ${quoteIdent(str(r.schema))}.${quoteIdent(str(r.name))}`,
+        (r) =>
+          `create sequence if not exists ${quoteIdent(str(r.schema))}.${quoteIdent(str(r.name))}`,
       ),
       60,
     ),
@@ -570,7 +570,11 @@ export async function replicateSchemaByIntrospection(
   const primeCols = await query(primeRef, Q.columns);
   const grouped = new Map<
     string,
-    { schema: string; table: string; cols: { name: string; type: string; notNull: boolean; default: string | null }[] }
+    {
+      schema: string;
+      table: string;
+      cols: { name: string; type: string; notNull: boolean; default: string | null }[];
+    }
   >();
   for (const r of primeCols) {
     const key = `${str(r.schema)}.${str(r.table_name)}`;
