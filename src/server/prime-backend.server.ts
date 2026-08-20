@@ -49,8 +49,8 @@ export type PrimeEdgeFunction = {
 
 export type PrimeAuthConfig = {
   site_url?: string;
-  uri_allow_list?: string;      // comma-separated (Management API shape)
-  jwt_exp?: number;             // seconds
+  uri_allow_list?: string; // comma-separated (Management API shape)
+  jwt_exp?: number; // seconds
   disable_signup?: boolean;
   external_anonymous_users_enabled?: boolean;
   password_min_length?: number;
@@ -235,7 +235,48 @@ export function parseAuthConfig(toml: string | null): PrimeAuthConfig | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
+/**
+ * Secrets whose whole value is that ONE deployment holds them.
+ *
+ * A vendor API key is shared on purpose — that is the forwarded-key billing
+ * model. A signing secret is the opposite: `INTERNAL_EDGE_SECRET` is what the
+ * prime's cron jobs sign internal function invocations with, so copying it to
+ * a clone makes a request signed for either deployment valid on the other, in
+ * both directions. `CSRF_TOKEN_PEPPER` has the same shape — tokens become
+ * interchangeable across tenants.
+ *
+ * These were being shelled and inherited like any other name, because they
+ * are ordinary `Deno.env.get()` reads and nothing distinguished them.
+ */
+export const IDENTITY_SECRETS = new Set([
+  "INTERNAL_EDGE_SECRET",
+  "INTERNAL_EDGE_SECRET_V2",
+  "CSRF_TOKEN_PEPPER",
+]);
 
+/**
+ * Secrets that are deployment CONFIG rather than credentials. Copying them
+ * points the clone's own functions at the prime's domain.
+ */
+export const DEPLOYMENT_CONFIG_SECRETS = new Set([
+  "ALLOWED_ORIGINS",
+  "CORS_STRICT_ALLOWED_ORIGINS",
+  "APP_URL",
+  "APP_BASE_URL",
+]);
+
+export type SecretClass = "platform" | "identity" | "deployment_config" | "vendor";
+
+/**
+ * How a shelled secret should reach a clone. The three non-vendor classes are
+ * the ones a naive copy gets wrong.
+ */
+export function classifySecret(name: string): SecretClass {
+  if (AUTO_INJECTED_SECRETS.has(name) || name.startsWith("SUPABASE_")) return "platform";
+  if (IDENTITY_SECRETS.has(name)) return "identity";
+  if (DEPLOYMENT_CONFIG_SECRETS.has(name)) return "deployment_config";
+  return "vendor";
+}
 
 /**
  * Extract secret names referenced by function source code.

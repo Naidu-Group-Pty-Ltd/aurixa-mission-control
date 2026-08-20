@@ -40,11 +40,25 @@ async function runBackendProvisioning(
   };
 
   try {
-    const { resolvePrimeSource, fetchPrimeBackendSnapshot } =
-      await import(/* @vite-ignore */ "@/lib/_server-shims/prime-backend.server");
-    const { getAppOctokit } = await import(/* @vite-ignore */ "@/lib/_server-shims/github-app.server");
-    const { provisionCloneBackend } = await import(/* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server");
+    const { resolvePrimeSource, fetchPrimeBackendSnapshot } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/prime-backend.server"
+    );
+    const { getAppOctokit } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/github-app.server"
+    );
+    const { provisionCloneBackend } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server"
+    );
     const { encryptSecret } = await import(/* @vite-ignore */ "@/lib/_server-shims/crypto.server");
+    const { getPrimeProjectRef } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server"
+    );
+    const { computeParity } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/handoff-parity.server"
+    );
+    const { retargetCloneRepo } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/clone-repo-retarget.server"
+    );
     // ── Snapshot the prime's backend architecture from GitHub ──
     const source = await resolvePrimeSource(supabase);
     if (!source) {
@@ -73,7 +87,7 @@ async function runBackendProvisioning(
     // whitelist them on the new backend instead of copying prime's URLs.
     const { data: cloneRow } = await supabase
       .from("clones")
-      .select("slug, deploy_url, lovable_project_url")
+      .select("slug, deploy_url, lovable_project_url, github_owner, github_repo, default_branch")
       .eq("id", input.cloneId)
       .maybeSingle();
     const { data: cfRow } = await supabase
@@ -117,6 +131,57 @@ async function runBackendProvisioning(
       updateStatus,
     );
 
+    // Take the prime out of the clone's own repository now that its project
+    // ref exists. Until this runs the repo is a byte copy that still names the
+    // prime in config.toml, in the workflows' hard-coded fallback and in the
+    // CLI's checked-in link file — and the only thing stopping it acting on
+    // the prime is that no SUPABASE_ACCESS_TOKEN has been added yet.
+    let repoRetarget: Awaited<ReturnType<typeof retargetCloneRepo>> | null = null;
+    if (cloneRow?.github_owner && cloneRow?.github_repo) {
+      try {
+        await updateStatus("migrating", "Re-pointing the clone repository at its own project...");
+        repoRetarget = await retargetCloneRepo(
+          {
+            owner: cloneRow.github_owner,
+            repo: cloneRow.github_repo,
+            branch: cloneRow.default_branch ?? undefined,
+          },
+          result.projectRef,
+        );
+        const failedRetarget = repoRetarget.actions.filter((a) => a.status === "failed");
+        if (failedRetarget.length > 0) {
+          await updateStatus(
+            "migrating",
+            `Repository still names another project in ${failedRetarget.length} place(s): ${failedRetarget
+              .map((a) => a.target)
+              .join(", ")}`,
+          );
+        }
+      } catch (err) {
+        await updateStatus(
+          "migrating",
+          `Repository re-target failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    // Compare the result with the prime before calling it ready.
+    //
+    // Every step above reports its own success, which is a different question
+    // from whether the clone MATCHES. computeParity already knew how to ask;
+    // nothing was asking it. Non-fatal — a clone that came up short is
+    // recorded as short rather than thrown away, because the remedy is a
+    // retry of the missing pieces, not a re-provision.
+    let parity: Awaited<ReturnType<typeof computeParity>> | null = null;
+    let parityError: string | null = null;
+    try {
+      await updateStatus("migrating", "Comparing the new backend with the prime...");
+      parity = await computeParity(getPrimeProjectRef(), result.projectRef);
+    } catch (err) {
+      parityError = err instanceof Error ? err.message : String(err);
+      await updateStatus("migrating", `Parity check could not run: ${parityError}`);
+    }
+
     const failedFunctions = result.edgeFunctions.filter((f) => !f.success);
     const failedSecrets = result.secretShells.filter((s) => !s.success);
     const missingSecrets = result.secretShells.filter((s) => s.status === "missing");
@@ -133,12 +198,21 @@ async function runBackendProvisioning(
         // On resume the original db password is kept — don't null it out
         ...(result.dbPass ? { db_pass: encryptSecret(result.dbPass) } : {}),
         status: "ready" as const,
+        parity_report: parity ?? null,
+        parity_checked_at: parity ? new Date().toISOString() : null,
+        repo_retarget: repoRetarget ?? null,
         status_detail:
-          partialFailures > 0
-            ? `Backend ready with warnings: ${failedFunctions.length} function deploy(s) and ${failedSecrets.length} secret sync(s) failed; ${missingSecrets.length} secret(s) awaiting operator input`
-            : missingSecrets.length > 0
-              ? `Backend ready — ${missingSecrets.length} secret(s) awaiting operator input at /clones/${input.cloneId}/secrets`
-              : "Backend is ready — prime architecture replicated",
+          // Parity leads, because it is the only line that speaks to whether
+          // the clone matches rather than to whether the steps ran.
+          parity && parity.blocking_issues.length > 0
+            ? `Backend provisioned but DOES NOT MATCH the prime — ${parity.blocking_issues.join(", ")}. Review at /clones/${input.cloneId}`
+            : parityError
+              ? `Backend ready, but parity could not be verified (${parityError}) — it has not been compared with the prime`
+              : partialFailures > 0
+                ? `Backend ready with warnings: ${failedFunctions.length} function deploy(s) and ${failedSecrets.length} secret sync(s) failed; ${missingSecrets.length} secret(s) awaiting operator input`
+                : missingSecrets.length > 0
+                  ? `Backend ready — ${missingSecrets.length} secret(s) awaiting operator input at /clones/${input.cloneId}/secrets`
+                  : "Backend is ready — verified against the prime",
         migration_version: result.latestMigration,
         source_repo: snapshot.sourceRepo,
         source_ref: snapshot.sourceRef,
@@ -176,7 +250,9 @@ async function runBackendProvisioning(
       error?: string;
     }> = [];
     if (moduleIds.length > 0) {
-      const { applyModuleMigrations } = await import(/* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server");
+      const { applyModuleMigrations } = await import(
+        /* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server"
+      );
       const { data: mods } = await supabase
         .from("modules")
         .select("id, name, clone_migration_sql, apply_on_install, dependencies")
@@ -312,7 +388,9 @@ export const provisionBackend = createServerFn({ method: "POST" })
       context,
     }): Promise<{ ok: true; queued: true } | { ok: false; error: string }> => {
       const { supabase, userId } = context;
-      const { encryptSecret } = await import(/* @vite-ignore */ "@/lib/_server-shims/crypto.server");
+      const { encryptSecret } = await import(
+        /* @vite-ignore */ "@/lib/_server-shims/crypto.server"
+      );
 
       const { data: clone } = await supabase
         .from("clones")
@@ -426,7 +504,9 @@ export const retryBackendProvisioning = createServerFn({ method: "POST" })
       context,
     }): Promise<{ ok: true; queued: true } | { ok: false; error: string }> => {
       const { supabase, userId } = context;
-      const { encryptSecret } = await import(/* @vite-ignore */ "@/lib/_server-shims/crypto.server");
+      const { encryptSecret } = await import(
+        /* @vite-ignore */ "@/lib/_server-shims/crypto.server"
+      );
 
       const { data: backend } = await supabase
         .from("clone_backends")
@@ -508,7 +588,9 @@ export const setCloneBackendSecret = createServerFn({ method: "POST" })
     if (!backend?.supabase_project_ref) {
       return { ok: false as const, error: "Clone backend not provisioned yet" };
     }
-    const { setCloneSecretValue } = await import(/* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server");
+    const { setCloneSecretValue } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server"
+    );
     const res = await setCloneSecretValue(backend.supabase_project_ref, data.name, data.value);
     const now = new Date().toISOString();
     await supabase.from("clone_backend_secrets").upsert(
@@ -639,7 +721,9 @@ export const addModulesToBackend = createServerFn({ method: "POST" })
       applyOnInstall: m.apply_on_install !== false,
     }));
 
-    const { applyModuleMigrations } = await import(/* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server");
+    const { applyModuleMigrations } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/backend-provisioning.server"
+    );
     // Reflect progress on the clone_backends row while migrations run.
     await supabase
       .from("clone_backends")

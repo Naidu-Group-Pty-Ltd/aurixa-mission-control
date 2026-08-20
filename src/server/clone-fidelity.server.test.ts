@@ -1,0 +1,153 @@
+import { describe, it, expect } from "vitest";
+import {
+  classifySecret,
+  IDENTITY_SECRETS,
+  DEPLOYMENT_CONFIG_SECRETS,
+} from "./prime-backend.server";
+import {
+  quoteExtensionIdent,
+  resolveRequiredExtensions,
+  REQUIRED_EXTENSION_FLOOR,
+  planCloneSecrets,
+} from "./backend-provisioning.server";
+
+/**
+ * Fidelity rules for cloning a prime, each one learned from a clone that was
+ * wrong in a way that looked right. See docs/CLONE_PIPELINE_GAPS.md.
+ */
+
+describe("resolveRequiredExtensions", () => {
+  it("names supabase_vault, because `vault` is not an extension", () => {
+    // The old hard-coded list said "vault". `create extension vault` fails —
+    // non-fatally — so clones were provisioned with no vault at all, which is
+    // what the cron auth and secret decryption read.
+    expect(REQUIRED_EXTENSION_FLOOR).toContain("supabase_vault");
+    expect(REQUIRED_EXTENSION_FLOOR as readonly string[]).not.toContain("vault");
+  });
+
+  it("mirrors what the prime actually has, not a fixed guess", () => {
+    // `vector` is the one that bites: the prime's embedding columns cannot be
+    // created without it, so a migration declaring one fails outright.
+    const out = resolveRequiredExtensions(["vector", "uuid-ossp", "pg_stat_statements"]);
+    expect(out).toContain("vector");
+    expect(out).toContain("uuid-ossp");
+    expect(out).toContain("pg_stat_statements");
+  });
+
+  it("keeps the floor even when the prime reports nothing", () => {
+    const out = resolveRequiredExtensions([]);
+    for (const e of REQUIRED_EXTENSION_FLOOR) expect(out).toContain(e);
+  });
+
+  it("drops what Postgres ships anyway, and is stable", () => {
+    expect(resolveRequiredExtensions(["plpgsql"])).not.toContain("plpgsql");
+    expect(resolveRequiredExtensions(["b", "a"])).toEqual(resolveRequiredExtensions(["a", "b"]));
+  });
+
+  it("does not duplicate an extension the prime shares with the floor", () => {
+    const out = resolveRequiredExtensions(["pg_cron", "pg_cron"]);
+    expect(out.filter((n) => n === "pg_cron")).toHaveLength(1);
+  });
+});
+
+describe("quoteExtensionIdent", () => {
+  it("quotes a name that is not a bare identifier", () => {
+    // `create extension if not exists uuid-ossp` is a syntax error: the
+    // hyphen ends the identifier. Unquoted interpolation silently lost it.
+    expect(quoteExtensionIdent("uuid-ossp")).toBe('"uuid-ossp"');
+  });
+
+  it("leaves ordinary names alone", () => {
+    expect(quoteExtensionIdent("pg_cron")).toBe("pg_cron");
+    expect(quoteExtensionIdent("supabase_vault")).toBe("supabase_vault");
+  });
+});
+
+describe("classifySecret", () => {
+  it("treats signing secrets as identity, not credentials", () => {
+    // A vendor key is shared on purpose — that is the forwarded-key billing
+    // model. A signing secret's whole value is that ONE deployment holds it.
+    for (const n of IDENTITY_SECRETS) expect(classifySecret(n)).toBe("identity");
+  });
+
+  it("treats origin/URL settings as deployment config", () => {
+    for (const n of DEPLOYMENT_CONFIG_SECRETS) expect(classifySecret(n)).toBe("deployment_config");
+  });
+
+  it("treats SUPABASE_* as platform", () => {
+    expect(classifySecret("SUPABASE_URL")).toBe("platform");
+    expect(classifySecret("SUPABASE_SERVICE_ROLE_KEY")).toBe("platform");
+    expect(classifySecret("SUPABASE_JWKS")).toBe("platform");
+  });
+
+  it("treats everything else as an inheritable vendor credential", () => {
+    expect(classifySecret("ANTHROPIC_API_KEY")).toBe("vendor");
+    expect(classifySecret("AIRTABLE_TOKEN")).toBe("vendor");
+  });
+});
+
+describe("planCloneSecrets", () => {
+  const gen = () => "GENERATED";
+
+  it("NEVER copies an identity secret, even when a value is available", () => {
+    const { toWrite, results } = planCloneSecrets(
+      ["INTERNAL_EDGE_SECRET"],
+      { INTERNAL_EDGE_SECRET: "the-primes-signing-secret" },
+      gen,
+    );
+    expect(toWrite).toEqual([{ name: "INTERNAL_EDGE_SECRET", value: "GENERATED" }]);
+    expect(results.get("INTERNAL_EDGE_SECRET")?.status).toBe("generated");
+  });
+
+  it("gives each identity secret its own value", () => {
+    let n = 0;
+    const { toWrite } = planCloneSecrets(
+      ["INTERNAL_EDGE_SECRET", "CSRF_TOKEN_PEPPER"],
+      {},
+      () => `v${n++}`,
+    );
+    expect(new Set(toWrite.map((s) => s.value)).size).toBe(2);
+  });
+
+  it("inherits vendor credentials", () => {
+    const { toWrite, results } = planCloneSecrets(
+      ["ANTHROPIC_API_KEY"],
+      { ANTHROPIC_API_KEY: "sk-ant-x" },
+      gen,
+    );
+    expect(toWrite).toEqual([{ name: "ANTHROPIC_API_KEY", value: "sk-ant-x" }]);
+    expect(results.get("ANTHROPIC_API_KEY")?.status).toBe("inherited");
+  });
+
+  it("reports a vendor credential with no value as missing rather than inventing one", () => {
+    const { toWrite, results } = planCloneSecrets(["DOMAIN_API_KEY"], {}, gen);
+    expect(toWrite).toHaveLength(0);
+    expect(results.get("DOMAIN_API_KEY")?.status).toBe("missing");
+  });
+
+  it("does not carry the prime's own origins across", () => {
+    const { toWrite, results } = planCloneSecrets(
+      ["ALLOWED_ORIGINS"],
+      { ALLOWED_ORIGINS: "https://prime.example" },
+      gen,
+    );
+    expect(toWrite).toHaveLength(0);
+    expect(results.get("ALLOWED_ORIGINS")?.status).toBe("skipped_deployment_config");
+  });
+
+  it("refuses a platform name even if one reaches it", () => {
+    const { toWrite, results } = planCloneSecrets(
+      ["SUPABASE_SERVICE_ROLE_KEY"],
+      { SUPABASE_SERVICE_ROLE_KEY: "prime-service-role" },
+      gen,
+    );
+    expect(toWrite).toHaveLength(0);
+    expect(results.get("SUPABASE_SERVICE_ROLE_KEY")?.status).toBe("skipped_platform");
+  });
+
+  it("returns a result for every name it was given", () => {
+    const names = ["INTERNAL_EDGE_SECRET", "ANTHROPIC_API_KEY", "ALLOWED_ORIGINS", "NOPE"];
+    const { results } = planCloneSecrets(names, { ANTHROPIC_API_KEY: "x" }, gen);
+    for (const n of names) expect(results.get(n)).toBeDefined();
+  });
+});

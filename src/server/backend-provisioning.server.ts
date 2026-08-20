@@ -7,6 +7,9 @@
  *   SB_ORG_ID          – Organization ID from supabase.com/dashboard/org/_/general
  */
 
+import crypto from "node:crypto";
+
+import { classifySecret } from "./prime-backend.server";
 import type { PrimeBackendSnapshot } from "./prime-backend.server";
 
 const MGMT_API = "https://api.supabase.com/v1";
@@ -122,8 +125,8 @@ export async function checkOrgCapacity(input?: {
           typeof match.plan === "string"
             ? match.plan
             : typeof (match as Record<string, unknown>).tier === "string"
-            ? ((match as Record<string, unknown>).tier as string)
-            : null;
+              ? ((match as Record<string, unknown>).tier as string)
+              : null;
       }
     }
   } catch {
@@ -169,8 +172,8 @@ export async function checkOrgCapacity(input?: {
   const reason = hardBlock
     ? `Free-tier orgs are limited to ${softLimit} active projects. Upgrade the org or archive an unused project before provisioning.`
     : wouldExceed
-    ? `Creating another project would exceed the configured soft limit of ${softLimit}. Set SB_ORG_PROJECT_SOFT_LIMIT to override, or archive an unused project.`
-    : null;
+      ? `Creating another project would exceed the configured soft limit of ${softLimit}. Set SB_ORG_PROJECT_SOFT_LIMIT to override, or archive an unused project.`
+      : null;
 
   return {
     orgId,
@@ -208,7 +211,6 @@ export async function createSupabaseProject(input: CreateProjectInput): Promise<
 
   return res.json();
 }
-
 
 /**
  * Poll project status until it becomes ACTIVE_HEALTHY or times out.
@@ -337,6 +339,19 @@ function normalizeBucket(raw: unknown): StorageBucketConfig | null {
  * Derive the prime project's ref from the server-side Supabase URL. Used to
  * point the Management API at the prime when we take a bucket snapshot.
  */
+/**
+ * The prime's ref, or null when it is not configured. Every replication step
+ * here is best-effort against the prime, so a missing SUPABASE_URL should
+ * degrade the step rather than throw out of the whole provisioning run.
+ */
+export function tryGetPrimeProjectRef(): string | null {
+  try {
+    return getPrimeProjectRef();
+  } catch {
+    return null;
+  }
+}
+
 export function getPrimeProjectRef(): string {
   const url = process.env.SUPABASE_URL;
   if (!url) throw new Error("SUPABASE_URL is not configured — cannot derive prime project ref");
@@ -379,7 +394,11 @@ export async function listProjectEdgeFunctionSlugs(projectRef: string): Promise<
     return raw
       .map((r) => {
         const o = r as Record<string, unknown>;
-        return typeof o.slug === "string" ? o.slug : typeof o.name === "string" ? (o.name as string) : "";
+        return typeof o.slug === "string"
+          ? o.slug
+          : typeof o.name === "string"
+            ? (o.name as string)
+            : "";
       })
       .filter((s) => s.length > 0)
       .sort();
@@ -417,7 +436,9 @@ export async function listProjectSecretNames(projectRef: string): Promise<string
  * whitelisted subset (site_url, uri_allow_list, JWT expiry, signup
  * toggles, password policy) — never OAuth provider secrets.
  */
-export async function getProjectAuthConfig(projectRef: string): Promise<Record<string, unknown> | null> {
+export async function getProjectAuthConfig(
+  projectRef: string,
+): Promise<Record<string, unknown> | null> {
   try {
     const res = await fetch(`${MGMT_API}/projects/${projectRef}/config/auth`, {
       headers: headers(),
@@ -561,29 +582,25 @@ async function copyBucketObject(
   bucketId: string,
   path: string,
 ): Promise<{ ok: true; bytes: number } | { ok: false; error: string; skipped?: boolean }> {
-  const dl = await fetch(
-    `${sourceUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`,
-    { headers: { Authorization: `Bearer ${sourceKey}`, apikey: sourceKey } },
-  );
+  const dl = await fetch(`${sourceUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`, {
+    headers: { Authorization: `Bearer ${sourceKey}`, apikey: sourceKey },
+  });
   if (!dl.ok) return { ok: false, error: `download ${dl.status}` };
   const contentType = dl.headers.get("content-type") ?? "application/octet-stream";
   const buf = await dl.arrayBuffer();
   if (buf.byteLength > SEED_ASSET_LIMITS.maxBytesPerObject) {
     return { ok: false, error: "object exceeds per-object cap", skipped: true };
   }
-  const up = await fetch(
-    `${targetUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${targetKey}`,
-        apikey: targetKey,
-        "Content-Type": contentType,
-        "x-upsert": "true",
-      },
-      body: buf,
+  const up = await fetch(`${targetUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${targetKey}`,
+      apikey: targetKey,
+      "Content-Type": contentType,
+      "x-upsert": "true",
     },
-  );
+    body: buf,
+  });
   if (!up.ok) return { ok: false, error: `upload ${up.status} — ${await up.text()}` };
   return { ok: true, bytes: buf.byteLength };
 }
@@ -770,7 +787,10 @@ export async function applyAuthConfig(
 ): Promise<AuthConfigResult> {
   const patch = buildAuthConfigPatch(authConfig, origins ?? null);
   if (!patch || Object.keys(patch).length === 0) {
-    return { status: "skipped", reason: "no [auth] block in prime config.toml and no clone origins provided" };
+    return {
+      status: "skipped",
+      reason: "no [auth] block in prime config.toml and no clone origins provided",
+    };
   }
   try {
     const res = await fetch(`${MGMT_API}/projects/${projectRef}/config/auth`, {
@@ -786,7 +806,9 @@ export async function applyAuthConfig(
       status: "applied",
       fields: Object.keys(patch),
       siteUrl: patch.site_url,
-      redirectCount: patch.uri_allow_list ? patch.uri_allow_list.split(",").filter(Boolean).length : 0,
+      redirectCount: patch.uri_allow_list
+        ? patch.uri_allow_list.split(",").filter(Boolean).length
+        : 0,
     };
   } catch (err) {
     return { status: "failed", error: err instanceof Error ? err.message : String(err) };
@@ -884,6 +906,121 @@ export function rewriteCronCommand(
 }
 
 /**
+ * Rewrite the prime's anon key to the clone's wherever it is embedded.
+ *
+ * 22 of this prime's migration files put the prime's anon JWT INLINE in
+ * `net.http_post` Authorization headers, across 15 endpoints. Rewriting the
+ * host alone leaves a job that posts to the clone carrying a token for the
+ * prime, which the clone rejects — a job that looks scheduled and never works.
+ */
+export function rewriteEmbeddedAnonKey(
+  command: string,
+  primeAnonKey: string | null | undefined,
+  cloneAnonKey: string | null | undefined,
+): { command: string; changed: boolean } {
+  if (!command || !primeAnonKey || !cloneAnonKey || primeAnonKey === cloneAnonKey) {
+    return { command, changed: false };
+  }
+  if (!command.includes(primeAnonKey)) return { command, changed: false };
+  return { command: command.split(primeAnonKey).join(cloneAnonKey), changed: true };
+}
+
+/**
+ * Seed the clone's own project URL into its vault.
+ *
+ * Several of the prime's functions read `vault.decrypted_secrets` for
+ * `supabase_url` and fall back to a hardcoded prime URL when the lookup finds
+ * nothing — which is exactly a fresh clone's state. Seeding this first means
+ * the fallback is never reached; rewriting the bodies (below) means it does
+ * not matter if it is.
+ */
+export async function seedCloneVaultUrl(
+  cloneRef: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const url = getProjectUrl(cloneRef);
+  try {
+    await runSqlOnProject(
+      cloneRef,
+      `do $seed$
+       begin
+         if exists (select 1 from vault.decrypted_secrets where name = 'supabase_url') then
+           perform vault.update_secret(
+             (select id from vault.decrypted_secrets where name = 'supabase_url' limit 1),
+             ${sqlLiteral(url)}, 'supabase_url', 'Project base URL');
+         else
+           perform vault.create_secret(${sqlLiteral(url)}, 'supabase_url', 'Project base URL');
+         end if;
+       end $seed$;`,
+    );
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type FunctionRepointResult = {
+  name: string;
+  status: "rewritten" | "failed";
+  error?: string;
+};
+
+/**
+ * Re-point any function body that still names the prime.
+ *
+ * `replicateCronJobs` fixes `cron.job.command`. It does not reach `pg_proc`,
+ * and on this prime four functions carry the prime's URL as a vault FALLBACK:
+ * `bootstrap_cron_vault`, `dispatch_web_push_on_notification`,
+ * `dispatch_web_push_for_portal_notification` and
+ * `invoke_pdf_parse_recover_stuck_jobs`. `bootstrap_cron_vault` is worse than
+ * a fallback — it SEEDS the vault with the prime's URL, so calling it on a
+ * clone points that clone at the prime for good.
+ *
+ * Reads each definition with `pg_get_functiondef`, substitutes the ref, and
+ * re-creates it. `CREATE OR REPLACE` in the definition makes this idempotent.
+ */
+export async function repointPrimeUrlsInFunctions(
+  cloneRef: string,
+  primeRef: string,
+  schemas: readonly string[] = ["public", "aml"],
+): Promise<FunctionRepointResult[]> {
+  const schemaList = schemas.map((s) => sqlLiteral(s)).join(", ");
+  let rows: Array<{ name?: string; def?: string }> = [];
+  try {
+    rows = ((await runSqlOnProject(
+      cloneRef,
+      `select p.proname as name, pg_get_functiondef(p.oid) as def
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname in (${schemaList})
+          and p.prosrc like '%' || ${sqlLiteral(primeRef)} || '%'`,
+    )) ?? []) as Array<{ name?: string; def?: string }>;
+  } catch (err) {
+    return [
+      { name: "(scan)", status: "failed", error: err instanceof Error ? err.message : String(err) },
+    ];
+  }
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+
+  const results: FunctionRepointResult[] = [];
+  for (const r of rows) {
+    const name = String(r?.name ?? "(unknown)");
+    const def = String(r?.def ?? "");
+    if (!def || !def.includes(primeRef)) continue;
+    try {
+      await runSqlOnProject(cloneRef, def.split(primeRef).join(cloneRef));
+      results.push({ name, status: "rewritten" });
+    } catch (err) {
+      results.push({
+        name,
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return results;
+}
+
+/**
  * Replicate the prime's pg_cron schedule onto a freshly provisioned clone.
  * Runs AFTER migration replay (migrations may already have scheduled the
  * same jobs pointing at prime's URL) — so we unschedule and re-schedule
@@ -899,6 +1036,13 @@ export async function replicateCronJobs(
   cloneRef: string,
   primeRef: string,
   primeJobs: PrimeCronJob[],
+  /**
+   * The two projects' anon keys. Supplied so a job that carries the prime's
+   * key inline — 22 of this prime's migrations write one into a net.http_post
+   * Authorization header — is rewritten to the clone's rather than left
+   * scheduled and permanently rejected. Omit to rewrite the host only.
+   */
+  keys?: { primeAnonKey?: string | null; cloneAnonKey?: string | null },
 ): Promise<CronJobReplicationResult[]> {
   if (primeJobs.length === 0) return [];
   // Ensure pg_cron exists on the clone. Extension is idempotent.
@@ -915,7 +1059,14 @@ export async function replicateCronJobs(
 
   const results: CronJobReplicationResult[] = [];
   for (const job of primeJobs) {
-    const { command, changed } = rewriteCronCommand(job.command, primeRef, cloneRef);
+    const hostRewrite = rewriteCronCommand(job.command, primeRef, cloneRef);
+    const keyRewrite = rewriteEmbeddedAnonKey(
+      hostRewrite.command,
+      keys?.primeAnonKey,
+      keys?.cloneAnonKey,
+    );
+    const command = keyRewrite.command;
+    const changed = hostRewrite.changed || keyRewrite.changed;
     // Escape single quotes for embedding into SQL literals.
     const q = (s: string) => s.replace(/'/g, "''");
     try {
@@ -947,18 +1098,59 @@ export async function replicateCronJobs(
 
 // ─── G4: Required extensions + realtime publication parity ───────────
 /**
- * Extensions the prime repo depends on at runtime. Missing any of these
- * silently breaks cron (pg_cron), webhook fanout / cron http calls (pg_net),
- * Vault-based cron auth + secret decryption (vault + pgcrypto), and the
- * GraphQL endpoint used by some public reads (pg_graphql).
+ * The floor: extensions a clone needs even if the prime somehow lacks them.
+ * Missing any of these silently breaks cron (pg_cron), webhook fanout and
+ * cron http calls (pg_net), Vault-backed cron auth and secret decryption
+ * (supabase_vault + pgcrypto), and the GraphQL endpoint some public reads use.
+ *
+ * THE FLOOR IS NOT THE LIST. It used to be, and a hard-coded list drifts from
+ * the prime silently: this one named "vault", which is not an extension —
+ * Postgres knows it as `supabase_vault`, so `create extension` failed every
+ * time, non-fatally, and clones were provisioned with no vault at all. It also
+ * omitted `vector`, which the prime's embedding columns
+ * (`agent_semantic_memories`, `document_chunks`) need before any migration
+ * that declares one can apply.
+ *
+ * `resolveRequiredExtensions` unions this with whatever the prime actually
+ * has, so the prime is the authority and the floor is only a backstop.
  */
-export const REQUIRED_EXTENSIONS = [
+export const REQUIRED_EXTENSION_FLOOR = [
   "pgcrypto",
   "pg_net",
   "pg_cron",
   "pg_graphql",
-  "vault",
+  "supabase_vault",
 ] as const;
+
+/** Shipped with every Postgres; `create extension` on it is noise, not safety. */
+const EXTENSIONS_ALWAYS_PRESENT = new Set(["plpgsql"]);
+
+/**
+ * Quote an extension name for `create extension`. Most are bare identifiers,
+ * but `uuid-ossp` contains a hyphen and is a syntax error unquoted — which is
+ * the second reason a clone could end up without an extension the prime has.
+ */
+export function quoteExtensionIdent(name: string): string {
+  return /^[a-z_][a-z0-9_]*$/.test(name) ? name : `"${name.replace(/"/g, '""')}"`;
+}
+
+/**
+ * The extensions to install on a clone: the floor, plus everything the prime
+ * runs, minus the ones Postgres ships anyway. Sorted so the result is stable
+ * and diffable.
+ */
+export function resolveRequiredExtensions(primeExtensionNames: readonly string[]): string[] {
+  const names = new Set<string>(REQUIRED_EXTENSION_FLOOR);
+  for (const n of primeExtensionNames) {
+    const trimmed = (n ?? "").trim();
+    if (trimmed) names.add(trimmed);
+  }
+  for (const skip of EXTENSIONS_ALWAYS_PRESENT) names.delete(skip);
+  return [...names].sort();
+}
+
+/** @deprecated Kept so existing imports resolve; prefer resolveRequiredExtensions(). */
+export const REQUIRED_EXTENSIONS = REQUIRED_EXTENSION_FLOOR;
 
 export type RequiredExtensionResult = {
   name: string;
@@ -966,23 +1158,46 @@ export type RequiredExtensionResult = {
   error?: string;
 };
 
+/** Every extension installed on a project, by name. */
+export async function fetchProjectExtensionNames(projectRef: string): Promise<string[]> {
+  try {
+    const rows = (await runSqlOnProject(
+      projectRef,
+      `select extname from pg_extension order by extname`,
+    )) as Array<{ extname?: string }> | null;
+    if (!Array.isArray(rows)) return [];
+    return rows.map((r) => String(r?.extname ?? "")).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Force-install the extension set every clone depends on. Idempotent per
+ * Force-install the extension set the clone depends on. Idempotent per
  * extension; non-fatal per extension so operators can retry from the parity
  * report.
+ *
+ * Pass the prime's ref to mirror its extensions. Without it only the floor is
+ * installed, which is the old behaviour and is not enough for this prime.
  */
 export async function enforceRequiredExtensions(
   projectRef: string,
+  primeRef?: string | null,
 ): Promise<RequiredExtensionResult[]> {
+  const primeNames = primeRef ? await fetchProjectExtensionNames(primeRef) : [];
+  const wanted = resolveRequiredExtensions(primeNames);
   const results: RequiredExtensionResult[] = [];
-  for (const name of REQUIRED_EXTENSIONS) {
+  for (const name of wanted) {
     try {
       const rows = (await runSqlOnProject(
         projectRef,
-        `select 1 as present from pg_extension where extname = '${name}'`,
+        `select 1 as present from pg_extension where extname = ${sqlLiteral(name)}`,
       )) as Array<{ present?: number }> | null;
       const present = Array.isArray(rows) && rows.length > 0;
-      await runSqlOnProject(projectRef, `create extension if not exists ${name};`);
+      await runSqlOnProject(
+        projectRef,
+        `create extension if not exists ${quoteExtensionIdent(name)};`,
+      );
       results.push({ name, status: present ? "already_present" : "installed" });
     } catch (err) {
       results.push({
@@ -1085,13 +1300,6 @@ export async function replicateRealtimePublication(
     failures,
   };
 }
-
-
-
-
-
-
-
 
 /**
  * Every clone backend carries its own migration ledger so replays are
@@ -1252,9 +1460,7 @@ export type ModuleMigrationResult = {
  * missing a dep are excluded from `ordered` and reported so the caller can
  * mark them failed without attempting SQL.
  */
-export function topoSortModules(
-  modules: ModuleMigrationInput[],
-): {
+export function topoSortModules(modules: ModuleMigrationInput[]): {
   ordered: ModuleMigrationInput[];
   cycleIds: Set<string>;
   missingDeps: Map<string, string[]>;
@@ -1388,10 +1594,7 @@ export async function applyModuleMigrations(
       continue;
     }
 
-    await onStatusUpdate?.(
-      "migrating",
-      `Applying module ${i + 1}/${ordered.length}: ${m.name}`,
-    );
+    await onStatusUpdate?.("migrating", `Applying module ${i + 1}/${ordered.length}: ${m.name}`);
 
     // Wrap the module's SQL + ledger insert in a single transaction so a
     // partial failure rolls back cleanly.
@@ -1549,7 +1752,17 @@ export async function deployEdgeFunctions(
   return results;
 }
 
-export type SecretShellStatus = "set" | "missing" | "failed" | "inherited";
+export type SecretShellStatus =
+  | "set"
+  | "missing"
+  | "failed"
+  | "inherited"
+  /** Freshly generated on the clone — an identity secret, never copied. */
+  | "generated"
+  /** Platform-managed (SUPABASE_*); Supabase injects its own. */
+  | "skipped_platform"
+  /** Names the prime's own domain; the clone supplies its own. */
+  | "skipped_deployment_config";
 
 export type SecretShellResult = {
   name: string;
@@ -1571,17 +1784,48 @@ export type SecretShellResult = {
  * We NEVER write a placeholder onto the clone — that value made every consumer
  * (Stripe, Lovable AI, VAPID, GitHub) fail at first call.
  */
-export async function syncCloneSecrets(
-  projectRef: string,
+/**
+ * Decide what value each shelled secret should carry on the clone.
+ *
+ * Pure so the classification is testable without the Management API. The
+ * caller supplies the random generator, so a test can assert "not the prime's
+ * value" without asserting a particular one.
+ *
+ * - **identity** secrets are GENERATED, never inherited. Copying
+ *   `INTERNAL_EDGE_SECRET` makes a request signed for one deployment valid on
+ *   the other; see IDENTITY_SECRETS.
+ * - **deployment_config** is skipped, because the prime's value names the
+ *   prime's own domain. `applyAuthConfig` already sets the clone's origins
+ *   from `cloneOrigins`; an operator fills the rest in from the clone page.
+ * - **platform** never reaches this function (extractSecretNames drops it),
+ *   but is refused here too so a hand-built name list cannot slip one past.
+ * - **vendor** credentials are inherited — that is the forwarded-key model.
+ */
+export function planCloneSecrets(
   names: string[],
   inheritedValues: Record<string, string>,
-): Promise<SecretShellResult[]> {
-  if (names.length === 0) return [];
-
+  generate: () => string,
+): { toWrite: { name: string; value: string }[]; results: Map<string, SecretShellResult> } {
   const toWrite: { name: string; value: string }[] = [];
   const results = new Map<string, SecretShellResult>();
 
   for (const name of names) {
+    const kind = classifySecret(name);
+
+    if (kind === "platform") {
+      results.set(name, { name, status: "skipped_platform", success: true });
+      continue;
+    }
+    if (kind === "identity") {
+      toWrite.push({ name, value: generate() });
+      results.set(name, { name, status: "generated", success: true });
+      continue;
+    }
+    if (kind === "deployment_config") {
+      results.set(name, { name, status: "skipped_deployment_config", success: true });
+      continue;
+    }
+
     const val = inheritedValues[name];
     if (typeof val === "string" && val.length > 0) {
       toWrite.push({ name, value: val });
@@ -1590,6 +1834,20 @@ export async function syncCloneSecrets(
       results.set(name, { name, status: "missing", success: true });
     }
   }
+
+  return { toWrite, results };
+}
+
+export async function syncCloneSecrets(
+  projectRef: string,
+  names: string[],
+  inheritedValues: Record<string, string>,
+): Promise<SecretShellResult[]> {
+  if (names.length === 0) return [];
+
+  const { toWrite, results } = planCloneSecrets(names, inheritedValues, () =>
+    crypto.randomBytes(32).toString("hex"),
+  );
 
   if (toWrite.length > 0) {
     const res = await fetch(`${MGMT_API}/projects/${projectRef}/secrets`, {
@@ -2023,7 +2281,6 @@ export type ProvisionBackendResult = {
   realtimePublication: RealtimeReplicationResult;
 };
 
-
 /**
  * Full pipeline: create project → wait ready → get keys → replay the prime's
  * migrations → deploy the prime's edge functions → create empty-shell secrets
@@ -2103,7 +2360,9 @@ export async function provisionCloneBackend(
   let requiredExtensions: RequiredExtensionResult[] = [];
   try {
     await onStatusUpdate?.("migrating", "Enforcing required Postgres extensions...");
-    requiredExtensions = await enforceRequiredExtensions(projectRef);
+    // Mirror the prime's extensions, not a hard-coded guess. See
+    // resolveRequiredExtensions for what that list used to miss.
+    requiredExtensions = await enforceRequiredExtensions(projectRef, tryGetPrimeProjectRef());
     const failedExt = requiredExtensions.filter((r) => r.status === "failed");
     if (failedExt.length > 0) {
       await onStatusUpdate?.(
@@ -2121,7 +2380,6 @@ export async function provisionCloneBackend(
   // Step 5: Deploy the prime's edge functions (non-fatal per function)
   const edgeFunctions = await deployEdgeFunctions(projectRef, snapshot.functions, onStatusUpdate);
 
-
   // Step 5b: Replicate storage bucket configuration from the prime. Migrations
   // already replayed the row-level policies on `storage.objects`, but those
   // policies only match if the buckets themselves exist — otherwise every
@@ -2135,7 +2393,10 @@ export async function provisionCloneBackend(
     const failed = storageBuckets.filter((b) => b.status === "failed");
     const totalObjects = storageBuckets.reduce((n, b) => n + (b.objects_copied ?? 0), 0);
     const totalBytes = storageBuckets.reduce((n, b) => n + (b.bytes_copied ?? 0), 0);
-    const objectFailures = storageBuckets.reduce((n, b) => n + Math.max(0, b.objects_failed ?? 0), 0);
+    const objectFailures = storageBuckets.reduce(
+      (n, b) => n + Math.max(0, b.objects_failed ?? 0),
+      0,
+    );
     if (failed.length > 0) {
       await onStatusUpdate?.(
         "migrating",
@@ -2160,7 +2421,11 @@ export async function provisionCloneBackend(
   let authConfigResult: AuthConfigResult = { status: "skipped", reason: "not attempted" };
   try {
     await onStatusUpdate?.("migrating", "Replicating auth policy from prime config.toml...");
-    authConfigResult = await applyAuthConfig(projectRef, snapshot.authConfig, input.cloneOrigins ?? null);
+    authConfigResult = await applyAuthConfig(
+      projectRef,
+      snapshot.authConfig,
+      input.cloneOrigins ?? null,
+    );
     if (authConfigResult.status === "failed") {
       await onStatusUpdate?.(
         "migrating",
@@ -2174,18 +2439,53 @@ export async function provisionCloneBackend(
     };
   }
 
-
   // Step 5d: Replicate the prime's pg_cron schedule. Migrations already
   // replayed any `cron.schedule(...)` calls verbatim on the clone, which
   // means every job's `net.http_post` currently fires against the PRIME's
   // URL. We rewrite each job's command so the clone's schedule fires
   // against the clone's own edge functions instead. Non-fatal per job.
+  // Step 5d-pre: take the prime's URL out of everything that still holds it,
+  // BEFORE any job is scheduled. Cron commands were already rewritten; these
+  // two are the places that rewrite does not reach, and both fire on a fresh
+  // clone precisely because it is fresh. Non-fatal — surfaced for retry.
+  let vaultSeed: { ok: boolean; error?: string } = { ok: false };
+  let functionRepoints: FunctionRepointResult[] = [];
+  try {
+    const primeRef = getPrimeProjectRef();
+    await onStatusUpdate?.("migrating", "Seeding this project's own URL into its vault...");
+    vaultSeed = await seedCloneVaultUrl(projectRef);
+    if (!vaultSeed.ok) {
+      await onStatusUpdate?.(
+        "migrating",
+        `Vault seed failed (${vaultSeed.error ?? "unknown"}) — functions that read supabase_url will fall back to the prime until this is fixed`,
+      );
+    }
+    await onStatusUpdate?.("migrating", "Re-pointing any function body that names the prime...");
+    functionRepoints = await repointPrimeUrlsInFunctions(projectRef, primeRef);
+    const repointFailed = functionRepoints.filter((r) => r.status === "failed");
+    if (repointFailed.length > 0) {
+      await onStatusUpdate?.(
+        "migrating",
+        `${repointFailed.length} function(s) still name the prime — operators can retry from the clone page`,
+      );
+    }
+  } catch (err) {
+    await onStatusUpdate?.(
+      "migrating",
+      `Prime-reference cleanup skipped: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   let cronJobs: CronJobReplicationResult[] = [];
   try {
     const primeRef = getPrimeProjectRef();
     await onStatusUpdate?.("migrating", "Replicating pg_cron schedule from prime...");
     const primeJobs = await fetchPrimeCronJobs(primeRef);
-    cronJobs = await replicateCronJobs(projectRef, primeRef, primeJobs);
+    const primeKeys = selectProjectKeys(await getProjectApiKeys(primeRef).catch(() => []));
+    cronJobs = await replicateCronJobs(projectRef, primeRef, primeJobs, {
+      primeAnonKey: primeKeys.anonKey,
+      cloneAnonKey: anonKey,
+    });
     const failed = cronJobs.filter((c) => c.status === "failed");
     if (failed.length > 0) {
       await onStatusUpdate?.(
@@ -2228,8 +2528,6 @@ export async function provisionCloneBackend(
     };
   }
 
-
-
   await onStatusUpdate?.(
     "migrating",
     `Syncing ${snapshot.secretNames.length} secret(s) — inheriting whitelisted values...`,
@@ -2239,7 +2537,6 @@ export async function provisionCloneBackend(
     snapshot.secretNames,
     input.inheritedSecrets ?? {},
   );
-
 
   // Step 7: Seed admin
   await onStatusUpdate?.("seeding_admin", "Creating admin user...");
@@ -2268,9 +2565,7 @@ export async function provisionCloneBackend(
     requiredExtensions,
     realtimePublication,
   };
-
 }
-
 
 function generateSecurePassword(): string {
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
