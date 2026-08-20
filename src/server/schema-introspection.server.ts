@@ -33,6 +33,10 @@ export const REPLICATED_SCHEMAS = ["public", "aml"] as const;
 
 const SCHEMA_LIST = REPLICATED_SCHEMAS.map((s) => `'${s}'`).join(", ");
 
+/** Data API roles whose table privileges must come across, or PostgREST 401/403s on every table. */
+export const API_ROLES = ["anon", "authenticated", "service_role"] as const;
+const API_ROLE_LIST = API_ROLES.map((r) => `'${r}'`).join(", ");
+
 /** Max passes for the function-convergence loop, so a genuine error cannot loop forever. */
 export const MAX_FUNCTION_PASSES = 5;
 
@@ -47,7 +51,8 @@ export type StageName =
   | "matviews"
   | "triggers"
   | "rls"
-  | "policies";
+  | "policies"
+  | "grants";
 
 export type StageResult = {
   stage: StageName;
@@ -247,14 +252,28 @@ export function buildEnumDdl(schema: string, typeName: string, labels: readonly 
   return `do $$ begin create type ${quoteIdent(schema)}.${quoteIdent(typeName)} as enum (${values}); exception when duplicate_object then null; end $$`;
 }
 
+export type ColumnDef = {
+  name: string;
+  type: string;
+  notNull: boolean;
+  default: string | null;
+  /** pg_attribute.attidentity: 'a' = always, 'd' = by default, '' = none. */
+  identity?: string | null;
+};
+
 export function buildCreateTableDdl(
   schema: string,
   table: string,
-  columns: readonly { name: string; type: string; notNull: boolean; default: string | null }[],
+  columns: readonly ColumnDef[],
 ): string {
   const cols = columns.map((c) => {
     let s = `${quoteIdent(c.name)} ${c.type}`;
-    if (c.default) s += ` default ${c.default}`;
+    // Identity columns carry no pg_attrdef default — they must be declared.
+    if (c.identity === "a" || c.identity === "d") {
+      s += ` generated ${c.identity === "a" ? "always" : "by default"} as identity`;
+    } else if (c.default) {
+      s += ` default ${c.default}`;
+    }
     if (c.notNull) s += " not null";
     return s;
   });
@@ -292,6 +311,15 @@ export function parsePgArray(value: unknown): string[] {
     .split(",")
     .map((p) => p.trim().replace(/^"|"$/g, ""))
     .filter(Boolean);
+}
+
+export function buildGrantDdl(
+  schema: string,
+  table: string,
+  grantee: string,
+  privilege: string,
+): string {
+  return `grant ${privilege.toLowerCase()} on ${quoteIdent(schema)}.${quoteIdent(table)} to ${quoteIdent(grantee)}`;
 }
 
 // ─── Batch DDL application ───────────────────────────────────────────
@@ -377,7 +405,7 @@ export async function applyStatements(
 
 const Q = {
   enums: `select n.nspname as schema, t.typname as name,
-            array_agg(e.enumlabel order by e.enumsortorder) as labels
+            to_jsonb(array_agg(e.enumlabel::text order by e.enumsortorder)) as labels
           from pg_type t
           join pg_namespace n on n.oid = t.typnamespace
           join pg_enum e on e.enumtypid = t.oid
@@ -393,6 +421,7 @@ const Q = {
               format_type(a.atttypid, a.atttypmod) as data_type,
               a.attnotnull as not_null,
               pg_get_expr(d.adbin, d.adrelid) as column_default,
+              a.attidentity::text as identity,
               a.attnum as ord
             from pg_attribute a
             join pg_class c on c.oid = a.attrelid
@@ -454,6 +483,13 @@ const Q = {
                roles::text as roles, cmd, qual, with_check
              from pg_policies where schemaname in (${SCHEMA_LIST})
              order by tablename, policyname`,
+
+  // PostgREST reaches nothing without these: RLS alone is not access.
+  grants: `select table_schema as schema, table_name, grantee, privilege_type
+           from information_schema.role_table_grants
+           where table_schema in (${SCHEMA_LIST})
+             and grantee in (${API_ROLE_LIST})
+           order by 1, 2, 3, 4`,
 };
 
 /** Count queries used for reconciliation — run identically on both sides. */
@@ -470,6 +506,7 @@ const COUNTS: Record<StageName, string> = {
   triggers: `select count(*)::int as n from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where not t.tgisinternal and n.nspname in (${SCHEMA_LIST})`,
   rls: `select count(*)::int as n from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and c.relrowsecurity and n.nspname in (${SCHEMA_LIST})`,
   policies: `select count(*)::int as n from pg_policies where schemaname in (${SCHEMA_LIST})`,
+  grants: `select count(*)::int as n from information_schema.role_table_grants where table_schema in (${SCHEMA_LIST}) and grantee in (${API_ROLE_LIST})`,
 };
 
 async function query(ref: string, sql: string): Promise<Array<Record<string, unknown>>> {
@@ -573,7 +610,7 @@ export async function replicateSchemaByIntrospection(
     {
       schema: string;
       table: string;
-      cols: { name: string; type: string; notNull: boolean; default: string | null }[];
+      cols: ColumnDef[];
     }
   >();
   for (const r of primeCols) {
@@ -584,9 +621,11 @@ export async function replicateSchemaByIntrospection(
       type: str(r.data_type),
       notNull: r.not_null === true || r.not_null === "true",
       default: r.column_default == null ? null : str(r.column_default),
+      identity: r.identity == null ? null : str(r.identity),
     });
     grouped.set(key, entry);
   }
+
   const tableStmts = Array.from(grouped.values()).map((t) =>
     buildCreateTableDdl(t.schema, t.table, t.cols),
   );
@@ -654,6 +693,21 @@ export async function replicateSchemaByIntrospection(
     notes: [`convergence: ${history.join(" → ")}`],
   });
 
+  // 4b. A column default that calls a user function could not be created
+  // before stage 4 existed. Re-apply the table DDL once the functions are in
+  // place and re-reconcile, so that ordering cannot silently lose a table.
+  if (!tableStage.reconciled || tableStage.failed > 0) {
+    await say("Re-applying tables now that functions exist...");
+    const retry = await applyStatements(cloneRef, "tables:retry", tableStmts, 60);
+    tableStage.applied += retry.applied;
+    tableStage.failed = retry.failed;
+    tableStage.cloneCount = await countOn(cloneRef, "tables");
+    tableStage.reconciled =
+      reconcile(tableStage.primeCount, tableStage.cloneCount) &&
+      !(tableStage.notes ?? []).some((n) => n.startsWith("still drifted"));
+    tableStage.notes = [...(tableStage.notes ?? []), `retry after functions: +${retry.applied}`];
+  }
+
   // 5. constraints, ordered p → u → c → f
   await say("Replicating constraints...");
   const conRows = await query(primeRef, Q.constraints);
@@ -677,21 +731,36 @@ export async function replicateSchemaByIntrospection(
   ).map((def) => def.replace(/^create (unique )?index /i, (m) => `${m.trimEnd()} if not exists `));
   stages.push(await runStage("indexes", primeRef, cloneRef, idxStmts, 60));
 
-  // 7. views
+  // 7. views — a view on a view fails when the callee is not in place yet, and
+  // catalog order is not dependency order, so converge the same way functions do.
   await say("Replicating views...");
   const viewRows = await query(primeRef, Q.views);
-  stages.push(
-    await runStage(
-      "views",
-      primeRef,
-      cloneRef,
-      viewRows.map(
-        (r) =>
-          `create or replace view ${quoteIdent(str(r.schema))}.${quoteIdent(str(r.name))} as ${str(r.def)}`,
-      ),
-      30,
-    ),
+  const viewStmts = viewRows.map(
+    (r) =>
+      `create or replace view ${quoteIdent(str(r.schema))}.${quoteIdent(str(r.name))} as ${str(r.def)}`,
   );
+  const viewHistory: number[] = [];
+  let viewApply: BatchApplyResult = { applied: 0, failed: 0, errors: [] };
+  let viewApplied = 0;
+  while (shouldRunAnotherFunctionPass(viewHistory, 3)) {
+    viewApply = await applyStatements(cloneRef, "views", viewStmts, 30);
+    viewApplied += viewApply.applied;
+    viewHistory.push(viewApply.failed);
+  }
+  const [viewPrime, viewClone] = await Promise.all([
+    countOn(primeRef, "views"),
+    countOn(cloneRef, "views"),
+  ]);
+  stages.push({
+    stage: "views",
+    primeCount: viewPrime,
+    cloneCount: viewClone,
+    applied: viewApplied,
+    failed: viewHistory[viewHistory.length - 1] ?? 0,
+    reconciled: reconcile(viewPrime, viewClone),
+    ...(viewApply.errors.length ? { errors: viewApply.errors } : {}),
+    notes: [`convergence: ${viewHistory.join(" → ")}`],
+  });
 
   // 8. materialized views (relkind 'm' — every table query misses these, and
   //    an index belongs to one, so skipping this breaks the index stage)
@@ -775,6 +844,15 @@ export async function replicateSchemaByIntrospection(
     ),
   );
 
+  // 12. Data API grants. RLS alone is not access: without the prime's table
+  // privileges PostgREST cannot reach a single table on the clone.
+  await say("Replicating Data API grants...");
+  const grantRows = await query(primeRef, Q.grants);
+  const grantStmts = grantRows.map((r) =>
+    buildGrantDdl(str(r.schema), str(r.table_name), str(r.grantee), str(r.privilege_type)),
+  );
+  stages.push(await runStage("grants", primeRef, cloneRef, grantStmts, 60));
+
   const shortStages = stages.filter((s) => !s.reconciled).map((s) => s.stage);
   return { ok: shortStages.length === 0, primeRef, cloneRef, stages, shortStages };
 }
@@ -812,7 +890,7 @@ export async function verifyCloneIsEmpty(
           )}.${quoteIdent(str(t.name))}`,
       )
       .join(" union all ");
-    const rows = toRows(await runSqlOnProject(cloneRef, `${union}`));
+    const rows = toRows(await runSqlOnProject(cloneRef, assertReadOnlySourceQuery(union)));
     for (const r of rows) {
       const n = num(r.n);
       totalRows += n;
