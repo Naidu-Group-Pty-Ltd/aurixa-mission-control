@@ -1,4 +1,4 @@
-// @ts-nocheck — 1 unresolved type error (argument types ×1).
+// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Server functions for the Support Ops surface: ticket queue, ticket
 // detail, the human-validation gate on parked remediation runs, priority

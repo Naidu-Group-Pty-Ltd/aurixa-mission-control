@@ -1,4 +1,3 @@
-// @ts-nocheck — 1 unresolved type error (assignability ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G10 — Org capacity preflight surface.
 // Exposes the `checkOrgCapacity` helper as an admin-only server function so
@@ -8,6 +7,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
+import { asJson } from "@/lib/json-cast";
 
 export const getPrimeOrgCapacity = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
@@ -50,13 +50,16 @@ export const auditFleetOrgCapacity = createServerFn({ method: "GET" })
 
     // Write to audit_log so the operator has a durable trail.
     if (!(prime as { error?: string }).error) {
-      await context.supabase.from("audit_log").insert({
-        actor_id: context.userId,
+      const { error: auditError } = await context.supabase.from("audit_log").insert({
+        actor_user_id: context.userId,
         action: "org_capacity_audit",
-        target_type: "supabase_org",
-        target_id: (prime as { orgId: string }).orgId,
-        metadata: prime as unknown as Record<string, unknown>,
+        entity_type: "supabase_org",
+        entity_id: (prime as { orgId: string }).orgId,
+        metadata: asJson(prime),
       });
+      if (auditError) {
+        console.error("[audit] org_capacity_audit not recorded:", auditError.message);
+      }
     }
 
     return { prime };

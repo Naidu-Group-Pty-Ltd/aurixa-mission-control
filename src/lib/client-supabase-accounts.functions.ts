@@ -1,4 +1,3 @@
-// @ts-nocheck — 7 unresolved type errors (assignability ×6, argument types ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // E3 — Client-owned Supabase account records. Stores the client's org id
 // and (encrypted) Personal Access Token so the handoff orchestrator can
@@ -8,6 +7,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
+import { asJson } from "@/lib/json-cast";
+import type { Database } from "@/integrations/supabase/types";
 
 const createSchema = z.object({
   clone_id: z.string().uuid().nullable().optional(),
@@ -173,13 +174,16 @@ export const verifyClientSupabaseAccount = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
 
-    await context.supabase.from("audit_log").insert({
-      actor_id: context.userId,
+    const { error: auditError } = await context.supabase.from("audit_log").insert({
+      actor_user_id: context.userId,
       action: "client_supabase_account_verified",
-      target_type: "client_supabase_account",
-      target_id: data.id,
-      metadata: { org_id: match.id, org_slug: match.slug, plan_tier: plan } as never,
+      entity_type: "client_supabase_account",
+      entity_id: data.id,
+      metadata: asJson({ org_id: match.id, org_slug: match.slug, plan_tier: plan }),
     });
+    if (auditError) {
+      console.error("[audit] client_supabase_account_verified not recorded:", auditError.message);
+    }
 
     return {
       ok: true as const,
@@ -209,8 +213,10 @@ export const updateClientSupabaseAccount = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { id, ...rest } = data;
-    const patch: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(rest)) if (v !== undefined) patch[k] = v;
+    const patch: Database["public"]["Tables"]["client_supabase_accounts"]["Update"] = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (v !== undefined) (patch as Record<string, unknown>)[k] = v;
+    }
     if (Object.keys(patch).length === 0) return { ok: true as const, noop: true };
     const { error } = await context.supabase
       .from("client_supabase_accounts")
@@ -239,11 +245,14 @@ export const rotateClientSupabasePat = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (error) throw error;
-    await context.supabase.from("audit_log").insert({
-      actor_id: context.userId,
+    const { error: auditError } = await context.supabase.from("audit_log").insert({
+      actor_user_id: context.userId,
       action: "client_supabase_pat_rotated",
-      target_type: "client_supabase_account",
-      target_id: data.id,
+      entity_type: "client_supabase_account",
+      entity_id: data.id,
     });
+    if (auditError) {
+      console.error("[audit] client_supabase_pat_rotated not recorded:", auditError.message);
+    }
     return { ok: true as const };
   });

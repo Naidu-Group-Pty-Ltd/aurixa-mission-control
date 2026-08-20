@@ -1,4 +1,3 @@
-// @ts-nocheck — 3 unresolved type errors (assignability ×2, argument types ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G21 — Billing split.
 // Records which invoices stay with Aurixa (seats, tokens, AI) versus what
@@ -6,6 +5,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
+import type { Database } from "@/integrations/supabase/types";
+import { asJson } from "@/lib/json-cast";
 
 export const upsertBillingSplit = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
@@ -34,7 +35,7 @@ export const upsertBillingSplit = createServerFn({ method: "POST" })
     if (hErr) throw hErr;
     if (!h) return { ok: false as const, error: "handoff_not_found" };
 
-    const patch: Record<string, unknown> = {
+    const patch: Database["public"]["Tables"]["handoff_billing_splits"]["Update"] = {
       aurixa_stripe_customer_id: data.aurixa_stripe_customer_id ?? null,
       aurixa_stripe_subscription_id: data.aurixa_stripe_subscription_id ?? null,
       aurixa_products_kept: data.aurixa_products_kept ?? [],
@@ -62,7 +63,7 @@ export const upsertBillingSplit = createServerFn({ method: "POST" })
         handoff_id: data.handoff_id,
         kind: "billing_split.updated",
         actor_user_id: context.userId,
-        details: patch,
+        details: asJson(patch),
       });
       return { ok: true as const, id: existing.id, updated: true };
     }
@@ -82,7 +83,7 @@ export const upsertBillingSplit = createServerFn({ method: "POST" })
       handoff_id: data.handoff_id,
       kind: "billing_split.configured",
       actor_user_id: context.userId,
-      details: patch,
+      details: asJson(patch),
     });
     return { ok: true as const, id: row.id, updated: false };
   });

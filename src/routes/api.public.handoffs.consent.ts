@@ -1,4 +1,3 @@
-// @ts-nocheck — 1 unresolved type error (argument types ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G11 — public client onboarding endpoint.
 // GET  /api/public/handoffs/consent?token=hoi_... → invite preview
@@ -11,6 +10,7 @@ import { z } from "zod";
 import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { encodeBytea, encryptSecret } from "@/server/crypto.server";
+import type { Database } from "@/integrations/supabase/types";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -214,7 +214,7 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
         // advance state to awaiting_client_consent if we're still upstream of it.
         const ADVANCEABLE_FROM = new Set(["draft", "dry_run_ready"]);
         const nowIso = new Date().toISOString();
-        const patch: Record<string, unknown> = {
+        const patch: Database["public"]["Tables"]["clone_handoffs"]["Update"] = {
           client_account_id: accountId,
           target_region: data.target_region,
           target_plan_tier: data.target_plan_tier,

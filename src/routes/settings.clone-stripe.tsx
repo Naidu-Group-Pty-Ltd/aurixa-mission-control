@@ -1,4 +1,4 @@
-// @ts-nocheck — 4 unresolved type errors (unknown property ×4).
+// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G7 — admin UI for per-clone Stripe routing.
 //
