@@ -6,9 +6,9 @@ import { billingHintFromMetadata, planChangeRef } from "./plan-allowance.server"
 
 describe("billingHintFromMetadata", () => {
   it("prefers the billing id checkout already resolved", () => {
-    expect(
-      billingHintFromMetadata({ billing_user_id: "bu_1", origin_user_id: "uid_2" }),
-    ).toBe("bu_1");
+    expect(billingHintFromMetadata({ billing_user_id: "bu_1", origin_user_id: "uid_2" })).toBe(
+      "bu_1",
+    );
   });
 
   it("falls back to the uid a storefront link carried", () => {

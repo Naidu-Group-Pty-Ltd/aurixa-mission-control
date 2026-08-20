@@ -21,7 +21,12 @@ export const createHandoffInvite = createServerFn({ method: "POST" })
     z
       .object({
         handoff_id: z.string().uuid(),
-        ttl_hours: z.number().int().min(1).max(24 * 30).default(72),
+        ttl_hours: z
+          .number()
+          .int()
+          .min(1)
+          .max(24 * 30)
+          .default(72),
         terms_version: z.string().min(1),
         terms_body: z.string().min(20),
         region_allowlist: z.array(z.string().min(1)).optional().default([]),
@@ -79,9 +84,7 @@ export const createHandoffInvite = createServerFn({ method: "POST" })
 
 export const listHandoffInvites = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((input) =>
-    z.object({ handoff_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input) => z.object({ handoff_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: rows, error } = await context.supabase
       .from("handoff_invites")

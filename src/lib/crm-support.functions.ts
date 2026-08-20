@@ -5,7 +5,13 @@ import { requireOperator } from "@/integrations/supabase/role-middleware";
 
 const uuid = z.string().uuid();
 
-export const TICKET_STATUSES = ["open", "in_progress", "waiting_client", "resolved", "closed"] as const;
+export const TICKET_STATUSES = [
+  "open",
+  "in_progress",
+  "waiting_client",
+  "resolved",
+  "closed",
+] as const;
 export const TICKET_TYPES = ["support", "bug", "billing", "feature", "incident"] as const;
 export const TICKET_SEVERITIES = ["low", "normal", "high", "critical"] as const;
 
@@ -40,8 +46,16 @@ export const getTicket = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: uuid }).parse(input))
   .handler(async ({ data, context }) => {
     const [ticket, messages] = await Promise.all([
-      context.supabase.from("crm_tickets").select("*, crm_accounts(id, name)").eq("id", data.id).maybeSingle(),
-      context.supabase.from("crm_ticket_messages").select("*").eq("ticket_id", data.id).order("created_at"),
+      context.supabase
+        .from("crm_tickets")
+        .select("*, crm_accounts(id, name)")
+        .eq("id", data.id)
+        .maybeSingle(),
+      context.supabase
+        .from("crm_ticket_messages")
+        .select("*")
+        .eq("ticket_id", data.id)
+        .order("created_at"),
     ]);
     if (ticket.error) throw ticket.error;
     return { ticket: ticket.data, messages: messages.data ?? [] };
@@ -106,7 +120,9 @@ export const updateTicket = createServerFn({ method: "POST" })
       (fields as any).resolved_at = new Date().toISOString();
     }
     if (fields.severity) {
-      (fields as any).sla_due_at = new Date(Date.now() + SLA_HOURS[fields.severity] * 3600_000).toISOString();
+      (fields as any).sla_due_at = new Date(
+        Date.now() + SLA_HOURS[fields.severity] * 3600_000,
+      ).toISOString();
     }
     const { data: row, error } = await context.supabase
       .from("crm_tickets")
@@ -122,7 +138,11 @@ export const addTicketMessage = createServerFn({ method: "POST" })
   .middleware([requireOperator])
   .inputValidator((input) =>
     z
-      .object({ ticket_id: uuid, body: z.string().min(1).max(20000), internal: z.boolean().default(false) })
+      .object({
+        ticket_id: uuid,
+        body: z.string().min(1).max(20000),
+        internal: z.boolean().default(false),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -173,7 +193,9 @@ export const upsertDispute = createServerFn({ method: "POST" })
       .object({
         id: uuid.optional(),
         account_id: uuid,
-        kind: z.enum(["chargeback", "billing_disagreement", "service_credit", "contractual", "other"]).default("billing_disagreement"),
+        kind: z
+          .enum(["chargeback", "billing_disagreement", "service_credit", "contractual", "other"])
+          .default("billing_disagreement"),
         status: z.enum(DISPUTE_STATUSES).optional(),
         amount_cents: z.number().int().min(0).default(0),
         reason: z.string().max(300).nullable().optional(),
@@ -197,7 +219,9 @@ export const upsertDispute = createServerFn({ method: "POST" })
     await context.supabase.from("crm_activities").insert({
       account_id: data.account_id,
       kind: "dispute",
-      title: id ? `Dispute updated (${fields.status ?? "open"})` : `Dispute opened: ${data.kind.replace(/_/g, " ")}`,
+      title: id
+        ? `Dispute updated (${fields.status ?? "open"})`
+        : `Dispute opened: ${data.kind.replace(/_/g, " ")}`,
       body: data.summary ?? null,
       actor_user_id: context.userId,
       entity_type: "crm_dispute",

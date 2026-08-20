@@ -130,10 +130,7 @@ export function buildFeedbackForm(plan: {
  * it. Silently dropped rather than rejected: a stray key is not a reason to
  * lose someone's written feedback.
  */
-export function sanitiseRatings(
-  raw: unknown,
-  form: FeedbackForm,
-): Record<string, number> {
+export function sanitiseRatings(raw: unknown, form: FeedbackForm): Record<string, number> {
   if (!raw || typeof raw !== "object") return {};
   const allowed = new Set(form.questions.map((q) => q.key));
   const out: Record<string, number> = {};

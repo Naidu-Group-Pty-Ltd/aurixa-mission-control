@@ -24,9 +24,9 @@ import { selectProjectKeys, getProjectApiKeys, getProjectUrl } from "./backend-p
  * These bound Worker CPU + memory + upstream bandwidth per request.
  */
 const PER_INVOCATION = {
-  maxObjects: 400,          // total objects copied+skipped across all buckets
+  maxObjects: 400, // total objects copied+skipped across all buckets
   maxBytes: 400 * 1024 * 1024, // 400 MB uploaded across all buckets
-  maxWallMs: 45_000,        // stop early to leave room for state flush
+  maxWallMs: 45_000, // stop early to leave room for state flush
   maxBytesPerObject: 100 * 1024 * 1024, // 100 MB per object hard cap
 };
 
@@ -166,29 +166,25 @@ async function copyObject(
   bucketId: string,
   path: string,
 ): Promise<{ ok: true; bytes: number } | { ok: false; error: string; skipped?: boolean }> {
-  const dl = await fetch(
-    `${sourceUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`,
-    { headers: { Authorization: `Bearer ${sourceKey}`, apikey: sourceKey } },
-  );
+  const dl = await fetch(`${sourceUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`, {
+    headers: { Authorization: `Bearer ${sourceKey}`, apikey: sourceKey },
+  });
   if (!dl.ok) return { ok: false, error: `download_${dl.status}` };
   const contentType = dl.headers.get("content-type") ?? "application/octet-stream";
   const buf = await dl.arrayBuffer();
   if (buf.byteLength > PER_INVOCATION.maxBytesPerObject) {
     return { ok: false, error: "object_exceeds_per_object_cap", skipped: true };
   }
-  const up = await fetch(
-    `${targetUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${targetKey}`,
-        apikey: targetKey,
-        "Content-Type": contentType,
-        "x-upsert": "true",
-      },
-      body: buf,
+  const up = await fetch(`${targetUrl}/storage/v1/object/${bucketId}/${encodeStoragePath(path)}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${targetKey}`,
+      apikey: targetKey,
+      "Content-Type": contentType,
+      "x-upsert": "true",
     },
-  );
+    body: buf,
+  });
   if (!up.ok) return { ok: false, error: `upload_${up.status}:${(await up.text()).slice(0, 200)}` };
   return { ok: true, bytes: buf.byteLength };
 }
@@ -287,13 +283,19 @@ export async function replicateStorageObjects(
           }
           // Budget checks BEFORE spending download bandwidth.
           if (totalObjects >= PER_INVOCATION.maxObjects) {
-            exhausted = "objects"; bucketComplete = false; break;
+            exhausted = "objects";
+            bucketComplete = false;
+            break;
           }
           if (totalBytes >= PER_INVOCATION.maxBytes) {
-            exhausted = "bytes"; bucketComplete = false; break;
+            exhausted = "bytes";
+            bucketComplete = false;
+            break;
           }
           if (Date.now() - started >= PER_INVOCATION.maxWallMs) {
-            exhausted = "time"; bucketComplete = false; break;
+            exhausted = "time";
+            bucketComplete = false;
+            break;
           }
           // Idempotency: skip if already present on target.
           if (await targetObjectExists(targetUrl, targetKey, bucketId, path)) {
@@ -329,7 +331,12 @@ export async function replicateStorageObjects(
 
     outcomes.push({
       bucket_id: bucketId,
-      status: bucketComplete && failed === 0 ? "complete" : failed > 0 && !exhausted ? "failed" : "in_progress",
+      status:
+        bucketComplete && failed === 0
+          ? "complete"
+          : failed > 0 && !exhausted
+            ? "failed"
+            : "in_progress",
       objects_scanned: scanned,
       objects_copied: copied,
       objects_skipped: skipped,

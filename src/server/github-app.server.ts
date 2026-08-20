@@ -40,7 +40,6 @@ function normalizePemWhitespace(pem: string): string {
 function ensurePkcs8(pem: string): string {
   const normalized = normalizePemWhitespace(pem);
 
-
   // Already PKCS#8 — nothing to do
   if (normalized.includes("-----BEGIN PRIVATE KEY-----")) {
     return normalized;

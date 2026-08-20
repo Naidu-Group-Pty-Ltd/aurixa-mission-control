@@ -196,7 +196,8 @@ export const checkGithubAppPreflight = createServerFn({ method: "POST" })
         templateAccessible = false;
       } else {
         templateAccessible = r.ok;
-        if (r.ok) templateRepoIsTemplate = Boolean((r.body as { is_template?: boolean })?.is_template);
+        if (r.ok)
+          templateRepoIsTemplate = Boolean((r.body as { is_template?: boolean })?.is_template);
       }
     }
 
@@ -207,9 +208,10 @@ export const checkGithubAppPreflight = createServerFn({ method: "POST" })
       targetRepoAccessible = r === null ? false : r.ok;
     }
 
-    const templateOk = data.method === "template"
-      ? templateAccessible !== false && templateRepoIsTemplate !== false
-      : true;
+    const templateOk =
+      data.method === "template"
+        ? templateAccessible !== false && templateRepoIsTemplate !== false
+        : true;
     const targetRepoOk = data.targetRepo ? targetRepoAccessible === true : true;
     const permsOk = contentsWritePermission !== false;
     const ok = templateOk && targetRepoOk && permsOk;
@@ -225,14 +227,17 @@ export const checkGithubAppPreflight = createServerFn({ method: "POST" })
       hint = "Update the App's repository permissions and re-authorize the installation.";
     } else if (targetRepoAccessible === false) {
       message = `App cannot access "${owner}/${data.targetRepo}".`;
-      hint = repositorySelection === "selected"
-        ? "Grant the Aurixa App access to this specific repository in the installation settings."
-        : "Verify the repo exists and the App installation has not been suspended.";
+      hint =
+        repositorySelection === "selected"
+          ? "Grant the Aurixa App access to this specific repository in the installation settings."
+          : "Verify the repo exists and the App installation has not been suspended.";
     } else if (templateAccessible === false) {
       message = "App installed, but the template repo is not accessible to this installation.";
-      hint = "Open the Aurixa App installation on the target org and grant it access to the template repo.";
+      hint =
+        "Open the Aurixa App installation on the target org and grant it access to the template repo.";
     } else if (templateRepoIsTemplate === false) {
-      message = "Repo exists, but it is not marked as a GitHub template. Enable 'Template repository' in its Settings.";
+      message =
+        "Repo exists, but it is not marked as a GitHub template. Enable 'Template repository' in its Settings.";
       hint = "In the template repo, Settings → General → check 'Template repository'.";
     }
 

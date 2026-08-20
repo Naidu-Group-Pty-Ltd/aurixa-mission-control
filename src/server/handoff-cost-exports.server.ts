@@ -7,7 +7,14 @@
 // error string when a lookup or upload step throws.
 
 type FulfillResult =
-  | { ok: true; export_id: string; storage_path: string; rows: number; total_tokens: number; total_cents: number }
+  | {
+      ok: true;
+      export_id: string;
+      storage_path: string;
+      rows: number;
+      total_tokens: number;
+      total_cents: number;
+    }
   | { ok: false; export_id: string; error: string };
 
 function csvEscape(v: unknown): string {
@@ -63,7 +70,9 @@ export async function fulfillCostExport(exportId: string): Promise<FulfillResult
     if (tenantIds.length > 0) {
       const { data: jobs, error: jErr } = await admin
         .from("report_jobs")
-        .select("id, tenant_id, kind, status, charged_tokens, estimated_tokens, completed_at, started_at")
+        .select(
+          "id, tenant_id, kind, status, charged_tokens, estimated_tokens, completed_at, started_at",
+        )
         .in("tenant_id", tenantIds)
         .in("status", ["completed", "refunded"])
         .gte("completed_at", exp.period_start)
@@ -91,14 +100,13 @@ export async function fulfillCostExport(exportId: string): Promise<FulfillResult
     // Seat entitlement snapshot (billed inventory as of export time).
     const { data: seats } = await admin
       .from("clone_seat_entitlements")
-      .select("seat_plan_id, seats_used, seats_purchased, stripe_subscription_id, seat_plans(slug, name, price_cents)")
+      .select(
+        "seat_plan_id, seats_used, seats_purchased, stripe_subscription_id, seat_plans(slug, name, price_cents)",
+      )
       .eq("clone_id", handoff.clone_id);
 
     // Aggregate totals.
-    const totalTokens = jobRows.reduce(
-      (sum, r) => sum + (Number(r.charged_tokens) || 0),
-      0,
-    );
+    const totalTokens = jobRows.reduce((sum, r) => sum + (Number(r.charged_tokens) || 0), 0);
     // Best-effort cents estimate: 1 token = 0.01¢ placeholder; real pricing is
     // per plan and lives in Stripe. We surface tokens as the source of truth
     // and let the operator fill cents from Stripe invoices if needed.
@@ -118,7 +126,17 @@ export async function fulfillCostExport(exportId: string): Promise<FulfillResult
         started_at: r.started_at,
         completed_at: r.completed_at,
       })),
-      ["section", "id", "tenant_id", "kind", "status", "tokens", "estimated", "started_at", "completed_at"],
+      [
+        "section",
+        "id",
+        "tenant_id",
+        "kind",
+        "status",
+        "tokens",
+        "estimated",
+        "started_at",
+        "completed_at",
+      ],
     );
     const ledgerCsv = buildCsv(
       ledgerRows.map((r) => ({
@@ -132,7 +150,17 @@ export async function fulfillCostExport(exportId: string): Promise<FulfillResult
         reason: r.reason ?? "",
         created_at: r.created_at,
       })),
-      ["section", "id", "tenant_id", "kind", "tokens", "source", "source_ref", "reason", "created_at"],
+      [
+        "section",
+        "id",
+        "tenant_id",
+        "kind",
+        "tokens",
+        "source",
+        "source_ref",
+        "reason",
+        "created_at",
+      ],
     );
     const seatCsv = buildCsv(
       (seats ?? []).map((s: any) => ({
@@ -144,7 +172,15 @@ export async function fulfillCostExport(exportId: string): Promise<FulfillResult
         price_cents: s.seat_plans?.price_cents ?? 0,
         stripe_subscription_id: s.stripe_subscription_id ?? "",
       })),
-      ["section", "plan_slug", "plan_name", "seats_purchased", "seats_used", "price_cents", "stripe_subscription_id"],
+      [
+        "section",
+        "plan_slug",
+        "plan_name",
+        "seats_purchased",
+        "seats_used",
+        "price_cents",
+        "stripe_subscription_id",
+      ],
     );
 
     const header =
@@ -208,9 +244,10 @@ export async function fulfillCostExport(exportId: string): Promise<FulfillResult
   }
 }
 
-export async function signCostExportDownload(exportId: string, expiresInSeconds = 600): Promise<
-  { ok: true; url: string; expires_in: number } | { ok: false; error: string }
-> {
+export async function signCostExportDownload(
+  exportId: string,
+  expiresInSeconds = 600,
+): Promise<{ ok: true; url: string; expires_in: number } | { ok: false; error: string }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const admin = supabaseAdmin as any;
   const { data: exp } = await admin

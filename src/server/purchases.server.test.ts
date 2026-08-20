@@ -271,7 +271,10 @@ describe("loadValidHandoff", () => {
 describe("unknownColumnFromError", () => {
   it("reads the column out of a Postgres 42703", () => {
     expect(
-      unknownColumnFromError({ code: "42703", message: "column purchases.item_name does not exist" }),
+      unknownColumnFromError({
+        code: "42703",
+        message: "column purchases.item_name does not exist",
+      }),
     ).toBe("item_name");
   });
 
@@ -285,7 +288,9 @@ describe("unknownColumnFromError", () => {
   });
 
   it("returns null for anything else, so real errors are never mistaken for drift", () => {
-    expect(unknownColumnFromError({ message: "duplicate key value violates unique constraint" })).toBeNull();
+    expect(
+      unknownColumnFromError({ message: "duplicate key value violates unique constraint" }),
+    ).toBeNull();
     expect(unknownColumnFromError({ message: "" })).toBeNull();
     expect(unknownColumnFromError(null)).toBeNull();
   });

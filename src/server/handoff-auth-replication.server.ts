@@ -21,7 +21,7 @@
 // The row-level password hash format Supabase issues (`$2a$…` bcrypt) is
 // accepted verbatim by `password_hash` on the admin create endpoint.
 
-import { runSqlOnProject, getProjectApiKeys, selectProjectKeys } from "./backend-provisioning.server";
+import { runSqlOnProject, selectProjectKeys } from "./backend-provisioning.server";
 
 const PAGE_SIZE = 200;
 const HARD_LIMIT = 10_000;
@@ -76,10 +76,7 @@ async function resolveTargetServiceRole(targetRef: string, targetPat: string): P
   return serviceRoleKey;
 }
 
-async function fetchAuthUsersPage(
-  sourceRef: string,
-  after: string,
-): Promise<AuthUserRow[]> {
+async function fetchAuthUsersPage(sourceRef: string, after: string): Promise<AuthUserRow[]> {
   // ISO timestamp cursor. `created_at, id` is a stable strict order on
   // `auth.users` (id is the tiebreaker for identical created_at).
   const sql = `

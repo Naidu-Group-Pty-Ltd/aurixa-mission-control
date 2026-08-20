@@ -20,7 +20,10 @@ const admin = supabaseAdmin as any;
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 function payloadHash(p: unknown): string {
-  return crypto.createHash("sha256").update(JSON.stringify(p ?? {})).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(p ?? {}))
+    .digest("hex");
 }
 
 async function loadPlatformConfig() {
@@ -63,7 +66,11 @@ export const updatePlatformHostingConfig = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = { ...data, updated_by: context.userId, updated_at: new Date().toISOString() };
+    const patch: Record<string, unknown> = {
+      ...data,
+      updated_by: context.userId,
+      updated_at: new Date().toISOString(),
+    };
     const { data: row, error } = await admin
       .from("platform_hosting_config")
       .update(patch)
@@ -78,7 +85,9 @@ export const updatePlatformHostingConfig = createServerFn({ method: "POST" })
 export const checkSubdomainAvailability = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { slug: string; excludeCloneId?: string }) =>
-    z.object({ slug: z.string().min(1).max(63), excludeCloneId: z.string().uuid().optional() }).parse(d),
+    z
+      .object({ slug: z.string().min(1).max(63), excludeCloneId: z.string().uuid().optional() })
+      .parse(d),
   )
   .handler(async ({ data }) => {
     const slug = data.slug.trim().toLowerCase();
@@ -293,7 +302,8 @@ export const verifyCloudflareSetup = createServerFn({ method: "POST" })
       steps.zoneRead.ok = true;
       steps.zoneRead.detail = `Zone: ${zone.name} (${zone.status})`;
     } catch (e) {
-      steps.zoneRead.detail = e instanceof CloudflareError ? e.message : "Zone read failed — check Zone:Read scope";
+      steps.zoneRead.detail =
+        e instanceof CloudflareError ? e.message : "Zone read failed — check Zone:Read scope";
       return { ok: false as const, ready: false, steps, config: cfg };
     }
 
@@ -302,7 +312,8 @@ export const verifyCloudflareSetup = createServerFn({ method: "POST" })
       steps.dnsEdit.ok = true;
       steps.dnsEdit.detail = `DNS API reachable (${Array.isArray(records) ? records.length : 0} record(s) sampled)`;
     } catch (e) {
-      steps.dnsEdit.detail = e instanceof CloudflareError ? e.message : "DNS list failed — check DNS:Edit scope";
+      steps.dnsEdit.detail =
+        e instanceof CloudflareError ? e.message : "DNS list failed — check DNS:Edit scope";
       return { ok: false as const, ready: false, steps, config: cfg };
     }
 

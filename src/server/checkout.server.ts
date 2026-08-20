@@ -164,8 +164,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   if (!priceId) {
     return {
       ok: false as const,
-      error:
-        args.period === "annual" ? "annual_price_not_linked" : "stripe_price_not_linked",
+      error: args.period === "annual" ? "annual_price_not_linked" : "stripe_price_not_linked",
     };
   }
 

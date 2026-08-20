@@ -151,7 +151,9 @@ describe("tierApplyOrder — the bug that made Apply fail", () => {
   });
 
   it("never drops or duplicates a tier", () => {
-    const order = tierApplyOrder(plan).map((t) => t.slug).sort();
+    const order = tierApplyOrder(plan)
+      .map((t) => t.slug)
+      .sort();
     expect(order).toEqual(["growth", "launch", "scale"]);
   });
 

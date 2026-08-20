@@ -58,7 +58,11 @@ export const setOnboardingStep = createServerFn({ method: "POST" })
   .middleware([requireOperator])
   .inputValidator((input) =>
     z
-      .object({ id: uuid, status: z.enum(["pending", "in_progress", "done", "skipped"]), notes: z.string().max(2000).nullable().optional() })
+      .object({
+        id: uuid,
+        status: z.enum(["pending", "in_progress", "done", "skipped"]),
+        notes: z.string().max(2000).nullable().optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -126,7 +130,11 @@ export const recordFeedbackResponse = createServerFn({ method: "POST" })
   .middleware([requireOperator])
   .inputValidator((input) =>
     z
-      .object({ id: uuid, nps_score: z.number().int().min(0).max(10).nullable().optional(), notes: z.string().max(4000).nullable().optional() })
+      .object({
+        id: uuid,
+        nps_score: z.number().int().min(0).max(10).nullable().optional(),
+        notes: z.string().max(4000).nullable().optional(),
+      })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -171,7 +179,9 @@ export const recordChurn = createServerFn({ method: "POST" })
         save_attempted: z.boolean().default(false),
         save_outcome: z.string().max(1000).nullable().optional(),
         refund_cents: z.number().int().min(0).default(0),
-        offboarding_path: z.enum(["ownership_transfer", "export_and_terminate", "terminate_only"]).default("export_and_terminate"),
+        offboarding_path: z
+          .enum(["ownership_transfer", "export_and_terminate", "terminate_only"])
+          .default("export_and_terminate"),
       })
       .parse(input),
   )
@@ -198,7 +208,11 @@ export const recordChurn = createServerFn({ method: "POST" })
       ...(offboarding_path === "ownership_transfer"
         ? [{ key: "handoff_complete", label: "Backend ownership handoff completed", done: false }]
         : []),
-      { key: "retention_clock", label: `Data destruction scheduled (${RETENTION_DAYS} days)`, done: false },
+      {
+        key: "retention_clock",
+        label: `Data destruction scheduled (${RETENTION_DAYS} days)`,
+        done: false,
+      },
     ];
 
     const { data: run, error: runErr } = await context.supabase
@@ -246,7 +260,9 @@ export const updateOffboarding = createServerFn({ method: "POST" })
       .object({
         id: uuid,
         status: z.enum(["pending", "in_progress", "complete", "canceled"]).optional(),
-        checklist: z.array(z.object({ key: z.string(), label: z.string(), done: z.boolean() })).optional(),
+        checklist: z
+          .array(z.object({ key: z.string(), label: z.string(), done: z.boolean() }))
+          .optional(),
         handoff_id: uuid.nullable().optional(),
         notes: z.string().max(4000).nullable().optional(),
       })
@@ -290,19 +306,36 @@ export const buildExportManifest = createServerFn({ method: "POST" })
 
     const [reports, purchases, invoices, brand, backend] = await Promise.all([
       tenantId
-        ? context.supabase.from("report_jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)
+        ? context.supabase
+            .from("report_jobs")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
         : Promise.resolve({ count: 0 }),
       cloneId
-        ? context.supabase.from("purchases").select("id", { count: "exact", head: true }).eq("clone_id", cloneId)
+        ? context.supabase
+            .from("purchases")
+            .select("id", { count: "exact", head: true })
+            .eq("clone_id", cloneId)
         : Promise.resolve({ count: 0 }),
       tenantId
-        ? context.supabase.from("invoices").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)
+        ? context.supabase
+            .from("invoices")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
         : Promise.resolve({ count: 0 }),
       cloneId
-        ? context.supabase.from("clone_brand_assignments").select("profile_id").eq("clone_id", cloneId).maybeSingle()
+        ? context.supabase
+            .from("clone_brand_assignments")
+            .select("profile_id")
+            .eq("clone_id", cloneId)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
       cloneId
-        ? context.supabase.from("clone_backends").select("id, status, region").eq("clone_id", cloneId).maybeSingle()
+        ? context.supabase
+            .from("clone_backends")
+            .select("id, status, region")
+            .eq("clone_id", cloneId)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
 
@@ -313,7 +346,11 @@ export const buildExportManifest = createServerFn({ method: "POST" })
       tenant_id: tenantId,
       datasets: [
         { key: "report_jobs", label: "Generated reports & job history", rows: reports.count ?? 0 },
-        { key: "purchases", label: "Purchase / billing attribution history", rows: purchases.count ?? 0 },
+        {
+          key: "purchases",
+          label: "Purchase / billing attribution history",
+          rows: purchases.count ?? 0,
+        },
         { key: "invoices", label: "Tax invoices", rows: invoices.count ?? 0 },
         { key: "brand_profile", label: "Brand configuration & assets", rows: brand.data ? 1 : 0 },
         { key: "backend", label: "Dedicated backend snapshot", rows: backend.data ? 1 : 0 },
@@ -335,11 +372,16 @@ export const buildExportManifest = createServerFn({ method: "POST" })
 
 export const markExportDelivered = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((input) => z.object({ id: uuid, checksum: z.string().max(200).nullable().optional() }).parse(input))
+  .inputValidator((input) =>
+    z.object({ id: uuid, checksum: z.string().max(200).nullable().optional() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
       .from("crm_offboarding_runs")
-      .update({ export_delivered_at: new Date().toISOString(), export_checksum: data.checksum ?? null })
+      .update({
+        export_delivered_at: new Date().toISOString(),
+        export_checksum: data.checksum ?? null,
+      })
       .eq("id", data.id)
       .select()
       .single();

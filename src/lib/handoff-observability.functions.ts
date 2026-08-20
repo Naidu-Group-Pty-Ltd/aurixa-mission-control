@@ -19,7 +19,12 @@ export const upsertObservabilityConfig = createServerFn({ method: "POST" })
       .object({
         handoff_id: z.string().uuid(),
         mode: z.enum(OBSERVABILITY_MODES),
-        poll_interval_seconds: z.number().int().min(60).max(24 * 60 * 60).optional(),
+        poll_interval_seconds: z
+          .number()
+          .int()
+          .min(60)
+          .max(24 * 60 * 60)
+          .optional(),
         notes: z.string().nullable().optional(),
       })
       .parse(input),
@@ -84,7 +89,12 @@ export const upsertObservabilityConfig = createServerFn({ method: "POST" })
 export const getObservabilityStatus = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((input) =>
-    z.object({ handoff_id: z.string().uuid(), beacon_limit: z.number().int().min(1).max(50).optional() }).parse(input),
+    z
+      .object({
+        handoff_id: z.string().uuid(),
+        beacon_limit: z.number().int().min(1).max(50).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const [{ data: config }, { data: beacons }] = await Promise.all([
@@ -95,7 +105,9 @@ export const getObservabilityStatus = createServerFn({ method: "POST" })
         .maybeSingle(),
       context.supabase
         .from("clone_health_beacons")
-        .select("id, source, reported_at, project_status, severity, message, db_size_bytes, active_connections, storage_used_bytes")
+        .select(
+          "id, source, reported_at, project_status, severity, message, db_size_bytes, active_connections, storage_used_bytes",
+        )
         .eq("handoff_id", data.handoff_id)
         .order("reported_at", { ascending: false })
         .limit(data.beacon_limit ?? 10),

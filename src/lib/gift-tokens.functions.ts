@@ -110,14 +110,16 @@ export const bulkGiftTokens = createServerFn({ method: "POST" })
       }
       granted++;
       sideEffects.push(fanBalanceUpdated(t.id, t.clone_id));
-      sideEffects.push(recordAdminAction({
-        mode: "admin_grant",
-        tenantId: t.id,
-        itemSlug: `promo:${campaignId}`,
-        operatorUserId: context.userId as string,
-        operatorUsername: operatorName,
-        metadata: { ...metadata, tokens: data.tokensPerTenant, reason: data.reason },
-      }));
+      sideEffects.push(
+        recordAdminAction({
+          mode: "admin_grant",
+          tenantId: t.id,
+          itemSlug: `promo:${campaignId}`,
+          operatorUserId: context.userId as string,
+          operatorUsername: operatorName,
+          metadata: { ...metadata, tokens: data.tokensPerTenant, reason: data.reason },
+        }),
+      );
     }
 
     // Serverless runtimes cancel in-flight promises once the response is sent,

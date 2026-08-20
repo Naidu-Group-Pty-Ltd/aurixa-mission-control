@@ -17,7 +17,6 @@ import { describeRefresh, refreshStorefrontMirror } from "@/server/storefront-re
 import {
   TIERS,
   TIER_INCLUDES_AML,
-  annualCents,
   gstComponentCents,
   tierBaseCents,
   tierHeadlineCents,
@@ -315,9 +314,7 @@ async function ensurePrice(
  */
 export function tierApplyOrder(plan: SyncPlan): Tier[] {
   const position = new Map(plan.renames.map((r, i) => [r.to, i]));
-  return [...TIERS].sort(
-    (a, b) => (position.get(a.slug) ?? -1) - (position.get(b.slug) ?? -1),
-  );
+  return [...TIERS].sort((a, b) => (position.get(a.slug) ?? -1) - (position.get(b.slug) ?? -1));
 }
 
 export type ApplyResult = {
@@ -341,7 +338,10 @@ export type ApplyResult = {
  * the sheet already contains GST. Left at Stripe's default, enabling Stripe
  * Tax later would ADD 10% on top and quietly overcharge every customer.
  */
-export async function applyCatalogSync(plan: SyncPlan, rows: readonly PlanRow[] = []): Promise<ApplyResult> {
+export async function applyCatalogSync(
+  plan: SyncPlan,
+  rows: readonly PlanRow[] = [],
+): Promise<ApplyResult> {
   const stripe = getStripe();
   const result: ApplyResult = {
     applied: true,
