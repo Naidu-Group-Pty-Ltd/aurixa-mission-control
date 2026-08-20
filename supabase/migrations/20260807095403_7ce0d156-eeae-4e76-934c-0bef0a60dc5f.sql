@@ -7,10 +7,14 @@ CREATE TABLE IF NOT EXISTS public.api_provider_rates (
  is_active boolean NOT NULL DEFAULT true, notes text, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
 GRANT SELECT ON public.api_provider_rates TO authenticated; GRANT ALL ON public.api_provider_rates TO service_role;
 ALTER TABLE public.api_provider_rates ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Operators read api_provider_rates" ON public.api_provider_rates;
 CREATE POLICY "Operators read api_provider_rates" ON public.api_provider_rates FOR SELECT TO authenticated USING (public.is_operator(auth.uid()));
+DROP POLICY IF EXISTS "Admins write api_provider_rates" ON public.api_provider_rates;
 CREATE POLICY "Admins write api_provider_rates" ON public.api_provider_rates FOR ALL TO authenticated USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 CREATE INDEX IF NOT EXISTS idx_api_provider_rates_provider ON public.api_provider_rates(provider);
 CREATE INDEX IF NOT EXISTS idx_api_provider_rates_active ON public.api_provider_rates(is_active,is_billable);
+-- CREATE TRIGGER has no IF NOT EXISTS; drop first so a re-run is idempotent.
+DROP TRIGGER IF EXISTS api_provider_rates_updated_at ON public.api_provider_rates;
 CREATE TRIGGER api_provider_rates_updated_at BEFORE UPDATE ON public.api_provider_rates FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TABLE IF NOT EXISTS public.api_usage_events (
@@ -23,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.api_usage_events (
  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(tenant_id,idempotency_key));
 GRANT SELECT ON public.api_usage_events TO authenticated; GRANT ALL ON public.api_usage_events TO service_role;
 ALTER TABLE public.api_usage_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Operators read api_usage_events" ON public.api_usage_events;
 CREATE POLICY "Operators read api_usage_events" ON public.api_usage_events FOR SELECT TO authenticated USING(public.is_operator(auth.uid()));
 CREATE INDEX IF NOT EXISTS idx_api_usage_events_tenant_period ON public.api_usage_events(tenant_id,period_start,secret_name);
 CREATE INDEX IF NOT EXISTS idx_api_usage_events_clone_occurred ON public.api_usage_events(clone_id,occurred_at DESC);
@@ -37,6 +42,7 @@ CREATE TABLE IF NOT EXISTS public.api_usage_rollups (
  UNIQUE(tenant_id,period_start,secret_name));
 GRANT SELECT ON public.api_usage_rollups TO authenticated; GRANT ALL ON public.api_usage_rollups TO service_role;
 ALTER TABLE public.api_usage_rollups ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Operators read api_usage_rollups" ON public.api_usage_rollups;
 CREATE POLICY "Operators read api_usage_rollups" ON public.api_usage_rollups FOR SELECT TO authenticated USING(public.is_operator(auth.uid()));
 CREATE INDEX IF NOT EXISTS idx_api_usage_rollups_period ON public.api_usage_rollups(period_start DESC,tenant_id);
 CREATE INDEX IF NOT EXISTS idx_api_usage_rollups_clone ON public.api_usage_rollups(clone_id,period_start DESC);
@@ -49,9 +55,12 @@ CREATE TABLE IF NOT EXISTS public.api_usage_charges (
  metadata jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(tenant_id,period_start));
 GRANT SELECT ON public.api_usage_charges TO authenticated; GRANT ALL ON public.api_usage_charges TO service_role;
 ALTER TABLE public.api_usage_charges ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Operators read api_usage_charges" ON public.api_usage_charges;
 CREATE POLICY "Operators read api_usage_charges" ON public.api_usage_charges FOR SELECT TO authenticated USING(public.is_operator(auth.uid()));
+DROP POLICY IF EXISTS "Admins write api_usage_charges" ON public.api_usage_charges;
 CREATE POLICY "Admins write api_usage_charges" ON public.api_usage_charges FOR ALL TO authenticated USING(public.is_admin(auth.uid())) WITH CHECK(public.is_admin(auth.uid()));
 CREATE INDEX IF NOT EXISTS idx_api_usage_charges_status ON public.api_usage_charges(status,period_start DESC);
+DROP TRIGGER IF EXISTS api_usage_charges_updated_at ON public.api_usage_charges;
 CREATE TRIGGER api_usage_charges_updated_at BEFORE UPDATE ON public.api_usage_charges FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TABLE IF NOT EXISTS public.api_usage_charge_lines (
@@ -61,6 +70,7 @@ CREATE TABLE IF NOT EXISTS public.api_usage_charge_lines (
  byok_quantity numeric(18,4) NOT NULL DEFAULT 0, UNIQUE(charge_id,secret_name));
 GRANT SELECT ON public.api_usage_charge_lines TO authenticated; GRANT ALL ON public.api_usage_charge_lines TO service_role;
 ALTER TABLE public.api_usage_charge_lines ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Operators read api_usage_charge_lines" ON public.api_usage_charge_lines;
 CREATE POLICY "Operators read api_usage_charge_lines" ON public.api_usage_charge_lines FOR SELECT TO authenticated USING(public.is_operator(auth.uid()));
 CREATE INDEX IF NOT EXISTS idx_api_usage_charge_lines_charge ON public.api_usage_charge_lines(charge_id);
 

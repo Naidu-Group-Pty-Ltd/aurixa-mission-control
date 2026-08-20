@@ -59,6 +59,20 @@ jobs:
       - name: Cron coverage
         run: npm run check:cron
 
+      # A credential written into a migration produces no runtime signal at all:
+      # the migration runs correctly, every check stays green, and the value is
+      # readable by anyone with repository access. One shipped the live
+      # CRON_SECRET this way. Anon JWTs are judged by their decoded role and
+      # allowed, because five are committed on purpose.
+      - name: No credentials in migrations
+        run: npm run check:migration-secrets
+
+      # `applyPrimeMigrations` replays this corpus onto every clone backend and
+      # halts on the first failure. It halted at migration 69 of 192 — every
+      # clone provisioned since received 75 of 153 tables, and nothing said so.
+      - name: Migration corpus stays replayable
+        run: npm run check:migration-replay
+
       # Two failures with no runtime signal, on the deployment path: a secret
       # given a `VITE_` name is inlined into the client bundle and served to the
       # public with nothing logging it, and a deployment status the column

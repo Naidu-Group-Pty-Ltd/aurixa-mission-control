@@ -1,3 +1,6 @@
+-- `included_in_plans` is text[] (declared 20260519045832) and stays text[];
+-- this file wrote jsonb array literals into it, which Postgres refuses. The
+-- sibling migration 20260728152125 gets it right with ARRAY[...]::text[].
 -- Aurixa price list — add-on modules and the per-tier entitlement matrix.
 --
 -- Transcribed from the signed-off pricing sheet. Every figure is TAX-INCLUSIVE:
@@ -28,29 +31,29 @@ INSERT INTO public.addon_modules
   (slug, name, description, price_min_cents, price_max_cents, currency, billing_period,
    category, included_in_plans, is_active, sort_order, metadata)
 VALUES
-  ('market-updates', 'Market Updates', NULL, 5900, 5900, 'AUD', 'monthly', 'Main Dashboard', '["growth", "scale"]'::jsonb, true, 10, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('commercial-industrial', 'Commercial / Industrial', NULL, 16900, 16900, 'AUD', 'monthly', 'Main Dashboard', '["scale"]'::jsonb, true, 20, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('opportunity-marketplace', 'Opportunity Marketplace', NULL, 16900, 16900, 'AUD', 'monthly', 'Main Dashboard', '["scale"]'::jsonb, true, 30, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('intelligence-hub', 'Aurixa Intelligence Hub', NULL, 7900, 7900, 'AUD', 'monthly', 'Reports & Analysis', '[]'::jsonb, true, 40, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('report-comparisons', 'Generated Reports — Comparisons', NULL, 9900, 9900, 'AUD', 'monthly', 'Reports & Analysis', '["growth", "scale"]'::jsonb, true, 50, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('cashflow-comparisons', 'Cash Flow Analysis — Comparisons', NULL, 9900, 9900, 'AUD', 'monthly', 'Reports & Analysis', '["growth", "scale"]'::jsonb, true, 60, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('email-copilot', 'Email Copilot', 'Unlocks client Emails, which stay off on every tier without it.', 9900, 9900, 'AUD', 'monthly', 'Client & CRM', '[]'::jsonb, true, 70, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('call-logs', 'Call Logs', 'Plus a custom build price if requested.', 22500, 22500, 'AUD', 'monthly', 'Client & CRM', '[]'::jsonb, true, 80, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('portfolio-analysis', 'Portfolio Analysis', NULL, 12500, 12500, 'AUD', 'monthly', 'Client & CRM', '["scale"]'::jsonb, true, 90, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('send-portfolio', 'Send Portfolio To Client', NULL, 6900, 6900, 'AUD', 'monthly', 'Client & CRM', '["scale"]'::jsonb, true, 100, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('client-forms', 'Client Forms', 'Enabled on every tier; price applies to standalone purchase.', 4900, 4900, 'AUD', 'monthly', 'Client & CRM', '["launch", "growth", "scale"]'::jsonb, true, 110, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('borrowing-capacity', 'Borrowing Capacity', NULL, 22500, 22500, 'AUD', 'monthly', 'Client & CRM', '["scale"]'::jsonb, true, 120, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('lenders', 'Lenders', 'In development.', 9900, 9900, 'AUD', 'monthly', 'Client & CRM', '[]'::jsonb, true, 130, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('client-ai', 'Client AI', NULL, 7900, 7900, 'AUD', 'monthly', 'Client & CRM', '["scale"]'::jsonb, true, 140, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('agreements', 'Agreements', NULL, 6900, 6900, 'AUD', 'monthly', 'Operations', '["scale"]'::jsonb, true, 150, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('marketing', 'Marketing', NULL, 17900, 17900, 'AUD', 'monthly', 'Operations', '["scale"]'::jsonb, true, 160, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('deal-pipeline', 'Deal Pipeline', NULL, 9900, 9900, 'AUD', 'monthly', 'Operations', '["growth", "scale"]'::jsonb, true, 170, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('aml-ctf', 'AML / CTF Compliance', 'The difference between a tier''s with- and without-AML headline price.', 19500, 19500, 'AUD', 'monthly', 'AML / CTF Compliance', '[]'::jsonb, true, 180, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('model-hub', 'Model Hub', NULL, 19500, 19500, 'AUD', 'monthly', 'Administration', '["scale"]'::jsonb, true, 190, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('finance-portal', 'Finance Portal', 'Also unlocks client Send To Finance and Finance Messages.', 22500, 22500, 'AUD', 'monthly', 'Administration', '["scale"]'::jsonb, true, 200, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('integrations', 'Integrations', 'Subject to the client integrating their own APIs.', 13500, 13500, 'AUD', 'monthly', 'Administration', '[]'::jsonb, true, 210, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('api-usage', 'API Usage', NULL, 14900, 14900, 'AUD', 'monthly', 'Administration', '["scale"]'::jsonb, true, 220, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
-  ('aurixa-agent', 'Aurixa Agent', NULL, 37500, 37500, 'AUD', 'monthly', 'AI Assistant', '[]'::jsonb, true, 230, '{"tax_inclusive": true, "gst_included": true}'::jsonb)
+  ('market-updates', 'Market Updates', NULL, 5900, 5900, 'AUD', 'monthly', 'Main Dashboard', ARRAY['growth','scale']::text[], true, 10, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('commercial-industrial', 'Commercial / Industrial', NULL, 16900, 16900, 'AUD', 'monthly', 'Main Dashboard', ARRAY['scale']::text[], true, 20, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('opportunity-marketplace', 'Opportunity Marketplace', NULL, 16900, 16900, 'AUD', 'monthly', 'Main Dashboard', ARRAY['scale']::text[], true, 30, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('intelligence-hub', 'Aurixa Intelligence Hub', NULL, 7900, 7900, 'AUD', 'monthly', 'Reports & Analysis', ARRAY[]::text[], true, 40, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('report-comparisons', 'Generated Reports — Comparisons', NULL, 9900, 9900, 'AUD', 'monthly', 'Reports & Analysis', ARRAY['growth','scale']::text[], true, 50, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('cashflow-comparisons', 'Cash Flow Analysis — Comparisons', NULL, 9900, 9900, 'AUD', 'monthly', 'Reports & Analysis', ARRAY['growth','scale']::text[], true, 60, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('email-copilot', 'Email Copilot', 'Unlocks client Emails, which stay off on every tier without it.', 9900, 9900, 'AUD', 'monthly', 'Client & CRM', ARRAY[]::text[], true, 70, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('call-logs', 'Call Logs', 'Plus a custom build price if requested.', 22500, 22500, 'AUD', 'monthly', 'Client & CRM', ARRAY[]::text[], true, 80, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('portfolio-analysis', 'Portfolio Analysis', NULL, 12500, 12500, 'AUD', 'monthly', 'Client & CRM', ARRAY['scale']::text[], true, 90, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('send-portfolio', 'Send Portfolio To Client', NULL, 6900, 6900, 'AUD', 'monthly', 'Client & CRM', ARRAY['scale']::text[], true, 100, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('client-forms', 'Client Forms', 'Enabled on every tier; price applies to standalone purchase.', 4900, 4900, 'AUD', 'monthly', 'Client & CRM', ARRAY['launch','growth','scale']::text[], true, 110, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('borrowing-capacity', 'Borrowing Capacity', NULL, 22500, 22500, 'AUD', 'monthly', 'Client & CRM', ARRAY['scale']::text[], true, 120, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('lenders', 'Lenders', 'In development.', 9900, 9900, 'AUD', 'monthly', 'Client & CRM', ARRAY[]::text[], true, 130, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('client-ai', 'Client AI', NULL, 7900, 7900, 'AUD', 'monthly', 'Client & CRM', ARRAY['scale']::text[], true, 140, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('agreements', 'Agreements', NULL, 6900, 6900, 'AUD', 'monthly', 'Operations', ARRAY['scale']::text[], true, 150, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('marketing', 'Marketing', NULL, 17900, 17900, 'AUD', 'monthly', 'Operations', ARRAY['scale']::text[], true, 160, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('deal-pipeline', 'Deal Pipeline', NULL, 9900, 9900, 'AUD', 'monthly', 'Operations', ARRAY['growth','scale']::text[], true, 170, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('aml-ctf', 'AML / CTF Compliance', 'The difference between a tier''s with- and without-AML headline price.', 19500, 19500, 'AUD', 'monthly', 'AML / CTF Compliance', ARRAY[]::text[], true, 180, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('model-hub', 'Model Hub', NULL, 19500, 19500, 'AUD', 'monthly', 'Administration', ARRAY['scale']::text[], true, 190, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('finance-portal', 'Finance Portal', 'Also unlocks client Send To Finance and Finance Messages.', 22500, 22500, 'AUD', 'monthly', 'Administration', ARRAY['scale']::text[], true, 200, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('integrations', 'Integrations', 'Subject to the client integrating their own APIs.', 13500, 13500, 'AUD', 'monthly', 'Administration', ARRAY[]::text[], true, 210, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('api-usage', 'API Usage', NULL, 14900, 14900, 'AUD', 'monthly', 'Administration', ARRAY['scale']::text[], true, 220, '{"tax_inclusive": true, "gst_included": true}'::jsonb),
+  ('aurixa-agent', 'Aurixa Agent', NULL, 37500, 37500, 'AUD', 'monthly', 'AI Assistant', ARRAY[]::text[], true, 230, '{"tax_inclusive": true, "gst_included": true}'::jsonb)
 ON CONFLICT (slug) DO UPDATE SET
   name              = EXCLUDED.name,
   description       = EXCLUDED.description,

@@ -159,14 +159,19 @@ COMMENT ON COLUMN public.clones.purchased_addon_slugs IS
 
 INSERT INTO public.clone_addon_purchases (clone_id, addon_slug, addon_name, status, source, notes)
 SELECT c.id,
-       slug,
+       -- Qualified: `clones` has its own `slug` and so does `addon_modules`,
+       -- so the bare name was ambiguous regardless of the lateral's alias.
+       s.addon_slug,
        am.name,
        'active',
        'backfill',
        'Lifted from clones.purchased_addon_slugs when the purchase table landed'
   FROM public.clones c
-  CROSS JOIN LATERAL unnest(c.purchased_addon_slugs) AS slug
-  LEFT JOIN public.addon_modules am ON am.slug = slug
+  -- Alias the unnested column: bare `slug` is ambiguous once addon_modules
+  -- (which has its own `slug`) is joined, and Postgres rejects the whole
+  -- statement rather than picking one.
+  CROSS JOIN LATERAL unnest(c.purchased_addon_slugs) AS s(addon_slug)
+  LEFT JOIN public.addon_modules am ON am.slug = s.addon_slug
  WHERE c.purchased_addon_slugs IS NOT NULL
    AND array_length(c.purchased_addon_slugs, 1) > 0
 ON CONFLICT DO NOTHING;

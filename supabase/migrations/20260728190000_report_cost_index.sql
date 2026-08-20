@@ -60,7 +60,15 @@ VALUES
    '{"token_kind":"aml_identity_check","default_credit_cost":4,"complexity":"low"}'::jsonb),
   ('aml_screening_check', 'AML — Screening Check', 'compliance',
    'Sanctions / PEP / adverse-media screening.', 4, 210,
-   '{"token_kind":"aml_screening_check","default_credit_cost":4,"complexity":"low"}'::jsonb)
+   '{"token_kind":"aml_screening_check","default_credit_cost":4,"complexity":"low"}'::jsonb),
+  -- Present on the live prime but seeded by no migration, so 20260729010000's
+  -- "every reviewed slug must exist" assertion could never pass on a fresh
+  -- database — and that assertion halts replay, which is how clone backends
+  -- stopped receiving the schema. Shipped default 4; that migration reviews it
+  -- to 5, exactly as its own comment says.
+  ('scenario-model', 'Scenario Model', 'report',
+   'Scenario modelling run.', 4, 120,
+   '{"token_kind":"scenario-model","default_credit_cost":4,"complexity":"medium"}'::jsonb)
 ON CONFLICT (slug) DO UPDATE
   SET name        = EXCLUDED.name,
       category    = EXCLUDED.category,
@@ -80,6 +88,9 @@ ON CONFLICT (slug) DO UPDATE
 -- has_role(uid,'admin') admitted level 80 as well. Repricing every clone is a
 -- platform-wide action; it belongs to level 100+ (super_admin, high_king).
 DROP POLICY IF EXISTS "Admins write report_credit_costs" ON public.report_credit_costs;
+-- Also drop the name we are about to create: 20260728102159 created it earlier
+-- the same day, so on a fresh replay this CREATE collided and halted the run.
+DROP POLICY IF EXISTS "Super admins write report_credit_costs" ON public.report_credit_costs;
 CREATE POLICY "Super admins write report_credit_costs"
   ON public.report_credit_costs FOR ALL TO authenticated
   USING (public.has_role(auth.uid(), 'super_admin'::public.app_role))
@@ -108,6 +119,7 @@ CREATE INDEX IF NOT EXISTS report_cost_revisions_created_idx
   ON public.report_cost_revisions (created_at DESC);
 
 ALTER TABLE public.report_cost_revisions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Operators read report_cost_revisions" ON public.report_cost_revisions;
 CREATE POLICY "Operators read report_cost_revisions"
   ON public.report_cost_revisions FOR SELECT TO authenticated
   USING (public.is_operator(auth.uid()));
