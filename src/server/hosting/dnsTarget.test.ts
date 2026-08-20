@@ -44,6 +44,37 @@ describe("resolveDnsTarget", () => {
     expect(resolveDnsTarget({ dns_target_value: "x.com" }, FLEET)?.source).toBe("fleet_default");
   });
 
+  it("withdraws the fleet default entirely on a provider-managed fleet", () => {
+    // Vercel routes by the domains registered on a project. A fleet-wide CNAME
+    // for a domain no project has claimed answers DEPLOYMENT_NOT_FOUND, which
+    // reads as a broken build and sends the debugging to the wrong place.
+    const r = resolveDnsTarget(null, {
+      target_type: "cname",
+      target_value: "cname.vercel-dns.com",
+      proxied: false,
+      hosting_provider_slug: "vercel",
+    });
+    expect(r).toBeNull();
+  });
+
+  it("still honours the fleet default when a person configures the host", () => {
+    // `manual` is the case the fleet default exists for, and withdrawing it
+    // there would strand every hand-served clone.
+    const r = resolveDnsTarget(null, { ...FLEET, hosting_provider_slug: "manual" });
+    expect(r?.source).toBe("fleet_default");
+  });
+
+  it("does not let a provider-managed fleet suppress the deployment's own target", () => {
+    // The withdrawal is of the FALLBACK. A deployment that reported a target is
+    // the authority and must still win.
+    const r = resolveDnsTarget(
+      { dns_target_type: "cname", dns_target_value: "abc.vercel-dns.com" },
+      { ...FLEET, hosting_provider_slug: "vercel" },
+    );
+    expect(r?.source).toBe("deployment");
+    expect(r?.recordContent).toBe("abc.vercel-dns.com");
+  });
+
   it("returns null rather than inventing a record", () => {
     // A record pointing somewhere wrong serves someone else's page; no record
     // serves NXDOMAIN. The second is the recoverable failure.

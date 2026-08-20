@@ -166,7 +166,24 @@ export const requestCloneSubdomain = createServerFn({ method: "POST" })
       deployment,
       createdBy: context.userId,
     });
-    if (!enqueued.ok) throw new Error(`subdomain_enqueue_failed:${enqueued.reason}`);
+    if (!enqueued.ok) {
+      // `no_target` is the ORDINARY path on a provider-managed fleet, not an
+      // error: the name is reserved and the platform is configured, and the
+      // clone's Vercel project simply has not attached the domain yet. The
+      // deployment drain enqueues the record itself at `attaching_domain`, with
+      // the CNAME Vercel issued.
+      //
+      // Throwing here would fail the wizard's submit for a clone that is
+      // progressing exactly as designed.
+      if (enqueued.reason === "no_target") {
+        await admin
+          .from("clones")
+          .update({ subdomain_status: "awaiting_deployment" })
+          .eq("id", data.cloneId);
+        return { ok: true as const, status: "awaiting_deployment" as const, fqdn };
+      }
+      throw new Error(`subdomain_enqueue_failed:${enqueued.reason}`);
+    }
     return {
       ok: true as const,
       status: "queued" as const,
@@ -226,6 +243,7 @@ export const reconcilePendingSubdomains = createServerFn({ method: "POST" })
       .eq("subdomain_status", "pending_platform");
     let enqueued = 0;
     let skipped = 0;
+    let awaiting = 0;
     for (const row of pending ?? []) {
       const { data: deployment } = await admin
         .from("clone_deployments")
@@ -245,13 +263,27 @@ export const reconcilePendingSubdomains = createServerFn({ method: "POST" })
         // Leave the clone dormant rather than marking it queued for a job that
         // was never created — a `queued` row with no job is the state nobody
         // can diagnose from the UI.
+        //
+        // `no_target` is separated out because it is not the platform's fault:
+        // leaving such a clone in `pending_platform` makes every future
+        // reconcile retry it and tells the operator the platform is
+        // misconfigured when the only thing outstanding is the clone's own
+        // build.
+        if (result.reason === "no_target") {
+          await admin
+            .from("clones")
+            .update({ subdomain_status: "awaiting_deployment" })
+            .eq("id", row.id);
+          awaiting++;
+          continue;
+        }
         skipped++;
         continue;
       }
       await admin.from("clones").update({ subdomain_status: "queued" }).eq("id", row.id);
       enqueued++;
     }
-    return { ok: true as const, enqueued, skipped };
+    return { ok: true as const, awaitingDeployment: awaiting, enqueued, skipped };
   });
 
 export const listCloneSubdomains = createServerFn({ method: "GET" })

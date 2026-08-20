@@ -13,6 +13,11 @@
  *
  * So the target belongs to the DEPLOYMENT, and the platform value is the
  * fallback. This module is the only place that decides.
+ *
+ * On a PROVIDER-MANAGED fleet — which is what Aurixa now is, every clone staged
+ * on Vercel and served at `<subdomain>.aurixasystems.com.au` — that fallback is
+ * withdrawn entirely, and `resolveDnsTarget` returns null rather than writing a
+ * record for a domain no project has claimed. The reasoning is in the function.
  */
 
 export type DnsRecordType = "A" | "CNAME";
@@ -21,7 +26,22 @@ export type FleetDefault = {
   target_type: string | null | undefined; // 'a' | 'cname' in the column
   target_value: string | null | undefined;
   proxied?: boolean | null;
+  /**
+   * The platform's hosting provider. When a provider BUILDS and SERVES the
+   * clone, the fleet default stops being a usable fallback — see
+   * `resolveDnsTarget`.
+   */
+  hosting_provider_slug?: string | null;
 };
+
+/**
+ * Providers that route by the domains registered on a project, so a fleet-wide
+ * record cannot stand in for a per-deployment one.
+ *
+ * `manual` is deliberately absent: a hand-configured host is exactly the case
+ * the fleet default exists for.
+ */
+const PROVIDER_MANAGED = new Set(["vercel"]);
 
 export type DeploymentTarget = {
   dns_target_type?: string | null;
@@ -77,6 +97,20 @@ export function resolveDnsTarget(
       proxied: false,
     };
   }
+
+  // On a provider-managed fleet the default is NOT a fallback.
+  //
+  // Every clone is its own Vercel project and Vercel routes by the domains
+  // registered on one, so `cname.vercel-dns.com` for a domain no project has
+  // claimed resolves to an edge that answers DEPLOYMENT_NOT_FOUND. That is a
+  // page which looks like a broken deploy rather than like absent DNS, and it
+  // sends whoever debugs it to the build logs instead of to the domain.
+  //
+  // NXDOMAIN is the better failure: it is unambiguous, it is what "this clone
+  // has no deployment yet" actually means, and it costs nothing to correct the
+  // moment the deployment reports its target.
+  const providerManaged = PROVIDER_MANAGED.has((fleet?.hosting_provider_slug ?? "").toLowerCase());
+  if (providerManaged) return null;
 
   const fleetType = normaliseType(fleet?.target_type);
   const fleetValue = fleet?.target_value?.trim();
