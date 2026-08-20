@@ -175,11 +175,44 @@ export const createBulkSecurityAssessments = createServerFn({ method: "POST" })
     if (partnerError) throw new Error(partnerError.message);
     if (!partner) throw new Error("security_partner_not_found");
 
+    // `deploy_url` alone was the target list, and until the deployment pipeline
+    // existed nothing ever wrote that column — so every assessment this endpoint
+    // has ever created was handed to a security partner with `target_urls: []`.
+    // An empty scope is not a small defect in a penetration test: it is a
+    // partner being paid to test a target nobody named.
+    //
+    // The deployment's own origin is a valid target before the custom domain
+    // verifies, so both are collected and deduped.
     const { data: clones, error: clonesError } = await admin
       .from("clones")
-      .select("id, name, deploy_url")
+      .select("id, name, deploy_url, clone_deployments(domain, provider_origin, status)")
       .in("id", data.cloneIds);
     if (clonesError) throw new Error(clonesError.message);
+
+    const { resolveCloneOrigin } = await import("@/server/hosting/dnsTarget.pure");
+    const targetsFor = (clone: {
+      deploy_url?: string | null;
+      clone_deployments?:
+        | { domain?: string | null; provider_origin?: string | null; status?: string | null }
+        | Array<{ domain?: string | null; provider_origin?: string | null; status?: string | null }>
+        | null;
+    }): string[] => {
+      const dep = Array.isArray(clone.clone_deployments)
+        ? clone.clone_deployments[0]
+        : clone.clone_deployments;
+      const candidates = [
+        clone.deploy_url ?? null,
+        resolveCloneOrigin({
+          domain: dep?.domain,
+          providerOrigin: dep?.provider_origin,
+          deploymentStatus: dep?.status,
+        }),
+        dep?.provider_origin ?? null,
+      ];
+      return Array.from(
+        new Set(candidates.filter((u): u is string => typeof u === "string" && u.length > 0)),
+      );
+    };
 
     const created: Array<{ id: string; clone_id: string | null }> = [];
     const skipped: Array<{ cloneId: string; reason: string }> = [];
@@ -243,7 +276,7 @@ export const createBulkSecurityAssessments = createServerFn({ method: "POST" })
           status: "pending",
           scope_summary: data.scopeSummary?.trim() || null,
           rules_of_engagement: data.rulesOfEngagement?.trim() || null,
-          target_urls: clone.deploy_url ? [clone.deploy_url] : [],
+          target_urls: targetsFor(clone),
           due_at: data.dueAt || null,
           retest_required: data.retestRequired,
           created_by: context.userId,

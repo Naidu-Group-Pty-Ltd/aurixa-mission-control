@@ -111,9 +111,33 @@ export async function getCloneHealth(
       .limit(20),
   ]);
 
+  // `deploy_url` was the only source, and until the deployment pipeline existed
+  // nothing wrote it — so this ping never ran for any clone and every health
+  // card in the fleet has shown `unknown` uptime since the feature shipped.
+  //
+  // `unknown` is still the honest answer for a clone that is not deployed, which
+  // is why the fallback resolves an origin rather than constructing one: a ping
+  // against a guessed hostname reports "down" for a site that was never meant to
+  // exist, and a red pip is worse than a grey one.
   let uptime: CloneHealth["uptime"] = { status: "unknown", httpStatus: null, latencyMs: null };
-  if (clone?.deploy_url) {
-    uptime = await pingDeploy(clone.deploy_url);
+  let deployUrl: string | null = clone?.deploy_url ?? null;
+  if (!deployUrl) {
+    const { data: deployment } = await supabase
+      .from("clone_deployments")
+      .select("domain, provider_origin, status")
+      .eq("clone_id", cloneId)
+      .maybeSingle();
+    if (deployment) {
+      const { resolveCloneOrigin } = await import("@/server/hosting/dnsTarget.pure");
+      deployUrl = resolveCloneOrigin({
+        domain: deployment.domain,
+        providerOrigin: deployment.provider_origin,
+        deploymentStatus: deployment.status,
+      });
+    }
+  }
+  if (deployUrl) {
+    uptime = await pingDeploy(deployUrl);
   }
 
   const succeeded = (results ?? []).filter(
@@ -177,7 +201,7 @@ export async function getCloneHealth(
 
   const result: CloneHealth = {
     cloneId,
-    deployUrl: clone?.deploy_url ?? null,
+    deployUrl,
     uptime,
     lastSuccessfulCascadeAt,
     lastFailedCascadeAt,
