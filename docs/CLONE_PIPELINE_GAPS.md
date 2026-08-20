@@ -9,6 +9,12 @@ Everything below is evidence, not review. Counts come from the two live
 projects (`dduzbchuswwbefdunfct`, `plisdzywzleljorrphxv`); line references are
 to this repository.
 
+> **Status, 20 Aug 2026.** §2, §3, §4, §5, §6 and §8 are **fixed** —
+> see the commit that added `clone-repo-retarget.server.ts`. §1 (the only
+> schema path is a migration replay that cannot run) and §7 (the convergence
+> rules that path needs) are **open**, and §1 is still what blocks a clone of
+> this prime. Each section below is marked.
+
 **The headline: the pipeline cannot currently clone this prime at all**, and
 several of the checks that would have caught that measure the wrong thing.
 The parts it does cover it covers well — cron rewriting, storage seed assets,
@@ -16,7 +22,7 @@ auth policy, realtime membership and the `_shared` bundling are all sound.
 
 ---
 
-## 1 · BLOCKING — the only schema path is a migration replay that cannot run
+## 1 · BLOCKING — the only schema path is a migration replay that cannot run  — **OPEN**
 
 `applyPrimeMigrations` (`backend-provisioning.server.ts:1145`) replays
 `supabase/migrations/**` from the prime's repository in filename order, and
@@ -68,7 +74,7 @@ applied list afterwards so future incremental migrations still apply.
 
 ---
 
-## 2 · SECURITY — per-deployment identity secrets are copied verbatim
+## 2 · SECURITY — per-deployment identity secrets are copied verbatim — **FIXED**
 
 `extractSecretNames` (`prime-backend.server.ts:245`) correctly drops
 `SUPABASE_*`. But `INTERNAL_EDGE_SECRET` and `CSRF_TOKEN_PEPPER` are ordinary
@@ -100,7 +106,7 @@ verified the values differed from the prime's before finishing.
 
 ---
 
-## 3 · SECURITY — the clone repository is left primed to deploy into the prime
+## 3 · SECURITY — the clone repository is left primed to deploy into the prime — **FIXED**
 
 The repository is created with `createFork` / `createUsingTemplate`
 (`clone-provisioning.functions.ts:118,130`) — a byte copy. Nothing rewrites it
@@ -135,7 +141,7 @@ project": an unset variable is a question, not a licence to guess.
 
 ---
 
-## 4 · The parity engine measures tables but not what holds them together
+## 4 · The parity engine measures tables but not what holds them together — **FIXED**
 
 `handoff-parity.server.ts` snapshots tables and columns, RLS, policies,
 functions, extensions, buckets, cron, edge-function slugs, secret names, auth
@@ -162,7 +168,7 @@ rename that a count cannot.
 
 ---
 
-## 5 · Parity is never run by provisioning
+## 5 · Parity is never run by provisioning — **FIXED**
 
 `handoff-parity` is reachable only from `handoffs.functions.ts` and
 `hooks.handoff-parity-refresh.tsx`. `provisionCloneBackend` never calls it.
@@ -179,7 +185,7 @@ parity should be visibly incomplete, not green.
 
 ---
 
-## 6 · `REQUIRED_EXTENSIONS` names an extension that does not exist
+## 6 · `REQUIRED_EXTENSIONS` names an extension that does not exist — **FIXED**
 
 `backend-provisioning.server.ts:955`:
 
@@ -212,7 +218,7 @@ the prime already knows the answer.
 
 ---
 
-## 7 · Three things the DDL path has to do that a single pass does not
+## 7 · Three things the DDL path has to do that a single pass does not — **OPEN** (needed by §1)
 
 Found while applying 1.58 MB of generated DDL. Each produced a wrong result
 that looked like a right one.
@@ -236,7 +242,7 @@ count.
 
 ---
 
-## 8 · The prime's URL survives in two places cron rewriting does not reach
+## 8 · The prime's URL survives in two places cron rewriting does not reach — **FIXED**
 
 `rewriteCronCommand` (`:863`) rewrites prime hosts to the clone host in
 `cron.job.command`, and re-schedules every job after replay. That is right,
