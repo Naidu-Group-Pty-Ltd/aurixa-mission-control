@@ -17,7 +17,15 @@ COMMENT ON COLUMN public.clone_backends.secret_shells IS 'Empty-shell secret nam
 
 -- Refresh the credential-free projection with the new report columns.
 -- (secret_shells holds names only; still excludes anon/service_role/db_pass.)
-create or replace view public.clone_backends_safe
+--
+-- DROP then CREATE, not CREATE OR REPLACE. Replace can only APPEND columns to
+-- an existing view; this one inserts six in the middle, so against the June
+-- definition it fails with "cannot change name of view column". That aborted
+-- migration replay at this file — and `applyPrimeMigrations` halts on the first
+-- failure, so every clone backend provisioned since stopped here with 75 of the
+-- schema's tables and none of the 123 migrations that follow.
+drop view if exists public.clone_backends_safe cascade;
+create view public.clone_backends_safe
 with (security_invoker = true)
 as
 select
