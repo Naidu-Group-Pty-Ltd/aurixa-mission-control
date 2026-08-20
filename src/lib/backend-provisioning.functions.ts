@@ -776,7 +776,7 @@ export const addModulesToBackend = createServerFn({ method: "POST" })
         succeededRequested.map((r) => ({
           clone_id: data.cloneId,
           module_id: r.id,
-          enabled_by: userId,
+          installed_by: userId,
         })),
         { onConflict: "clone_id,module_id" },
       );

@@ -5,6 +5,7 @@
 // a prior report; it inserts version N+1 so the decision trail survives.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { asJson } from "@/lib/json-cast";
 import { requireOperator, requireAdmin } from "@/integrations/supabase/role-middleware";
 
 const uuid = z.string().uuid();
@@ -182,7 +183,9 @@ export const getFitHistory = createServerFn({ method: "POST" })
       .select("*")
       .order("version", { ascending: false })
       .limit(20);
-    q = data.accountId ? q.eq("account_id", data.accountId) : q.eq("lead_id", data.leadId);
+    if (data.accountId) q = q.eq("account_id", data.accountId);
+    else if (data.leadId) q = q.eq("lead_id", data.leadId);
+    else throw new Error("subject_required");
     const { data: rows, error } = await q;
     if (error) throw error;
     const latest = rows?.[0];
@@ -307,6 +310,7 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
         ...(originLead ? { origin_application: buildLeadSubject(originLead) } : {}),
       };
     } else {
+      if (!data.leadId) throw new Error("subject_required");
       const { data: lead, error } = await sb
         .from("waitlist_leads")
         .select("*")
@@ -330,7 +334,7 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
     const countQ = sb.from("crm_fit_analyses").select("id", { count: "exact", head: true });
     const { count } = await (data.accountId
       ? countQ.eq("account_id", data.accountId)
-      : countQ.eq("lead_id", data.leadId));
+      : countQ.eq("lead_id", data.leadId ?? ""));
 
     const { data: created, error: insertError } = await sb
       .from("crm_fit_analyses")
@@ -342,7 +346,7 @@ export const runFitAnalysis = createServerFn({ method: "POST" })
         subject_website: website,
         version: (count ?? 0) + 1,
         status: "queued",
-        input_snapshot: subject,
+        input_snapshot: asJson(subject),
         requested_by: context.userId,
       })
       .select("id, version")
