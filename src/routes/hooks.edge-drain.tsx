@@ -31,7 +31,8 @@ type JobRow = {
     | "detach"
     | "provision_subdomain"
     | "deprovision_subdomain"
-    | "resync_subdomain";
+    | "resync_subdomain"
+    | "verify_domain_txt";
   payload: {
     externalRef?: string;
     hostname?: string;
@@ -42,9 +43,11 @@ type JobRow = {
     subdomain?: string;
     fqdn?: string;
     zoneId?: string;
-    recordType?: "A" | "AAAA" | "CNAME";
+    recordType?: "A" | "AAAA" | "CNAME" | "TXT";
     recordContent?: string;
     proxied?: boolean;
+    // verify_domain_txt: the ownership challenge the hosting provider issued.
+    recordName?: string;
   };
   attempts: number;
   max_attempts: number;
@@ -254,13 +257,71 @@ async function runJob(job: JobRow): Promise<{ ok: boolean; result?: unknown; err
       return { ok: true, result: { recordId, fqdn } };
     }
 
+    // ── Hosting-provider domain ownership challenge ─────────────────────
+    // A hosting provider will not serve a custom domain until it can prove we
+    // control the name. Vercel issues a TXT on `_vercel.<domain>`; writing it is
+    // the difference between a domain that verifies in a minute and one that
+    // sits in `verifying_domain` until somebody reads the provider dashboard.
+    //
+    // Tracked in edge_dns_records like every other record we create, under its
+    // own purpose so `deprovision_subdomain` — which deletes by
+    // `purpose = 'clone_subdomain'` — does not take the challenge with it, and
+    // so a challenge record is never mistaken for the record that serves the
+    // site.
+    if (job.action === "verify_domain_txt") {
+      if (job.provider_slug !== "cloudflare") throw new Error("subdomain_provider_unsupported");
+      const { zoneId, recordName, recordContent } = job.payload;
+      if (!zoneId || !recordName || !recordContent) throw new Error("payload_incomplete");
+      const { data: existing } = await admin
+        .from("edge_dns_records")
+        .select("id, external_record_id")
+        .eq("clone_id", job.clone_id)
+        .eq("purpose", "domain_verification")
+        .eq("zone_id", zoneId)
+        .eq("record_name", recordName)
+        .maybeSingle();
+      if (existing?.external_record_id) {
+        await cloudflareApi.updateDnsRecord(zoneId, existing.external_record_id, {
+          type: "TXT",
+          name: recordName,
+          content: recordContent,
+        });
+        await admin
+          .from("edge_dns_records")
+          .update({ record_content: recordContent, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+        return { ok: true, result: { recordId: existing.external_record_id, updated: true } };
+      }
+      const created = await cloudflareApi.createDnsRecord(zoneId, {
+        type: "TXT",
+        name: recordName,
+        content: recordContent,
+        comment: `aurixa-domain-verification:${job.clone_id}`,
+      });
+      await admin.from("edge_dns_records").insert({
+        clone_id: job.clone_id,
+        provider_slug: "cloudflare",
+        zone_id: zoneId,
+        external_record_id: created.id,
+        record_type: "TXT",
+        record_name: recordName,
+        record_content: recordContent,
+        proxied: false,
+        managed: true,
+        purpose: "domain_verification",
+      });
+      return { ok: true, result: { recordId: created.id, created: true } };
+    }
+
     if (job.action === "deprovision_subdomain") {
       if (job.provider_slug !== "cloudflare") throw new Error("subdomain_provider_unsupported");
       const { data: rows } = await admin
         .from("edge_dns_records")
         .select("id, zone_id, external_record_id, managed")
         .eq("clone_id", job.clone_id)
-        .eq("purpose", "clone_subdomain");
+        // Both purposes: leaving the ownership challenge behind means a TXT
+        // record for a domain we no longer serve, which is drift we created.
+        .in("purpose", ["clone_subdomain", "domain_verification"]);
       for (const r of rows ?? []) {
         if (!r.managed) continue; // never touch drift/unmanaged records
         try {

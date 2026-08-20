@@ -73,6 +73,7 @@ import { Route as HooksEntitlementDrainRouteImport } from './routes/hooks.entitl
 import { Route as HooksEdgeDriftRouteImport } from './routes/hooks.edge-drift'
 import { Route as HooksEdgeDrainRouteImport } from './routes/hooks.edge-drain'
 import { Route as HooksDriftRefreshRouteImport } from './routes/hooks.drift-refresh'
+import { Route as HooksDeploymentDrainRouteImport } from './routes/hooks.deployment-drain'
 import { Route as HooksCrmSweepRouteImport } from './routes/hooks.crm-sweep'
 import { Route as HooksCodexSweepRouteImport } from './routes/hooks.codex-sweep'
 import { Route as HooksCodexNightlyRouteImport } from './routes/hooks.codex-nightly'
@@ -474,6 +475,11 @@ const HooksEdgeDrainRoute = HooksEdgeDrainRouteImport.update({
 const HooksDriftRefreshRoute = HooksDriftRefreshRouteImport.update({
   id: '/hooks/drift-refresh',
   path: '/hooks/drift-refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HooksDeploymentDrainRoute = HooksDeploymentDrainRouteImport.update({
+  id: '/hooks/deployment-drain',
+  path: '/hooks/deployment-drain',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksCrmSweepRoute = HooksCrmSweepRouteImport.update({
@@ -939,6 +945,7 @@ export interface FileRoutesByFullPath {
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
   '/hooks/crm-sweep': typeof HooksCrmSweepRoute
+  '/hooks/deployment-drain': typeof HooksDeploymentDrainRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1080,6 +1087,7 @@ export interface FileRoutesByTo {
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
   '/hooks/crm-sweep': typeof HooksCrmSweepRoute
+  '/hooks/deployment-drain': typeof HooksDeploymentDrainRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1223,6 +1231,7 @@ export interface FileRoutesById {
   '/hooks/codex-nightly': typeof HooksCodexNightlyRoute
   '/hooks/codex-sweep': typeof HooksCodexSweepRoute
   '/hooks/crm-sweep': typeof HooksCrmSweepRoute
+  '/hooks/deployment-drain': typeof HooksDeploymentDrainRoute
   '/hooks/drift-refresh': typeof HooksDriftRefreshRoute
   '/hooks/edge-drain': typeof HooksEdgeDrainRoute
   '/hooks/edge-drift': typeof HooksEdgeDriftRoute
@@ -1367,6 +1376,7 @@ export interface FileRouteTypes {
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
     | '/hooks/crm-sweep'
+    | '/hooks/deployment-drain'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1508,6 +1518,7 @@ export interface FileRouteTypes {
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
     | '/hooks/crm-sweep'
+    | '/hooks/deployment-drain'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1650,6 +1661,7 @@ export interface FileRouteTypes {
     | '/hooks/codex-nightly'
     | '/hooks/codex-sweep'
     | '/hooks/crm-sweep'
+    | '/hooks/deployment-drain'
     | '/hooks/drift-refresh'
     | '/hooks/edge-drain'
     | '/hooks/edge-drift'
@@ -1790,6 +1802,7 @@ export interface RootRouteChildren {
   HooksCodexNightlyRoute: typeof HooksCodexNightlyRoute
   HooksCodexSweepRoute: typeof HooksCodexSweepRoute
   HooksCrmSweepRoute: typeof HooksCrmSweepRoute
+  HooksDeploymentDrainRoute: typeof HooksDeploymentDrainRoute
   HooksDriftRefreshRoute: typeof HooksDriftRefreshRoute
   HooksEdgeDrainRoute: typeof HooksEdgeDrainRoute
   HooksEdgeDriftRoute: typeof HooksEdgeDriftRoute
@@ -2308,6 +2321,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/drift-refresh'
       fullPath: '/hooks/drift-refresh'
       preLoaderRoute: typeof HooksDriftRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/deployment-drain': {
+      id: '/hooks/deployment-drain'
+      path: '/hooks/deployment-drain'
+      fullPath: '/hooks/deployment-drain'
+      preLoaderRoute: typeof HooksDeploymentDrainRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/crm-sweep': {
@@ -3001,6 +3021,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksCodexNightlyRoute: HooksCodexNightlyRoute,
   HooksCodexSweepRoute: HooksCodexSweepRoute,
   HooksCrmSweepRoute: HooksCrmSweepRoute,
+  HooksDeploymentDrainRoute: HooksDeploymentDrainRoute,
   HooksDriftRefreshRoute: HooksDriftRefreshRoute,
   HooksEdgeDrainRoute: HooksEdgeDrainRoute,
   HooksEdgeDriftRoute: HooksEdgeDriftRoute,
