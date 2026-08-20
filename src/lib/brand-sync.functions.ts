@@ -34,9 +34,9 @@ export const runBrandSync = createServerFn({ method: "POST" })
       }
       const result = await applyBrandSync();
       return {
+        ...result,
         ok: result.ok,
         error: result.errors.length ? result.errors.join(" · ") : undefined,
-        ...result,
       };
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : String(err) };

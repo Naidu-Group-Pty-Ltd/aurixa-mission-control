@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Stripe Checkout server functions (Mission Control operator surface).
 // The checkout engine itself lives in src/server/checkout.server.ts and is
 // shared with the storefront REST endpoint that powers the customer-facing

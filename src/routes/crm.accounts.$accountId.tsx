@@ -1,4 +1,3 @@
-// @ts-nocheck
 // The account hub — one screen holding an entire client relationship:
 // timeline, contacts, deals, contract, live billing, tickets, disputes,
 // feedback and the exit/offboarding record.

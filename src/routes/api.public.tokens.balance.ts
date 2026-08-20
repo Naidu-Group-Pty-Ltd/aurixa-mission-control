@@ -91,18 +91,27 @@ export const Route = createFileRoute("/api/public/tokens/balance")({
         // Best-effort, like the expiry schedule above — a balance read must not
         // fail because the entitlement query did, and an empty list degrades to
         // exactly the behaviour clones have today.
+        //
+        // A platform-level key carries no clone, and add-ons are bought against a
+        // clone — so there is nothing to look up. Skipping is also the only correct
+        // form: `.eq("clone_id", null)` asks PostgREST for `clone_id = NULL`, which
+        // no row satisfies, so the empty answer was right by accident rather than by
+        // rule.
         let addonSlugs: string[] = [];
-        try {
-          const { data: addons } = await supabaseAdmin
-            .from("clone_addon_purchases")
-            .select("addon_slug")
-            .eq("clone_id", key.clone_id)
-            .in("status", ["active", "past_due"]);
-          addonSlugs = [
-            ...new Set(((addons ?? []) as Array<{ addon_slug: string }>).map((a) => a.addon_slug)),
-          ].sort();
-        } catch (err) {
-          console.warn("[tokens/balance] add-on entitlements unavailable", err);
+        const addonCloneId = key.clone_id;
+        if (addonCloneId) {
+          try {
+            const { data: addons } = await supabaseAdmin
+              .from("clone_addon_purchases")
+              .select("addon_slug")
+              .eq("clone_id", addonCloneId)
+              .in("status", ["active", "past_due"]);
+            addonSlugs = [
+              ...new Set(((addons ?? []) as Array<{ addon_slug: string }>).map((a) => a.addon_slug)),
+            ].sort();
+          } catch (err) {
+            console.warn("[tokens/balance] add-on entitlements unavailable", err);
+          }
         }
 
         // AML/CTF is entitled by the purchased SKU, never by tier membership.

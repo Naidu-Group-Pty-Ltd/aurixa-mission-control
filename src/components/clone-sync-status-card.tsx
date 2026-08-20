@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Compact "sync status" card: shows the last synced SHA, sync state,
 // commits behind, last cascade run for this clone, and quick retry links.
 import { useEffect, useState } from "react";

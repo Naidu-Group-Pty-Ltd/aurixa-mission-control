@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G11 — Client onboarding portal invites.
 // Admins mint short-lived bearer tokens that a third party can redeem via
 // the public /api/public/handoffs/consent endpoint to submit their Supabase

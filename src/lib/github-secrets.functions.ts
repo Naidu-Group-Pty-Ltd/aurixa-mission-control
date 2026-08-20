@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Admin-facing server functions to push GitHub Actions repository
 // secrets from Mission Control into the Prime repo or any clone repo.
 //

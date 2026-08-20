@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G20 — Post-handoff observability engine.
 // Uses the client-org PAT stored in `client_supabase_accounts` to hit the
 // Supabase Management API and snapshot the target project's health into

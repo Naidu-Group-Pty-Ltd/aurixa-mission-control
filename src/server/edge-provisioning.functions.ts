@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Phase 2 — Edge provisioning server functions.
 // Enqueue/read jobs and per-clone edge config. All mutations require admin.
 // The actual work (calling Cloudflare, updating clone_edge_config) is done

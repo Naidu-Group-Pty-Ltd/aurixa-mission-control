@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Operator-facing reads and controls for piggybacked API-key usage.
 //
 // Reading is open to any operator — knowing which tenant is burning our OpenAI

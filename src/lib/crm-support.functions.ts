@@ -1,4 +1,3 @@
-// @ts-nocheck
 // CRM support surface — tickets, threaded messages, and formal disputes.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";

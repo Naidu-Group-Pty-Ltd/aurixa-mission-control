@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProtectedRoute } from "@/components/protected-route";
 import { ADMIN_ROLES, hasAnyRole } from "@/integrations/supabase/roles";

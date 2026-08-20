@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Server functions for approving / rejecting / inspecting blast-radius gates.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";

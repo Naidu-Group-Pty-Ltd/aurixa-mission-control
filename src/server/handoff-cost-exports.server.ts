@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G22 — Cost Export Fulfillment Engine.
 // Turns a `pending` handoff_cost_exports row into a durable CSV artifact
 // stored in the `handoff-contracts` bucket under

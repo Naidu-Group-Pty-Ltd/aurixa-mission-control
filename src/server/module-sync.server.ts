@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Server-only core for fleet-wide module sync. Handles bulk install/remove of
 // a single module across many clones, and optionally spawns a cascade event
 // scoped to ONLY that module's file_globs so the engine pushes just those files.

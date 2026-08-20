@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Checkout-session summary + fulfilment-status helpers, shared by the
 // operator server fns (src/lib/checkout-session.functions.ts) and the
 // storefront REST endpoint (api/public/storefront/session) that powers the

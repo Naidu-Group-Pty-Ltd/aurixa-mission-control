@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Per-clone purchase attribution summary (user-attributed pricing workflow,
 // Phase 4): lifetime revenue + the most recent purchases, with who initiated
 // each one, and a jump into the fleet-wide purchases explorer.

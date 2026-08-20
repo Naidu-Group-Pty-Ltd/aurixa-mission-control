@@ -1,4 +1,3 @@
-// @ts-nocheck
 // User-facing server functions for the white-label branding system.
 // All functions require an authenticated operator. Mutations also write
 // audit_log + notifications to keep the bell + audit trail in sync with

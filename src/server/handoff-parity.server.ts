@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Handoff parity engine (G1 + G3).
  *

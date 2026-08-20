@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useFleetSecurityBadge } from "@/lib/use-fleet-security-badge";
 import { cn } from "@/lib/utils";
 

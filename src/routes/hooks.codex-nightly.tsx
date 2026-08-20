@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Codex Security nightly scan drainer — invoked by pg_cron with
 // Bearer(cron_secret) auth. Enqueues one Codex scan for Prime plus one for
 // every clone with codex_nightly_enabled=true, with a dedup window so

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -279,6 +278,15 @@ export const cfApplyPosture = createServerFn({ method: "POST" })
     }
   });
 
+type CloudflareZoneAnalytics = {
+  clone_id: string;
+  zone_name: string;
+  requests: number;
+  threats: number;
+  bandwidth: number;
+  error?: boolean;
+};
+
 export const cfFleetAnalytics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -289,8 +297,11 @@ export const cfFleetAnalytics = createServerFn({ method: "GET" })
         "clone_id, zone_id, zone_name, security_level, bot_fight_mode, rate_limit_rps, waf_preset, status, last_synced_at",
       );
     const list = configs ?? [];
+    // Typed explicitly: a bare `[]` here is `never[]`, and the union of the two
+    // return shapes then gives every consumer of `analytics` an element type of
+    // `never` — which is why the fleet page could not read `a.clone_id`.
     if (!process.env.CLOUDFLARE_API_TOKEN)
-      return { configs: list, analytics: [], configured: false };
+      return { configs: list, analytics: [] as CloudflareZoneAnalytics[], configured: false };
 
     const analytics = await Promise.all(
       list.slice(0, 20).map(async (c) => {

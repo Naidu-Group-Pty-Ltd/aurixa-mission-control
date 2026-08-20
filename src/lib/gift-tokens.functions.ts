@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Bulk token gifting for promotions / one-off comps.
 // Uses existing grant_tokens RPC per tenant. Records a campaign id in
 // each ledger row's metadata so a promo can be audited/rolled up.

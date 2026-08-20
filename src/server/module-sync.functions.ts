@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { bulkSyncModule, type ModuleSyncResult } from "./module-sync.server";

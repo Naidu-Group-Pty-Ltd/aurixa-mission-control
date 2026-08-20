@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G20 — Post-handoff observability admin surface.
 // Server functions that configure how Mission Control stays informed after
 // the client owns their backend, plus manual poll + beacon listing.

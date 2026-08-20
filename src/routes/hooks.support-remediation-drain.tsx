@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Self-healing remediation drain — invoked by pg_cron every 2 minutes with
 // Bearer(cron_secret) auth.
 //

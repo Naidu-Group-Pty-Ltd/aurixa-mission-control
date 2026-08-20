@@ -1,4 +1,3 @@
-// @ts-nocheck
 // POST /api/public/security/intake
 //
 // Provider-neutral security-finding intake. Any registered source in

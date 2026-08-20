@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Phase 6 — Bridge Codex findings into the Security Partner Portal and
 // export a signed sign-off bundle to the security-reports bucket.
 import { createServerFn } from "@tanstack/react-start";

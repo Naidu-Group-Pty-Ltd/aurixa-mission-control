@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G13 — Terms-versions admin UI. Draft, activate, retire.
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";

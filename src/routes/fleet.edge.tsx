@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Fleet-wide edge security dashboard.
 // Admin-only view of every clone's edge configuration and quick actions.
 import { createFileRoute, Link } from "@tanstack/react-router";

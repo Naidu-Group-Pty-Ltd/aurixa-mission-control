@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G16 — Auth users replication.
 //
 // Copies `auth.users` from the clone's currently-owned Supabase project

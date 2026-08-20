@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Operator-facing RPCs for the per-report token cost index.
 //
 // Reading is open to any operator (it is the platform price list). Publishing

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Per-source HMAC-SHA256 verification for the provider-neutral intake route.
 // Same signature scheme as the Codex webhook (sha256=<hex>) but keyed by the
 // source's own secret so vendors can rotate independently.

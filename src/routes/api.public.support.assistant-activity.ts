@@ -1,4 +1,3 @@
-// @ts-nocheck
 // POST /api/public/support/assistant-activity — the Support Portal's
 // screening assistant forwards one record per question it handles, carrying
 // the workspace_id and user_id the portal took from the dashboard, so

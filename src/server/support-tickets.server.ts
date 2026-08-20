@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Server-only ingest core for the Support Portal ticket pipeline.
 //
 // The public route (/api/public/support/tickets) hands the raw request in

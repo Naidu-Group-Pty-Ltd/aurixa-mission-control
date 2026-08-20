@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createFileRoute, Link, useRouter, useNavigate } from "@tanstack/react-router";
 import { ProtectedRoute } from "@/components/protected-route";
 import { RouteError } from "@/components/route-error";
