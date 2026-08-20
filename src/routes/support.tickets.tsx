@@ -501,10 +501,13 @@ function TicketDetailSheet({
               <section>
                 <h3 className="mb-1 font-medium">Classification</h3>
                 <ul className="list-inside list-disc text-xs text-muted-foreground">
-                  {(((ticket.classification as { reasons?: string[] } | null)?.reasons ?? []) as string[]).map(
-                    (r: string, i: number) => (
+                  {(
+                    ((ticket.classification as { reasons?: string[] } | null)?.reasons ??
+                      []) as string[]
+                  ).map((r: string, i: number) => (
                     <li key={i}>{r}</li>
                   ))}
+
                 </ul>
                 <p className="mt-1 text-xs text-muted-foreground">
                   score {ticket.priority_score}
