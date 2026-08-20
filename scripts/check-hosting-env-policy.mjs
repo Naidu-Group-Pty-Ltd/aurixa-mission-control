@@ -135,6 +135,73 @@ if (!checkMatch) {
   }
 }
 
+// 3. A SUBDOMAIN STATUS THE COLUMN WILL REFUSE.
+//
+//    Same class as (2) and it has already bitten once on this path:
+//    `awaiting_deployment` was written by three call sites before the CHECK
+//    constraint knew about it. Every one of those call sites discards the error
+//    from the update, so the write failed and the clone simply stayed in its
+//    previous state — a subdomain that never progresses, with nothing logged
+//    anywhere and no failed request to find.
+//
+//    The constraint is amended by a later migration rather than living in the
+//    CREATE TABLE, so this reads the LAST definition in the corpus. Reading the
+//    first would compare against a list that was correct eight months ago.
+{
+  const constraintDefs = [
+    ...sql.matchAll(
+      /clones_subdomain_status_check\s*\n?\s*check\s*\(\s*subdomain_status\s+is\s+null\s+or\s+subdomain_status\s+in\s*\(([^)]*)\)/gi,
+    ),
+  ];
+  if (constraintDefs.length === 0) {
+    failures.push(
+      "supabase/migrations  could not find the clones_subdomain_status_check constraint. " +
+        "A parity check that cannot find its subject silently stops checking.",
+    );
+  } else {
+    const allowed = new Set(
+      [...constraintDefs[constraintDefs.length - 1][1].matchAll(/'([^']+)'/g)].map((m) => m[1]),
+    );
+    // Every literal the application assigns to the column, wherever it lives.
+    const written = new Map();
+    const collect = (dir) => {
+      for (const entry of readdirSync(dir)) {
+        const path = join(dir, entry);
+        const st = statSync(path);
+        if (st.isDirectory()) {
+          if (entry === "node_modules" || entry === ".git") continue;
+          collect(path);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(entry)) continue;
+        const src = readFileSync(path, "utf8");
+        // The ternary form first: `ready ? "queued" : "pending_platform"` also
+        // matches the plain pattern on its first branch, so running the simple
+        // one first would record only half of it.
+        for (const m of src.matchAll(
+          /subdomain_status:\s*[^,\n]*?\?\s*"([^"]+)"\s*:\s*"([^"]+)"/g,
+        )) {
+          if (!written.has(m[1])) written.set(m[1], path);
+          if (!written.has(m[2])) written.set(m[2], path);
+        }
+        for (const m of src.matchAll(/subdomain_status:\s*"([^"]+)"/g)) {
+          if (!written.has(m[1])) written.set(m[1], path);
+        }
+      }
+    };
+    collect("src");
+    for (const [value, file] of written) {
+      if (!allowed.has(value)) {
+        failures.push(
+          `${file}  writes clones.subdomain_status = "${value}", which the CHECK constraint ` +
+            `refuses. The update fails with "violates check constraint", the error is discarded, ` +
+            `and the clone silently keeps its previous status.`,
+        );
+      }
+    }
+  }
+}
+
 if (failures.length) {
   console.error("\n✗ Hosting policy check failed:\n");
   for (const f of failures) console.error("  " + f);

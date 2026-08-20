@@ -60,6 +60,7 @@ import { Route as ModulesBuilderRouteImport } from './routes/modules.builder'
 import { Route as ModulesSlugRouteImport } from './routes/modules.$slug'
 import { Route as JoinTokenRouteImport } from './routes/join.$token'
 import { Route as HooksWarmHealthRouteImport } from './routes/hooks.warm-health'
+import { Route as HooksVercelRouteImport } from './routes/hooks.vercel'
 import { Route as HooksTokenAlertsRouteImport } from './routes/hooks.token-alerts'
 import { Route as HooksSupportRemediationDrainRouteImport } from './routes/hooks.support-remediation-drain'
 import { Route as HooksRunSchedulesRouteImport } from './routes/hooks.run-schedules'
@@ -85,6 +86,7 @@ import { Route as HooksAirtableSyncRouteImport } from './routes/hooks.airtable-s
 import { Route as HandoffsNewRouteImport } from './routes/handoffs.new'
 import { Route as HandoffsHandoffIdRouteImport } from './routes/handoffs.$handoffId'
 import { Route as FleetEdgeRouteImport } from './routes/fleet.edge'
+import { Route as FleetDeploymentsRouteImport } from './routes/fleet.deployments'
 import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
 import { Route as CrmFitRouteImport } from './routes/crm.fit'
 import { Route as CrmDealsRouteImport } from './routes/crm.deals'
@@ -408,6 +410,11 @@ const HooksWarmHealthRoute = HooksWarmHealthRouteImport.update({
   path: '/hooks/warm-health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HooksVercelRoute = HooksVercelRouteImport.update({
+  id: '/hooks/vercel',
+  path: '/hooks/vercel',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HooksTokenAlertsRoute = HooksTokenAlertsRouteImport.update({
   id: '/hooks/token-alerts',
   path: '/hooks/token-alerts',
@@ -536,6 +543,11 @@ const HandoffsHandoffIdRoute = HandoffsHandoffIdRouteImport.update({
 const FleetEdgeRoute = FleetEdgeRouteImport.update({
   id: '/fleet/edge',
   path: '/fleet/edge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FleetDeploymentsRoute = FleetDeploymentsRouteImport.update({
+  id: '/fleet/deployments',
+  path: '/fleet/deployments',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CrmTicketsRoute = CrmTicketsRouteImport.update({
@@ -934,6 +946,7 @@ export interface FileRoutesByFullPath {
   '/crm/deals': typeof CrmDealsRoute
   '/crm/fit': typeof CrmFitRoute
   '/crm/tickets': typeof CrmTicketsRoute
+  '/fleet/deployments': typeof FleetDeploymentsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -959,6 +972,7 @@ export interface FileRoutesByFullPath {
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
+  '/hooks/vercel': typeof HooksVercelRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
@@ -1076,6 +1090,7 @@ export interface FileRoutesByTo {
   '/crm/deals': typeof CrmDealsRoute
   '/crm/fit': typeof CrmFitRoute
   '/crm/tickets': typeof CrmTicketsRoute
+  '/fleet/deployments': typeof FleetDeploymentsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -1101,6 +1116,7 @@ export interface FileRoutesByTo {
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
+  '/hooks/vercel': typeof HooksVercelRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
@@ -1220,6 +1236,7 @@ export interface FileRoutesById {
   '/crm/deals': typeof CrmDealsRoute
   '/crm/fit': typeof CrmFitRoute
   '/crm/tickets': typeof CrmTicketsRoute
+  '/fleet/deployments': typeof FleetDeploymentsRoute
   '/fleet/edge': typeof FleetEdgeRoute
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
@@ -1245,6 +1262,7 @@ export interface FileRoutesById {
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
+  '/hooks/vercel': typeof HooksVercelRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
@@ -1365,6 +1383,7 @@ export interface FileRouteTypes {
     | '/crm/deals'
     | '/crm/fit'
     | '/crm/tickets'
+    | '/fleet/deployments'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1390,6 +1409,7 @@ export interface FileRouteTypes {
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
+    | '/hooks/vercel'
     | '/hooks/warm-health'
     | '/join/$token'
     | '/modules/$slug'
@@ -1507,6 +1527,7 @@ export interface FileRouteTypes {
     | '/crm/deals'
     | '/crm/fit'
     | '/crm/tickets'
+    | '/fleet/deployments'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1532,6 +1553,7 @@ export interface FileRouteTypes {
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
+    | '/hooks/vercel'
     | '/hooks/warm-health'
     | '/join/$token'
     | '/modules/$slug'
@@ -1650,6 +1672,7 @@ export interface FileRouteTypes {
     | '/crm/deals'
     | '/crm/fit'
     | '/crm/tickets'
+    | '/fleet/deployments'
     | '/fleet/edge'
     | '/handoffs/$handoffId'
     | '/handoffs/new'
@@ -1675,6 +1698,7 @@ export interface FileRouteTypes {
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
+    | '/hooks/vercel'
     | '/hooks/warm-health'
     | '/join/$token'
     | '/modules/$slug'
@@ -1793,6 +1817,7 @@ export interface RootRouteChildren {
   CrmDealsRoute: typeof CrmDealsRoute
   CrmFitRoute: typeof CrmFitRoute
   CrmTicketsRoute: typeof CrmTicketsRoute
+  FleetDeploymentsRoute: typeof FleetDeploymentsRoute
   FleetEdgeRoute: typeof FleetEdgeRoute
   HooksAirtableSyncRoute: typeof HooksAirtableSyncRoute
   HooksApiUsageSettleRoute: typeof HooksApiUsageSettleRoute
@@ -1816,6 +1841,7 @@ export interface RootRouteChildren {
   HooksRunSchedulesRoute: typeof HooksRunSchedulesRoute
   HooksSupportRemediationDrainRoute: typeof HooksSupportRemediationDrainRoute
   HooksTokenAlertsRoute: typeof HooksTokenAlertsRoute
+  HooksVercelRoute: typeof HooksVercelRoute
   HooksWarmHealthRoute: typeof HooksWarmHealthRoute
   JoinTokenRoute: typeof JoinTokenRoute
   SecurityIntakeRoute: typeof SecurityIntakeRoute
@@ -2232,6 +2258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HooksWarmHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hooks/vercel': {
+      id: '/hooks/vercel'
+      path: '/hooks/vercel'
+      fullPath: '/hooks/vercel'
+      preLoaderRoute: typeof HooksVercelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hooks/token-alerts': {
       id: '/hooks/token-alerts'
       path: '/hooks/token-alerts'
@@ -2405,6 +2438,13 @@ declare module '@tanstack/react-router' {
       path: '/fleet/edge'
       fullPath: '/fleet/edge'
       preLoaderRoute: typeof FleetEdgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fleet/deployments': {
+      id: '/fleet/deployments'
+      path: '/fleet/deployments'
+      fullPath: '/fleet/deployments'
+      preLoaderRoute: typeof FleetDeploymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/crm/tickets': {
@@ -3012,6 +3052,7 @@ const rootRouteChildren: RootRouteChildren = {
   CrmDealsRoute: CrmDealsRoute,
   CrmFitRoute: CrmFitRoute,
   CrmTicketsRoute: CrmTicketsRoute,
+  FleetDeploymentsRoute: FleetDeploymentsRoute,
   FleetEdgeRoute: FleetEdgeRoute,
   HooksAirtableSyncRoute: HooksAirtableSyncRoute,
   HooksApiUsageSettleRoute: HooksApiUsageSettleRoute,
@@ -3035,6 +3076,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksRunSchedulesRoute: HooksRunSchedulesRoute,
   HooksSupportRemediationDrainRoute: HooksSupportRemediationDrainRoute,
   HooksTokenAlertsRoute: HooksTokenAlertsRoute,
+  HooksVercelRoute: HooksVercelRoute,
   HooksWarmHealthRoute: HooksWarmHealthRoute,
   JoinTokenRoute: JoinTokenRoute,
   SecurityIntakeRoute: SecurityIntakeRoute,

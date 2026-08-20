@@ -252,7 +252,11 @@ export const listFleetDeployments = createServerFn({ method: "GET" })
     const { data } = await admin
       .from("clone_deployments")
       .select(
-        "clone_id, provider_slug, status, status_detail, domain, provider_origin, last_deployed_at, updated_at, clones(id, name, slug)",
+        // `last_build_*` is the second dimension the fleet page renders: a row
+        // can be `live` with a failed build, which means serving the previous
+        // artefact. Omitting these columns makes that case indistinguishable
+        // from a healthy one on the only screen that could show it.
+        "clone_id, provider_slug, status, status_detail, domain, provider_origin, last_deployed_at, last_build_state, last_build_error, last_build_at, updated_at, clones(id, name, slug)",
       )
       .order("updated_at", { ascending: false });
     return {
@@ -275,6 +279,113 @@ export const listFleetDeployments = createServerFn({ method: "GET" })
  * the dormant posture is only honest if there is a way OUT of it that does not
  * require touching every clone by hand.
  */
+/**
+ * Give every clone that has no deployment row one.
+ *
+ * `reconcilePendingDeployments` only wakes rows that already exist at
+ * `pending_platform`. A clone provisioned before this feature has NO row at all,
+ * and every decision in the system reads an absent row as "nobody asked" — which
+ * is correct, and which means "all clones are staged on Vercel" would have
+ * silently meant "all clones created after today".
+ *
+ * Three rules make this safe to run against a live fleet:
+ *
+ *   - It only INSERTS. A clone that already has a row — declined, detached,
+ *     failed, live — is left exactly as it is. Enrolment is not a reset, and an
+ *     operator's `not_requested` is a decision this must not overturn.
+ *   - It reserves the subdomain first, through the same allocator provisioning
+ *     uses, so an enrolled clone gets a name that respects `reserved_slugs` and
+ *     cannot collide with one already taken.
+ *   - `dryRun` is the default. A fleet-wide write that creates a Vercel project
+ *     per clone is not something to discover the shape of by running it.
+ */
+export const enrolFleetInDeployments = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requireAdmin])
+  .inputValidator((d: { dryRun?: boolean; cloneIds?: string[] } | undefined) =>
+    z
+      .object({
+        dryRun: z.boolean().default(true),
+        cloneIds: z.array(z.string().uuid()).optional(),
+      })
+      .parse(d ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const config = await loadConfig();
+    const slug = asHostingSlug(config?.hosting_provider_slug);
+    const ready = providerConfigured(slug);
+
+    // Clones with no deployment row. Read both sides rather than using a `not.in`
+    // filter: PostgREST renders that as a URL-encoded list, and a fleet of a few
+    // hundred ids makes a request long enough to be rejected by the gateway —
+    // which comes back as an empty result, i.e. "nothing to enrol".
+    const [{ data: clones }, { data: existing }] = await Promise.all([
+      admin.from("clones").select("id, name, slug, subdomain").order("name"),
+      admin.from("clone_deployments").select("clone_id"),
+    ]);
+    const enrolled = new Set((existing ?? []).map((r: { clone_id: string }) => r.clone_id));
+    let candidates = (clones ?? []).filter((c: { id: string }) => !enrolled.has(c.id));
+    if (data.cloneIds?.length) {
+      const wanted = new Set(data.cloneIds);
+      candidates = candidates.filter((c: { id: string }) => wanted.has(c.id));
+    }
+
+    if (data.dryRun) {
+      return {
+        ok: true as const,
+        dryRun: true as const,
+        providerSlug: slug,
+        providerConfigured: ready,
+        wouldEnrol: candidates.length,
+        clones: candidates.map((c: { id: string; name: string; slug: string }) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+        })),
+      };
+    }
+
+    const { reserveCloneSubdomain } = await import("@/server/hosting/subdomainAllocation.server");
+    const status: DeploymentStatus = ready ? "pending" : "pending_platform";
+    let created = 0;
+    let named = 0;
+    const failures: Array<{ cloneId: string; error: string }> = [];
+
+    for (const clone of candidates as Array<{
+      id: string;
+      slug: string;
+      subdomain: string | null;
+    }>) {
+      // Name first: the deployment attaches whatever name is on the clone when
+      // it reaches `attaching_domain`, so enrolling without one produces a clone
+      // that goes live on `*.vercel.app` and never gets its own address.
+      if (!clone.subdomain) {
+        const reservation = await reserveCloneSubdomain({ cloneId: clone.id, slug: clone.slug });
+        if (reservation.ok) named++;
+      }
+      const { error } = await admin.from("clone_deployments").insert({
+        clone_id: clone.id,
+        provider_slug: slug,
+        status,
+        status_detail: ready
+          ? "Enrolled by fleet backfill."
+          : "No hosting provider token configured.",
+        requested_by: context.userId,
+      });
+      if (error) failures.push({ cloneId: clone.id, error: error.message });
+      else created++;
+    }
+
+    return {
+      ok: true as const,
+      dryRun: false as const,
+      providerSlug: slug,
+      providerConfigured: ready,
+      created,
+      subdomainsReserved: named,
+      failures,
+    };
+  });
+
 export const reconcilePendingDeployments = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireAdmin])
   .handler(async () => {

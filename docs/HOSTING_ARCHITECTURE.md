@@ -3,6 +3,13 @@
 _Vercel owns the application. Cloudflare owns the name. They meet at exactly
 one value._
 
+**The fleet decision, and what it changed.** Every clone is staged on Vercel and
+served at `<subdomain>.aurixasystems.com.au`, with DNS in Cloudflare. That is now
+the platform default rather than an option: `hosting_provider_slug` defaults to
+`vercel`, `auto_deploy` to `true`, and the fleet DNS default moved off Lovable's
+A record. The five gaps that decision exposed — and what closes each — are in
+[Automation, end to end](#automation-end-to-end) below.
+
 ---
 
 ## What this replaces
@@ -16,13 +23,13 @@ repository before this change.
 That absence is not visible as a missing feature — it is visible as five
 things that look like unrelated defects:
 
-| Symptom | Cause |
-| --- | --- |
-| Clone health shows no uptime for any clone | `clone-health.server.ts` pings `clone.deploy_url`; it is always null |
-| Security partners are assigned assessments with no target | `target_urls: clone.deploy_url ? [clone.deploy_url] : []` → always `[]` |
-| The billing handoff return-URL host pin never engages | It pins to `deploy_url` when present, and accepts any https URL otherwise |
-| A new clone's Supabase auth allow-list contains one guessed host | `siteUrl: deploy_url ?? lovable_project_url` — **both** columns are written by nothing |
-| The subdomain resolves to a host that has never heard of this clone | `platform_hosting_config.target_value` is ONE A record for the whole fleet |
+| Symptom                                                             | Cause                                                                                  |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Clone health shows no uptime for any clone                          | `clone-health.server.ts` pings `clone.deploy_url`; it is always null                   |
+| Security partners are assigned assessments with no target           | `target_urls: clone.deploy_url ? [clone.deploy_url] : []` → always `[]`                |
+| The billing handoff return-URL host pin never engages               | It pins to `deploy_url` when present, and accepts any https URL otherwise              |
+| A new clone's Supabase auth allow-list contains one guessed host    | `siteUrl: deploy_url ?? lovable_project_url` — **both** columns are written by nothing |
+| The subdomain resolves to a host that has never heard of this clone | `platform_hosting_config.target_value` is ONE A record for the whole fleet             |
 
 **`clones.deploy_url` is read in twenty places and written in none.** Neither is
 `lovable_project_url`. Everything downstream of "where does this clone live"
@@ -37,8 +44,8 @@ project per clone, named from the clone slug, created once and reused forever.
 
 **Cloudflare owns the name.** DNS in the Aurixa zone, plus the edge posture
 (security level, bot-fight, WAF preset) it already owns through
-`clone_edge_config`. Nothing about Cloudflare changes except *what the record
-points at*.
+`clone_edge_config`. Nothing about Cloudflare changes except _what the record
+points at_.
 
 **They meet at one value: the CNAME target Vercel issues for the custom
 domain** — plus, when Vercel demands it, one TXT record proving we own the
@@ -86,7 +93,7 @@ shipped and **nothing has ever read it**. It is now the value that decides.
 
 `platform_hosting_config.target_value` is a single A record documented as
 Lovable's `185.158.133.1`. That is correct for a platform where one origin
-serves every clone by `Host` header. It is *wrong* the moment each clone is its
+serves every clone by `Host` header. It is _wrong_ the moment each clone is its
 own Vercel project: Vercel routes by the domains registered on a project, so a
 fleet-wide CNAME means every clone resolves to a Vercel edge that has never
 heard of it and answers `DEPLOYMENT_NOT_FOUND`.
@@ -147,7 +154,7 @@ Every row bills someone. Mission Control creating a Vercel project is Aurixa's
 platform overhead, not the tenant's vendor spend, and the prime repo's rule
 holds in reverse: guessing which credential a call spent bills the wrong
 tenant, so a call that belongs to no tenant is metered to none. Per-clone
-hosting *cost* is a real billing question and is deliberately left for a
+hosting _cost_ is a real billing question and is deliberately left for a
 separate change rather than invented here.
 
 ### R8 — The worker respects both APIs' limits
@@ -159,14 +166,125 @@ domain attachment are heavy and rate-limited per team.
 
 ---
 
+## Automation, end to end
+
+The first pass built the pipeline. Committing the whole fleet to it exposed five
+places that still needed a person, and each one failed quietly rather than
+loudly.
+
+### A1 — The defaults described the previous world
+
+`hosting_provider_slug` shipped as `manual`, `auto_deploy` as `false`, and the
+fleet DNS target as Lovable's A record `185.158.133.1` with `proxied = true`. A
+clone provisioned on those defaults records `manual`, is never built, and points
+its subdomain at an origin that has never heard of it.
+
+`proxied` is the one that costs the most to diagnose. An orange-cloud record
+terminates TLS at Cloudflare and hides the origin, so Vercel's certificate
+challenge never arrives — the domain attaches, DNS resolves, the site even loads
+through Cloudflare's edge, and the certificate never issues. Both dashboards show
+the domain as correctly configured. `resolveDnsTarget` already forced DNS-only
+for deployment targets; the stored default now agrees with it so the two cannot
+drift.
+
+**On a provider-managed fleet the fleet default is withdrawn entirely.** Vercel
+routes by the domains registered on a project, so `cname.vercel-dns.com` for a
+domain no project has claimed answers `DEPLOYMENT_NOT_FOUND` — a page that reads
+as a broken build and sends whoever debugs it to the build logs instead of to the
+domain. `resolveDnsTarget` returns null instead, and NXDOMAIN is the better
+failure: unambiguous, correct, and costless to fix when the deployment reports
+its target.
+
+### A2 — The subdomain was never reserved
+
+`provisionClone` never wrote `clones.subdomain`; the drain fell back to
+`clone.slug`. That works until it doesn't, in three silent ways: `reserved_slugs`
+is bypassed (a clone slugged `admin` takes `admin.aurixasystems.com.au`),
+collisions reach `clones_subdomain_uidx` as a constraint violation whose error
+every caller on this path discards, and a slug that is legal for a GitHub repo
+(`My_Clone.v2`) is not legal for a hostname.
+
+`subdomainAllocation.pure.ts` decides once, before anything is written: normalise
+to an RFC 1123 label, refuse reserved names, suffix past collisions, and truncate
+the **base** rather than the suffix — shortening the disambiguator re-collides,
+which is the one thing the suffix exists to prevent. The server helper retries
+exactly once on 23505, because a second collision against a re-read set is not a
+race.
+
+The drain now requires the reserved name and never falls back to the slug. A
+clone with no name is live on the provider origin, which is a complete outcome
+rather than a failure.
+
+### A3 — A cascade did not rebuild anything
+
+Vercel rebuilds on push only where **its** GitHub App is installed on the
+repository. Mission Control forks clones through its own App and never installs
+Vercel's, so a cascade merges code into forty repositories and forty live sites
+go on serving the previous build, indefinitely.
+
+`decideRedeploy` is the rule, and most of it is about when _not_ to: a cascade
+must never enrol a clone that has no deployment row, never resurrect a `detached`
+one, and never overturn an operator's `not_requested`. It fires on `succeeded`
+only — a `pr_opened` result is a proposal, and the branch the deployment builds
+from does not have the change on it yet.
+
+### A4 — After `live`, a broken build was invisible
+
+The drain polls a build only while the row is in `deploying` and stops at `live`.
+Correct — polling every live clone forever burns the team rate limit on nothing —
+but it leaves every subsequent build unobserved. The build fails, Vercel keeps the
+previous production deployment serving, and the row goes on saying `live`. Which
+is true, and useless: the clone is up, and it is not running what was pushed.
+
+Those are two facts and one column cannot carry both, so build health is its own
+set of columns and `status` stays the lifecycle. `/hooks/vercel` is the fast path
+(HMAC-SHA1, production target only — a failing preview is a pull request that
+will not merge). `sweepLiveBuilds` inside the already-scheduled drain is the
+honest one: a webhook that was never delivered leaves no trace on either side,
+which is the same reason `cron_delivery_health` exists.
+
+### A5 — Deleting a clone left it serving
+
+The Vercel project kept building, the domain stayed attached, and the CNAME kept
+resolving. Worse than an orphaned resource: a running application on our domain,
+for a customer who has been offboarded.
+
+The obstacle is that everything needed to clean up is destroyed by the same
+delete — `clone_deployments`, `edge_provisioning_jobs` and `edge_dns_records` all
+cascade. Enqueuing a normal job does not help, because that job cascades too. So
+`hosting_teardowns` holds everything **by value**, has no foreign key to `clones`
+at all, and is filled by a `BEFORE DELETE` trigger rather than by a server
+function — `bulkDeleteClones` is one delete path, an admin with SQL access is
+another, and a trigger covers the ones nobody has written yet.
+
+Teardown order is the reverse of provisioning: DNS first, then the project.
+Removing the project while the CNAME still points at it leaves our own domain
+serving `DEPLOYMENT_NOT_FOUND`. Only `managed` records are removed — deleting
+somebody else's DNS record because a clone was deleted is collateral damage, not
+cleanup.
+
+### A6 — "All clones" excluded the ones that already existed
+
+`reconcilePendingDeployments` only wakes rows that already sit at
+`pending_platform`. A clone provisioned before this feature has no row at all, and
+every decision in the system reads an absent row as "nobody asked".
+`enrolFleetInDeployments` gives each one a row and a reserved name. It only
+INSERTs, so a declined or detached deployment is never overturned, and `dryRun`
+is the default because a fleet-wide write that creates a Vercel project per clone
+is not something to learn the shape of by running it.
+
+---
+
 ## Data model
 
-| Table | Purpose |
-| --- | --- |
-| `clone_deployments` | One row per clone. The state machine, the provider refs, the domain, the CNAME target Vercel issued, and the worker's claim/attempt fields. `clone_id` is the PK — R3. |
-| `deployment_events` | Append-only audit of every transition and every provider call, mirroring `edge_audit`. |
-| `hosting_providers` | Registry row per provider so the UI can list them, mirroring `edge_providers`. |
-| `platform_hosting_config` (extended) | `hosting_provider_slug`, `vercel_team_id`, `vercel_project_prefix`, `auto_deploy`. |
+| Table                                | Purpose                                                                                                                                                                |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clone_deployments`                  | One row per clone. The state machine, the provider refs, the domain, the CNAME target Vercel issued, and the worker's claim/attempt fields. `clone_id` is the PK — R3. |
+| `deployment_events`                  | Append-only audit of every transition and every provider call, mirroring `edge_audit`.                                                                                 |
+| `hosting_providers`                  | Registry row per provider so the UI can list them, mirroring `edge_providers`.                                                                                         |
+| `platform_hosting_config` (extended) | `hosting_provider_slug`, `vercel_team_id`, `vercel_project_prefix`, `auto_deploy`.                                                                                     |
+| `hosting_teardowns`                  | Work that must outlive the clone it belongs to. No FK to `clones` on purpose — see A5.                                                                                 |
+| `clone_deployments.last_build_*`     | Health of the most recent production build, separate from `status`. `live` + `error` means serving the previous artefact.                                              |
 
 `edge_provisioning_jobs` gains one action, `verify_domain_txt`. No schema change
 — `action` is TEXT — but the worker and the doc both name it.
@@ -218,11 +336,12 @@ loudly on correct code while passing on the drift it exists to catch.
 
 ## Credentials
 
-| Secret | Scope needed |
-| --- | --- |
-| `VERCEL_API_TOKEN` | Projects: read/write, Deployments: read/write, Domains: read/write on the team |
-| `VERCEL_TEAM_ID` | Optional; omit for a personal account |
-| `CLOUDFLARE_API_TOKEN` | Unchanged: `Zone:Read` + `DNS:Edit` |
+| Secret                  | Scope needed                                                                                                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VERCEL_API_TOKEN`      | Projects: read/write, Deployments: read/write, Domains: read/write on the team                                                                                                                                                      |
+| `VERCEL_TEAM_ID`        | Optional; omit for a personal account                                                                                                                                                                                               |
+| `VERCEL_WEBHOOK_SECRET` | The signing secret of a Vercel webhook pointed at `/hooks/vercel`. Absent, the receiver answers 503 rather than accepting unsigned writes to the fleet's hosting state; the reconciliation sweep still covers the gap, more slowly. |
+| `CLOUDFLARE_API_TOKEN`  | Unchanged: `Zone:Read` + `DNS:Edit`                                                                                                                                                                                                 |
 
 Absent `VERCEL_API_TOKEN` the whole path is **dormant, not broken** — the same
 posture the subdomain feature already takes. Enqueue still succeeds and the row

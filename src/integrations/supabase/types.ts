@@ -1613,6 +1613,11 @@ export type Database = {
           env_synced_at: string | null
           error_message: string | null
           last_deployed_at: string | null
+          build_checked_at: string | null
+          last_build_at: string | null
+          last_build_deployment_id: string | null
+          last_build_error: string | null
+          last_build_state: string | null
           latest_deployment_id: string | null
           max_attempts: number
           next_attempt_at: string
@@ -1641,6 +1646,11 @@ export type Database = {
           env_synced_at?: string | null
           error_message?: string | null
           last_deployed_at?: string | null
+          build_checked_at?: string | null
+          last_build_at?: string | null
+          last_build_deployment_id?: string | null
+          last_build_error?: string | null
+          last_build_state?: string | null
           latest_deployment_id?: string | null
           max_attempts?: number
           next_attempt_at?: string
@@ -1669,6 +1679,11 @@ export type Database = {
           env_synced_at?: string | null
           error_message?: string | null
           last_deployed_at?: string | null
+          build_checked_at?: string | null
+          last_build_at?: string | null
+          last_build_deployment_id?: string | null
+          last_build_error?: string | null
+          last_build_state?: string | null
           latest_deployment_id?: string | null
           max_attempts?: number
           next_attempt_at?: string
@@ -5849,6 +5864,86 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      hosting_teardowns: {
+        Row: {
+          attempts: number
+          clone_id: string | null
+          clone_name: string | null
+          clone_slug: string | null
+          completed_at: string | null
+          created_at: string
+          dns_record_ids: string[]
+          domain: string | null
+          error_message: string | null
+          id: string
+          max_attempts: number
+          next_attempt_at: string
+          project_id: string | null
+          project_name: string | null
+          provider_slug: string
+          requested_by: string | null
+          result: Json
+          status: string
+          team_id: string | null
+          worker_started_at: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          clone_id?: string | null
+          clone_name?: string | null
+          clone_slug?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dns_record_ids?: string[]
+          domain?: string | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number
+          next_attempt_at?: string
+          project_id?: string | null
+          project_name?: string | null
+          provider_slug?: string
+          requested_by?: string | null
+          result?: Json
+          status?: string
+          team_id?: string | null
+          worker_started_at?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          clone_id?: string | null
+          clone_name?: string | null
+          clone_slug?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dns_record_ids?: string[]
+          domain?: string | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number
+          next_attempt_at?: string
+          project_id?: string | null
+          project_name?: string | null
+          provider_slug?: string
+          requested_by?: string | null
+          result?: Json
+          status?: string
+          team_id?: string | null
+          worker_started_at?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hosting_teardowns_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
@@ -10131,6 +10226,7 @@ export type Database = {
       module_status: "proposed" | "approved" | "archived" | "rejected"
       notification_kind:
         | "cascade_completed"
+        | "deployment_build_failed"
         | "cascade_failed"
         | "cascade_partial"
         | "cascade_started"
@@ -10561,6 +10657,7 @@ export const Constants = {
       module_status: ["proposed", "approved", "archived", "rejected"],
       notification_kind: [
         "cascade_completed",
+        "deployment_build_failed",
         "cascade_failed",
         "cascade_partial",
         "cascade_started",
