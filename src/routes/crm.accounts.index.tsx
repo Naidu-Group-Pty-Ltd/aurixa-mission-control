@@ -1,4 +1,3 @@
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // CRM account list — the book of business.
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -188,7 +187,7 @@ function AccountsPage() {
 
       {rows.length === 0 && !q.isLoading ? (
         <EmptyState
-          icon={Users}
+          icon={<Users className="h-6 w-6" />}
           title="No accounts yet"
           description="Convert a waitlist lead or create an account manually to start tracking a client."
         />

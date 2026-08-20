@@ -1,4 +1,3 @@
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Support Ops — the ticket queue the Support Portal feeds, and the human
 // half of the self-healing pipeline: the validation queue where parked
 // remediation runs (P0/P1, destructive SQL, unverified or oversized
@@ -502,7 +501,8 @@ function TicketDetailSheet({
               <section>
                 <h3 className="mb-1 font-medium">Classification</h3>
                 <ul className="list-inside list-disc text-xs text-muted-foreground">
-                  {(ticket.classification?.reasons ?? []).map((r: string, i: number) => (
+                  {(((ticket.classification as { reasons?: string[] } | null)?.reasons ?? []) as string[]).map(
+                    (r: string, i: number) => (
                     <li key={i}>{r}</li>
                   ))}
                 </ul>
