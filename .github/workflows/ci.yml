@@ -54,6 +54,11 @@ jobs:
       - name: RLS policy coverage
         run: npm run check:rls
 
+      # A worker nobody schedules produces no error anywhere — the queue simply
+      # never drains. Six were in that state, each documenting its own cadence.
+      - name: Cron coverage
+        run: npm run check:cron
+
       - name: Typecheck
         run: npm run typecheck
 
