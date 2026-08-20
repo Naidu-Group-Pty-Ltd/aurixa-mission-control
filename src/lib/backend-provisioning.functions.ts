@@ -27,6 +27,8 @@ async function runBackendProvisioning(
     adminEmail: string;
     adminPassword: string;
     moduleIds?: string[];
+    /** Force the legacy migration replay instead of catalog introspection. */
+    schemaStrategy?: "introspection" | "migration-replay";
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const updateStatus = async (status: string, detail: string) => {
@@ -127,6 +129,7 @@ async function runBackendProvisioning(
         existingProjectRef: existingRow?.supabase_project_ref ?? null,
         inheritedSecrets,
         cloneOrigins,
+        schemaStrategy: input.schemaStrategy ?? "introspection",
       },
       updateStatus,
     );
@@ -217,7 +220,17 @@ async function runBackendProvisioning(
         source_repo: snapshot.sourceRepo,
         source_ref: snapshot.sourceRef,
         source_sha: snapshot.sourceSha,
-        migrations_applied: result.migrationsApplied,
+        migrations_applied: result.introspection
+          ? [
+              {
+                strategy: "introspection",
+                ok: result.introspection.ok,
+                rowsOnClone: result.introspection.rowsOnClone,
+                stages: result.introspection.stages,
+              },
+            ]
+          : result.migrationsApplied,
+
         edge_functions: result.edgeFunctions,
         secret_shells: result.secretShells,
         error_message: null,

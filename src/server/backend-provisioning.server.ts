@@ -11,6 +11,7 @@ import crypto from "node:crypto";
 
 import { classifySecret } from "./prime-backend.server";
 import type { PrimeBackendSnapshot } from "./prime-backend.server";
+import type { StageName, StageResult } from "./schema-introspection.server";
 
 const MGMT_API = "https://api.supabase.com/v1";
 
@@ -1333,7 +1334,7 @@ create table if not exists aurixa.schema_migrations (
 );
 `.trim();
 
-function sqlLiteral(value: string): string {
+export function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
@@ -2260,6 +2261,21 @@ export type ProvisionBackendInput = {
    * sign-ins from the clone's own hosts, not the prime's (G8).
    */
   cloneOrigins?: CloneOrigins;
+  /**
+   * How the clone's schema gets built. Default `introspection` reads the
+   * prime's live catalog; `migration-replay` forces the legacy path.
+   */
+  schemaStrategy?: SchemaStrategy;
+};
+
+export type SchemaStrategy = "introspection" | "migration-replay";
+
+export type IntrospectionSummary = {
+  ok: boolean;
+  stages: StageResult[];
+  shortStages: StageName[];
+  rowsOnClone: number | null;
+  nonEmptyTables: string[];
 };
 
 export type ProvisionBackendResult = {
@@ -2272,6 +2288,8 @@ export type ProvisionBackendResult = {
   adminUserId: string | null;
   migrationsApplied: PrimeMigrationResult[];
   latestMigration: string | null;
+  /** Present when the schema was built by catalog introspection. */
+  introspection?: IntrospectionSummary | null;
   edgeFunctions: EdgeFunctionDeployResult[];
   secretShells: SecretShellResult[];
   storageBuckets: BucketReplicationResult[];
@@ -2336,22 +2354,72 @@ export async function provisionCloneBackend(
 
   const projectUrl = getProjectUrl(projectRef);
 
-  // Step 4: Replay the prime repo's migrations (schema, tables, RLS, functions)
-  await onStatusUpdate?.(
-    "migrating",
-    `Replicating ${snapshot.migrations.length} migration(s) from ${snapshot.sourceRepo}@${snapshot.sourceSha.slice(0, 7)}...`,
-  );
-  const { results: migrationsApplied, latestApplied } = await applyPrimeMigrations(
-    projectRef,
-    snapshot.migrations,
-    onStatusUpdate,
-  );
-  const migrationFailure = migrationsApplied.find((r) => !r.success);
-  if (migrationFailure) {
-    throw new Error(
-      `Migration ${migrationFailure.name} failed: ${migrationFailure.error ?? "unknown"} ` +
-        `(project ${projectRef} kept — retry resumes from the failed migration)`,
+  // Step 4: Build the clone's schema.
+  //
+  // Default path is catalog introspection: read the prime's live pg_catalog
+  // and generate DDL. A replay of the repo's migration history is NOT a clone
+  // of the database — for our prime the history assumes base tables no
+  // migration creates, so it dies on migration #1. `applyPrimeMigrations` is
+  // kept (it is still right for incremental + module migrations) and can be
+  // forced with `schemaStrategy: "migration-replay"`.
+  const strategy = input.schemaStrategy ?? "introspection";
+  let migrationsApplied: PrimeMigrationResult[] = [];
+  let latestApplied: string | null = null;
+  let introspection: IntrospectionSummary | null = null;
+
+  if (strategy === "introspection") {
+    await onStatusUpdate?.("migrating", "Introspecting the prime's live catalog...");
+    const { replicateSchemaByIntrospection, stampMigrationLedgerFromPrime, verifyCloneIsEmpty } =
+      await import("./schema-introspection.server");
+    const primeRef = getPrimeProjectRef();
+    const result = await replicateSchemaByIntrospection(projectRef, {
+      primeRef,
+      onStatusUpdate,
+    });
+    const emptiness = await verifyCloneIsEmpty(projectRef, { allowRows: 0 }).catch(() => null);
+    introspection = {
+      ok: result.ok,
+      stages: result.stages,
+      shortStages: result.shortStages,
+      rowsOnClone: emptiness?.totalRows ?? null,
+      nonEmptyTables: emptiness?.nonEmpty.map((t) => t.table).slice(0, 20) ?? [],
+    };
+    if (!result.ok) {
+      const short = result.stages
+        .filter((s) => !s.reconciled)
+        .map((s) => `${s.stage} ${s.cloneCount}/${s.primeCount}`)
+        .join(", ");
+      throw new Error(
+        `Schema introspection did not reconcile against the prime: ${short} ` +
+          `(project ${projectRef} kept — a retry resumes idempotently)`,
+      );
+    }
+    // Stamp the prime's applied migration IDs so future INCREMENTAL migrations
+    // still apply cleanly instead of replaying history the clone already has.
+    const stamp = await stampMigrationLedgerFromPrime(projectRef, primeRef).catch(() => ({
+      stamped: 0,
+    }));
+    latestApplied =
+      [...snapshot.migrations].sort((a, b) => a.name.localeCompare(b.name)).at(-1)?.id ?? null;
+    await onStatusUpdate?.(
+      "migrating",
+      `Catalog introspection reconciled; stamped ${stamp.stamped} migration ID(s)`,
     );
+  } else {
+    await onStatusUpdate?.(
+      "migrating",
+      `Replaying ${snapshot.migrations.length} migration(s) from ${snapshot.sourceRepo}@${snapshot.sourceSha.slice(0, 7)}...`,
+    );
+    const replay = await applyPrimeMigrations(projectRef, snapshot.migrations, onStatusUpdate);
+    migrationsApplied = replay.results;
+    latestApplied = replay.latestApplied;
+    const migrationFailure = migrationsApplied.find((r) => !r.success);
+    if (migrationFailure) {
+      throw new Error(
+        `Migration ${migrationFailure.name} failed: ${migrationFailure.error ?? "unknown"} ` +
+          `(project ${projectRef} kept — retry resumes from the failed migration)`,
+      );
+    }
   }
 
   // Step 4b (G4): guarantee required extensions are enabled before anything
@@ -2557,6 +2625,8 @@ export async function provisionCloneBackend(
     adminUserId,
     migrationsApplied,
     latestMigration: latestApplied,
+    introspection,
+
     edgeFunctions,
     secretShells,
     storageBuckets,
