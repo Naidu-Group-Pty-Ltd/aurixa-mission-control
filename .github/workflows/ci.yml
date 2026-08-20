@@ -29,6 +29,12 @@ jobs:
         # dependency installation before project code is exercised.
         run: npm install
 
+      # Runs before the typecheck it protects: a table missing from the
+      # generated types makes every query against it resolve to `never`, so the
+      # typecheck goes green precisely because nothing is being checked.
+      - name: Supabase types match migrations
+        run: npm run check:supabase-types
+
       - name: Typecheck
         run: npm run typecheck
 

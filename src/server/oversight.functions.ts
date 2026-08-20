@@ -1,4 +1,3 @@
-// @ts-nocheck
 // High King oversight — the sovereign view over every tier.
 //
 // The High King seat (level 1000) has full visibility of all actions taken by
