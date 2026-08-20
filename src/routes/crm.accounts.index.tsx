@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // CRM account list — the book of business.
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";

@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Piggybacked API-key usage: what the fleet spends on the prime's vendor keys,
 // who is spending it, and what has been billed back.

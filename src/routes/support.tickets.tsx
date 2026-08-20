@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Support Ops — the ticket queue the Support Portal feeds, and the human
 // half of the self-healing pipeline: the validation queue where parked
