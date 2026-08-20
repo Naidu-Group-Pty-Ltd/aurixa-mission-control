@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 14 unresolved type errors (argument types ×5, spread of a non-object ×4, duplicate type identity ×3).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // E1 — Handoff state machine + event log.
 // E2, E4, E5, E7, E8 record scaffolding lives here as thin CRUD; the actual
 // compute (parity diff, snapshot capture, secret rotation execution, cost
@@ -53,7 +54,11 @@ export const getHandoff = createServerFn({ method: "POST" })
       await Promise.all([
         context.supabase
           .from("clone_handoffs")
-          .select("*, clones(id, name, slug), client_supabase_accounts(id, owner_email, org_slug)")
+          // github_owner/github_repo are read by the handoff detail page's GitHub App
+          // card; without them here it rendered "the clone/repo" every time.
+          .select(
+            "*, clones(id, name, slug, github_owner, github_repo), client_supabase_accounts(id, owner_email, org_slug)",
+          )
           .eq("id", data.id)
           .maybeSingle(),
         context.supabase

@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 2 unresolved type errors (assignability ×2).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G19 — Handoff parity refresh worker.
 //
 // Cron-invoked endpoint that keeps `handoff_parity_reports` fresh for every

@@ -19,7 +19,7 @@ import { ensureTenant, jsonResponse, resolveCloneApiKey } from "@/server/clone-a
 import { checkRateLimit } from "@/server/token-rate-limit.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 type PlanChangeRow = {
   id: string;

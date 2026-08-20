@@ -69,7 +69,7 @@ export const Route = createFileRoute("/api/public/billing/invoices")({
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const adminAny = supabaseAdmin as any;
+        const adminAny = supabaseAdmin;
         let q = adminAny
           .from("invoices")
           .select(

@@ -17,7 +17,7 @@ import { loadValidHandoff } from "@/server/purchases.server";
 import { tenantIdForBillingUserId } from "@/server/current-plan.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /**
  * The workspace behind a storefront credential.

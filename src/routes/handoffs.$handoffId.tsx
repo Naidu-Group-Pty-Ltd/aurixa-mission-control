@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1438,6 +1437,11 @@ function BillingSplitCard({ handoffId }: { handoffId: string }) {
 // HMAC seeded here. Operators can toggle, rotate the secret, copy the
 // installer SQL for the client to run, and inspect what has been shipped.
 function AuditShipperCard({ handoffId }: { handoffId: string }) {
+  // Without this, the `confirm({ title, description, … })` below resolved to
+  // the DOM's own `confirm(message: string)` — which renders the options object
+  // as "[object Object]" and still returns a boolean, so the rotation went
+  // ahead behind a meaningless prompt.
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["handoff", handoffId, "audit-shipper"],

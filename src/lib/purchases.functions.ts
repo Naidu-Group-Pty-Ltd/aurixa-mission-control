@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Operator queries over the purchases attribution ledger
 // (user-attributed pricing workflow, Phase 4; see
 // docs/user-tracking-pricing-workflow-plan.md).
@@ -13,7 +12,7 @@ import { reconcilePurchasesFromStripe } from "@/server/purchase-backfill.server"
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aggregatePurchases } from "@/lib/purchase-rollups";
 
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 // Stripe purchase modes + the discretionary admin_* actions recorded by
 // recordAdminAction — both filterable in the purchases explorer.

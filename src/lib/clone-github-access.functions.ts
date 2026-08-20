@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 3 unresolved type errors (assignability ×3).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 /**
  * G9 — GitHub App access verification for clone repositories.
  *

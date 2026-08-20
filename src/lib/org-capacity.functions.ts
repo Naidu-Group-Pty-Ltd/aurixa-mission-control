@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 1 unresolved type error (assignability ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G10 — Org capacity preflight surface.
 // Exposes the `checkOrgCapacity` helper as an admin-only server function so
 // operators can inspect Supabase org headroom before starting provisioning

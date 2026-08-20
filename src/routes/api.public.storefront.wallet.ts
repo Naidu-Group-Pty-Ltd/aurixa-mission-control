@@ -5,7 +5,7 @@ import { loadHandoffById } from "@/server/billing-handoffs.server";
 import { storefrontJson, storefrontPreflight } from "@/server/storefront-cors.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /**
  * GET /api/public/storefront/wallet?session_id=cs_…&(h=…|uid=…)

@@ -43,7 +43,7 @@ export const Route = createFileRoute("/api/public/billing/invoice-pdf")({
         if (!stripeInvoiceId) return jsonResponse({ ok: false, error: "missing_invoice" }, 400);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const adminAny = supabaseAdmin as any;
+        const adminAny = supabaseAdmin;
         let q = adminAny
           .from("invoices")
           .select("stripe_invoice_id, number, clone_id")

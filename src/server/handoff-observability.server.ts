@@ -22,7 +22,7 @@ export async function pollClientBackendHealth(handoffId: string): Promise<{
   detail?: string;
 }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
 
   const { data: cfg } = await admin
     .from("handoff_observability_configs")
@@ -149,7 +149,7 @@ export async function drainDueObservabilityPolls(limit = 20): Promise<{
   results: Array<{ handoff_id: string; ok: boolean; error?: string; status?: string }>;
 }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
 
   const { data: due } = await admin
     .from("handoff_observability_configs")

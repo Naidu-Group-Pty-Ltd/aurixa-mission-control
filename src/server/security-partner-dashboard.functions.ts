@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 1 unresolved type error (argument types ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin, requireOperator } from "@/integrations/supabase/role-middleware";

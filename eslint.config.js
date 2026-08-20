@@ -36,6 +36,20 @@ export default tseslint.config(
       // legacy `any` is being reduced incrementally (Phase 3 regenerates the DB
       // types), and surfacing unused vars/expressions flags dead code without
       // turning the lint gate red on day one.
+      // `@ts-nocheck` is allowed only when it says why. A bare directive hides
+      // every unrelated error in the file as well as the ones it was added for,
+      // which is how 164 files came to be suppressing 1,038 errors — including
+      // eight that were fatal at runtime. The set of files permitted to carry
+      // one at all is frozen in scripts/ts-nocheck-budget.txt and only shrinks.
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        {
+          "ts-nocheck": "allow-with-description",
+          "ts-ignore": true,
+          "ts-expect-error": "allow-with-description",
+          minimumDescriptionLength: 20,
+        },
+      ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",

@@ -33,7 +33,7 @@ export const Route = createFileRoute("/hooks/entitlement-drain")({
         try {
           const res = await drainPlanChangeReconciliations({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            supabase: supabaseAdmin as any,
+            supabase: supabaseAdmin,
             limit: MAX_EVENTS_PER_RUN,
           });
 

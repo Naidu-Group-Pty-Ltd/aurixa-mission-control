@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Operator purchases explorer (user-attributed pricing workflow, Phase 4):
 // every checkout across the fleet with who initiated it, from where.
 import { useMemo, useState } from "react";

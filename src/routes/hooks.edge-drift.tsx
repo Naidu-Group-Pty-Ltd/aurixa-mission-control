@@ -7,7 +7,7 @@ import crypto from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 export const Route = createFileRoute("/hooks/edge-drift")({
   server: {

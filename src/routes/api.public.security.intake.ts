@@ -93,7 +93,7 @@ export const Route = createFileRoute("/api/public/security/intake")({
           return json({ error: "invalid payload", detail: (err as Error).message }, 400);
         }
 
-        const admin = supabaseAdmin as any;
+        const admin = supabaseAdmin;
         const adapter = adapterFor(source);
 
         try {

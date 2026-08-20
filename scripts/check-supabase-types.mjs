@@ -80,7 +80,46 @@ for (const [name, values] of enums) {
   for (const v of values) if (!present.has(v)) missingValues.push(`${name} → "${v}"`);
 }
 
+// Every `.rpc("name")` the source calls must be a function the types declare.
+// An undeclared name is not a compile error while the caller holds an `any`
+// client, and there is no runtime signal either — PostgREST answers 404 and
+// supabase-js hands back `{ data: null, error }`, which most callers treat as
+// "nothing to do". `feedback_pending_forward` existed in SQL, was missing from
+// the types, and its retry drain read the 404 as an empty backlog.
+const src = [];
+const walk = (dir) => {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, e.name);
+    if (e.isDirectory()) walk(full);
+    else if (/\.tsx?$/.test(e.name) && e.name !== "types.ts") src.push(full);
+  }
+};
+walk("src");
+
+// The generator writes short entries inline (`name: { Args: … }`) and long ones
+// over several lines, so both forms have to count as declared.
+const declaredFns = new Set(
+  [...types.matchAll(/^ {6}([a-z_][a-z0-9_]*): \{\s*\n? *Args:/gm)].map((m) => m[1]),
+);
+const calledFns = new Set();
+for (const file of src) {
+  // Comments mention `.rpc("name")` when they explain the convention; strip them
+  // so prose cannot invent a call site.
+  const code = readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  for (const m of code.matchAll(/\.rpc\(\s*"([a-z_][a-z0-9_]*)"/g)) calledFns.add(m[1]);
+}
+const missingFns = [...calledFns].filter((f) => !declaredFns.has(f)).sort();
+
 const problems = [];
+if (missingFns.length)
+  problems.push(
+    `RPCs called from src/ but not declared in ${TYPES}:\n` +
+      missingFns.map((t) => `  • ${t}`).join("\n") +
+      `\n  Arguments and return shape are unchecked, and a name that does not exist\n` +
+      `  at all answers 404 — which reads as an empty result, not as an error.`,
+  );
 if (missingTables.length)
   problems.push(
     `Tables in migrations but not in ${TYPES}:\n` +
@@ -106,5 +145,6 @@ if (problems.length) {
 }
 
 console.log(
-  `✓ Supabase types cover ${tables.size} tables and ${enums.size} enums declared in ${MIGRATIONS}.`,
+  `✓ Supabase types cover ${tables.size} tables and ${enums.size} enums from ${MIGRATIONS}, ` +
+    `and all ${calledFns.size} RPCs called from src/.`,
 );

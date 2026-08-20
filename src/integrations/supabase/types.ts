@@ -9476,6 +9476,14 @@ export type Database = {
         Args: { _at?: string; _tenant_created_at: string }
         Returns: string
       }
+      feedback_pending_forward: {
+        Args: { _limit?: number }
+        Returns: {
+          attempts: number
+          last_error: string
+          submission_id: string
+        }[]
+      }
       feedback_prompt_due: {
         Args: { _origin_user_id?: string; _tenant_id: string }
         Returns: Json

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Operator-facing RPCs for the per-report token cost index.
 //
 // Reading is open to any operator (it is the platform price list). Publishing
@@ -87,7 +86,9 @@ export const publishReportCostIndex = createServerFn({ method: "POST" })
       publishedBy: user.id,
       note: data?.note ?? null,
     });
-    return { ok: true as const, ...result };
+    // `result` carries its own `ok`, which wins over the spread — so the
+    // `ok: true as const` this replaces was a claim the runtime never made.
+    return { ...result };
   });
 
 /** Dry run: what would publishing these edits change? */

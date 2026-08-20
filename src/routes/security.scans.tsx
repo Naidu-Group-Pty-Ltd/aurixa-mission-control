@@ -1,6 +1,6 @@
-// @ts-nocheck
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import type { ReactElement } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -222,7 +222,7 @@ function ScanDetail({ jobId }: { jobId: string }) {
       <SheetHeader>
         <SheetTitle>Scan Detail</SheetTitle>
       </SheetHeader>
-      {!d ? (
+      {!d?.job ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : (
         <>
@@ -646,7 +646,7 @@ function RemediationReviewPanel({ remediation }: { remediation: any }) {
   );
 }
 
-const healthIcon: Record<string, JSX.Element> = {
+const healthIcon: Record<string, ReactElement> = {
   ok: <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />,
   warn: <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />,
   fail: <XCircle className="h-4 w-4 text-red-500 shrink-0" />,

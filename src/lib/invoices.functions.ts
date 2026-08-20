@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { invoicePdfFilename, renderStripeInvoicePdf } from "@/server/invoice-pdf.server";
 import { buildInvoiceDocument } from "@/lib/brand/invoiceDocument.pure";
 
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 const STATUSES = ["draft", "open", "paid", "void", "uncollectible"] as const;
 

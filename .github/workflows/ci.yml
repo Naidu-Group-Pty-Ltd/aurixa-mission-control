@@ -35,6 +35,10 @@ jobs:
       - name: Supabase types match migrations
         run: npm run check:supabase-types
 
+      # The typecheck is only as good as the files it is allowed to see.
+      - name: '@ts-nocheck budget'
+        run: npm run check:ts-nocheck
+
       - name: Typecheck
         run: npm run typecheck
 

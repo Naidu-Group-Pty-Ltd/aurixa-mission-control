@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 3 unresolved type errors (argument types ×2, assignability ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Server-only orchestration for Codex Security scans without a user context
 // (pg_cron nightly job, the GitHub webhook receiver, and the sweeper).
 //
@@ -19,7 +20,7 @@ import {
   scanCallbackUrl,
 } from "@/server/codex-security-client.server";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 export type ScanKind =
   | "manual"

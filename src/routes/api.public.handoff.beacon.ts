@@ -44,7 +44,7 @@ export const Route = createFileRoute("/api/public/handoff/beacon")({
             400,
           );
 
-        const admin = supabaseAdmin as any;
+        const admin = supabaseAdmin;
         const { data: handoff } = await admin
           .from("clone_handoffs")
           .select("id")

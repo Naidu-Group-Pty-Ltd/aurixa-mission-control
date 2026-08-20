@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck — 7 unresolved type errors (assignability ×6, argument types ×1).
+// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // E3 — Client-owned Supabase account records. Stores the client's org id
 // and (encrypted) Personal Access Token so the handoff orchestrator can
 // provision a twin project in *their* org (round 2). PAT is encrypted at
@@ -136,7 +137,7 @@ export const verifyClientSupabaseAccount = createServerFn({ method: "POST" })
 
     // Prefer explicit slug/id match; otherwise fall back to the first org if only one exists.
     const wanted = acct.org_slug ?? acct.org_id ?? null;
-    let match =
+    const match =
       wanted != null
         ? orgs.find((o) => o.id === wanted || o.slug === wanted)
         : orgs.length === 1

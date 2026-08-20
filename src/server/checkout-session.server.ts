@@ -5,7 +5,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
 
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /**
  * Proves a session belongs to a handoff: the purchases row (or, as fallback

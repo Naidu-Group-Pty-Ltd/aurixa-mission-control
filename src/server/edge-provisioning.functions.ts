@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { EdgeProviderSlug, EdgePosture } from "./edge";
 
 // Any-cast helper until types.ts is regenerated after Phase 1 migration.
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 function hashPayload(payload: unknown): string {
   return crypto.createHash("sha256").update(JSON.stringify(payload ?? {})).digest("hex");

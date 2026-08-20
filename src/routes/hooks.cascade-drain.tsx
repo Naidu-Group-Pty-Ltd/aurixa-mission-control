@@ -14,7 +14,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 import { executeCascade } from "@/server/cascade-engine.server";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 const STALL_MINUTES = 10;
 const MAX_JOBS_PER_RUN = 3;
 const MAX_ATTEMPTS = 3;

@@ -16,7 +16,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { fireTokenWebhook } from "@/server/token-webhooks.server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /** Credit costs are whole numbers; this ceiling is a fat-finger guard, not a
  *  business rule. A four-digit cost on a report that used to cost 12 is far
