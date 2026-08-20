@@ -4,6 +4,11 @@ import { startHandoffCardSetup, startUidCardSetup } from "@/server/checkout.serv
 import { normalizeBillingContact } from "@/server/billing-contact.server";
 import { storefrontPricingBase } from "@/server/billing-handoffs.server";
 import { storefrontJson, storefrontPreflight } from "@/server/storefront-cors.server";
+import { checkRateLimit } from "@/server/token-rate-limit.server";
+
+// A buyer clicks Buy a handful of times at most; the limit is set to leave
+// real behaviour untouched while capping what one credential can mint.
+const STOREFRONT_CHECKOUT_LIMIT = 12;
 
 /**
  * POST /api/public/storefront/setup
@@ -62,6 +67,27 @@ export const Route = createFileRoute("/api/public/storefront/setup")({
           );
         }
         const data = parsed.data;
+
+        // Rate limit before touching Stripe. A `uid` is deliberately a stable,
+        // non-secret key carried in a pricing-page link, so possession of one
+        // is not a scarce thing — and every accepted request here mints a
+        // Stripe Checkout Session and may create a Customer. The sibling
+        // `tokens.*`, `seats.*` and `billing.*` public routes all limit; this
+        // family did not, and it is the family reachable with no secret at all.
+        const rl = await checkRateLimit(
+          `storefront:setup:${data.h ?? data.uid}`,
+          STOREFRONT_CHECKOUT_LIMIT,
+        );
+        if (!rl.ok) {
+          return storefrontJson(
+            {
+              ok: false,
+              error: "rate_limited",
+              retry_after_seconds: rl.retry_after_seconds,
+            },
+            429,
+          );
+        }
 
         const url = new URL(request.url);
         const mcOrigin = process.env.PUBLIC_APP_URL ?? `${url.protocol}//${url.host}`;
