@@ -9,7 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { encryptSecret } from "@/server/crypto.server";
+import { encodeBytea, encryptSecret } from "@/server/crypto.server";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -162,7 +162,7 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
           return json({ ok: false, error: "handoff_not_found" }, 404);
 
         // Encrypt the PAT before storing. Last-4 shown for admin display.
-        const pat_ciphertext = encryptSecret(data.pat);
+        const pat_ciphertext = encodeBytea(encryptSecret(data.pat));
         const pat_last4 = data.pat.slice(-4);
 
         // Upsert client_supabase_accounts. Reuse an existing row when the

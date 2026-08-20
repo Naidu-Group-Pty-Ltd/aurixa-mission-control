@@ -30,8 +30,8 @@ export const getClientOrgCapacity = createServerFn({ method: "POST" })
     if (!acct) throw new Error("Client Supabase account not found");
     if (!acct.pat_ciphertext) throw new Error("Client account has no PAT captured yet");
 
-    const { decryptSecret } = await import("@/server/crypto.server");
-    const pat = decryptSecret(String(acct.pat_ciphertext));
+    const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+    const pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
     const { checkOrgCapacity } = await import("@/server/backend-provisioning.server");
     return checkOrgCapacity({
       token: pat,

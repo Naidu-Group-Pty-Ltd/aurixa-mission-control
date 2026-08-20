@@ -1,4 +1,3 @@
-// @ts-nocheck
 // G14 — Secret rotation cutover executor.
 //
 // Given a `handoff_secret_rotations` row, execute the rotation against the
@@ -58,19 +57,20 @@ async function executeEdgeFunctionEnv(row: any): Promise<ExecuteOutcome> {
 
   const { data: acct, error: acctErr } = await supabaseAdmin
     .from("client_supabase_accounts")
-    .select("id, pat_ciphertext, status")
+    // `status` has never been a column here — revocation is `revoked_at`.
+    .select("id, pat_ciphertext, revoked_at")
     .eq("id", clientAccountId)
     .maybeSingle();
   if (acctErr) return { status: "failed", error: acctErr.message, audit: {} };
   if (!acct?.pat_ciphertext) {
     return { status: "failed", error: "no_client_pat", audit: {} };
   }
-  if (acct.status === "revoked") {
+  if (acct.revoked_at) {
     return { status: "failed", error: "client_pat_revoked", audit: {} };
   }
 
-  const { decryptSecret } = await import("@/server/crypto.server");
-  const pat = decryptSecret(String(acct.pat_ciphertext));
+  const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+  const pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
 
   // Supabase Mgmt API — set project secret (idempotent upsert).
   const res = await fetch(
@@ -177,17 +177,19 @@ async function rollbackEdgeFunctionEnv(row: any): Promise<RollbackOutcome> {
     };
   }
 
-  const { data: acct } = await supabaseAdmin
+  // Same as above: `revoked_at`, not `status`. This one also discarded the
+  // error, so a failed read was indistinguishable from an account with no PAT.
+  const { data: acct, error: acctReadErr } = await supabaseAdmin
     .from("client_supabase_accounts")
-    .select("id, pat_ciphertext, status")
+    .select("id, pat_ciphertext, revoked_at")
     .eq("id", clientAccountId)
     .maybeSingle();
+  if (acctReadErr) return { status: "failed", error: acctReadErr.message, audit: {} };
   if (!acct?.pat_ciphertext) return { status: "failed", error: "no_client_pat", audit: {} };
-  if (acct.status === "revoked")
-    return { status: "failed", error: "client_pat_revoked", audit: {} };
+  if (acct.revoked_at) return { status: "failed", error: "client_pat_revoked", audit: {} };
 
-  const { decryptSecret } = await import("@/server/crypto.server");
-  const pat = decryptSecret(String(acct.pat_ciphertext));
+  const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+  const pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
   const res = await fetch(
     `https://api.supabase.com/v1/projects/${projectRef}/secrets`,
     {

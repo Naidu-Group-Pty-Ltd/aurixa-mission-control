@@ -101,10 +101,14 @@ export const auditFleetGithubAccess = createServerFn({ method: "POST" })
     failing: CloneGithubAccessRow[];
     generated_at: string;
   }> => {
+    // `clones` has no `status` column and no archived concept of any kind —
+    // the `.not("status", "eq", "archived")` this replaces was copied from
+    // `modules`, which does have one. PostgREST answered 42703 to the whole
+    // select and the error is thrown two lines down, so this sweep has never
+    // completed a single run.
     const { data: clones, error } = await context.supabase
       .from("clones")
-      .select("id, name, github_owner, github_repo, status")
-      .not("status", "eq", "archived");
+      .select("id, name, github_owner, github_repo");
     if (error) throw new Error(error.message);
 
     const rows: CloneGithubAccessRow[] = [];

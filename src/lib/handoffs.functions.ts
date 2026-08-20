@@ -107,7 +107,6 @@ export const getHandoff = createServerFn({ method: "POST" })
     };
   });
 
-
 export const createHandoff = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((input) => createSchema.parse(input))
@@ -180,23 +179,32 @@ export const transitionHandoff = createServerFn({ method: "POST" })
     // blocking issues. This is the last line of defence in case the parity
     // engine hasn't been re-run since the target project drifted.
     if (data.to_state === "dry_run_ready") {
-      const { data: parity } = await context.supabase
+      // The column is `generated_at`; `computed_at` does not exist on this
+      // table. PostgREST answered 42703, the error was discarded, `parity` came
+      // back null — so this gate reported `parity_missing` for every handoff,
+      // including ones whose parity report had just been written.
+      const { data: parity, error: parityErr } = await context.supabase
         .from("handoff_parity_reports")
-        .select("id, blocking_issues, computed_at, risk_level")
+        .select("id, blocking_issues, generated_at, risk_level")
         .eq("handoff_id", data.id)
-        .order("computed_at", { ascending: false })
+        .order("generated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      // A read that FAILED is not a report that is ABSENT: the first is worth
+      // retrying, the second is a real blocker on the transition.
+      if (parityErr) {
+        return { ok: false as const, error: "parity_read_failed", detail: parityErr.message };
+      }
       if (!parity) {
         return { ok: false as const, error: "parity_missing" };
       }
-      const ageMs = Date.now() - new Date(parity.computed_at).getTime();
+      const ageMs = Date.now() - new Date(parity.generated_at).getTime();
       if (ageMs > 24 * 60 * 60 * 1000) {
         return {
           ok: false as const,
           error: "parity_stale",
           parity_id: parity.id,
-          computed_at: parity.computed_at,
+          computed_at: parity.generated_at,
         };
       }
       const blocking = (parity.blocking_issues as any[]) ?? [];
@@ -216,7 +224,12 @@ export const transitionHandoff = createServerFn({ method: "POST" })
     if (data.to_state === "twin_provisioning" || data.to_state === "snapshot_pending") {
       patch.initiated_at = new Date().toISOString();
     }
-    if (data.to_state === "complete" || data.to_state === "rolled_back" || data.to_state === "failed" || data.to_state === "canceled") {
+    if (
+      data.to_state === "complete" ||
+      data.to_state === "rolled_back" ||
+      data.to_state === "failed" ||
+      data.to_state === "canceled"
+    ) {
       patch.completed_at = new Date().toISOString();
     }
     if (data.error) patch.error = data.error;
@@ -229,7 +242,12 @@ export const transitionHandoff = createServerFn({ method: "POST" })
       handoff_id: data.id,
       kind: "handoff.transitioned",
       actor_user_id: context.userId,
-      details: { from: current.state, to: data.to_state, note: data.note ?? null, error: data.error ?? null },
+      details: {
+        from: current.state,
+        to: data.to_state,
+        note: data.note ?? null,
+        error: data.error ?? null,
+      },
     });
     return { ok: true as const, from: current.state, to: data.to_state };
   });
@@ -472,9 +490,7 @@ export const runParityDryRun = createServerFn({ method: "POST" })
 
     // Compute parity (server-only module — imported inside the handler so it
     // never leaks into the client bundle).
-    const { computeParity, getPrimeProjectRef } = await import(
-      "@/server/handoff-parity.server"
-    );
+    const { computeParity, getPrimeProjectRef } = await import("@/server/handoff-parity.server");
     const primeRef = getPrimeProjectRef();
     const parity = await computeParity(primeRef, backend.supabase_project_ref);
 
@@ -557,24 +573,20 @@ export const planStandardRotations = createServerFn({ method: "POST" })
       .from("handoff_secret_rotations")
       .select("target, key_ref")
       .eq("handoff_id", data.handoff_id);
-    const seen = new Set(
-      (existing ?? []).map((r: any) => `${r.target}::${r.key_ref}`),
+    const seen = new Set((existing ?? []).map((r: any) => `${r.target}::${r.key_ref}`));
+    const rows = DEFAULT_ROTATION_PLAN.filter((p) => !seen.has(`${p.target}::${p.key_ref}`)).map(
+      (p) => ({
+        handoff_id: data.handoff_id,
+        target: p.target,
+        key_ref: p.key_ref,
+        status: "pending" as const,
+        metadata: { hint: p.hint },
+      }),
     );
-    const rows = DEFAULT_ROTATION_PLAN.filter(
-      (p) => !seen.has(`${p.target}::${p.key_ref}`),
-    ).map((p) => ({
-      handoff_id: data.handoff_id,
-      target: p.target,
-      key_ref: p.key_ref,
-      status: "pending" as const,
-      metadata: { hint: p.hint },
-    }));
     if (rows.length === 0) {
       return { ok: true as const, inserted: 0, skipped: DEFAULT_ROTATION_PLAN.length };
     }
-    const { error } = await context.supabase
-      .from("handoff_secret_rotations")
-      .insert(rows);
+    const { error } = await context.supabase.from("handoff_secret_rotations").insert(rows);
     if (error) throw error;
     await context.supabase.from("handoff_events").insert({
       handoff_id: data.handoff_id,
@@ -981,9 +993,7 @@ export const replicateHandoffAuthUsers = createServerFn({ method: "POST" })
       .eq("id", data.handoff_id)
       .maybeSingle();
     const targetRef =
-      parity?.target_ref ??
-      (handoffMeta?.metadata as any)?.target_project_ref ??
-      null;
+      parity?.target_ref ?? (handoffMeta?.metadata as any)?.target_project_ref ?? null;
     if (!targetRef) {
       return { ok: false as const, error: "no_target_ref_pinned" };
     }
@@ -991,19 +1001,19 @@ export const replicateHandoffAuthUsers = createServerFn({ method: "POST" })
     // Decrypt client PAT.
     const { data: acct, error: aErr } = await context.supabase
       .from("client_supabase_accounts")
-      .select("id, pat_ciphertext, status")
+      // `status` has never been a column here — the revocation flag is
+      // `revoked_at`. PostgREST answers 42703 to the whole select, and `aErr`
+      // is thrown two lines down, so this path could never reach the decrypt.
+      .select("id, pat_ciphertext, revoked_at")
       .eq("id", handoff.client_account_id)
       .maybeSingle();
     if (aErr) throw aErr;
     if (!acct?.pat_ciphertext) return { ok: false as const, error: "no_client_pat" };
-    if (acct.status === "revoked")
-      return { ok: false as const, error: "client_pat_revoked" };
-    const { decryptSecret } = await import("@/server/crypto.server");
-    const targetPat = decryptSecret(String(acct.pat_ciphertext));
+    if (acct.revoked_at) return { ok: false as const, error: "client_pat_revoked" };
+    const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+    const targetPat = decryptSecret(decodeBytea(acct.pat_ciphertext));
 
-    const { replicateAuthUsers } = await import(
-      "@/server/handoff-auth-replication.server"
-    );
+    const { replicateAuthUsers } = await import("@/server/handoff-auth-replication.server");
 
     let outcome;
     try {
@@ -1024,9 +1034,7 @@ export const replicateHandoffAuthUsers = createServerFn({ method: "POST" })
 
     await context.supabase.from("handoff_events").insert({
       handoff_id: data.handoff_id,
-      kind: outcome.ok
-        ? "handoff.auth_replicated"
-        : "handoff.auth_replication_partial",
+      kind: outcome.ok ? "handoff.auth_replicated" : "handoff.auth_replication_partial",
       actor_user_id: context.userId,
       details: {
         source_ref: source.supabase_project_ref,
@@ -1142,10 +1150,7 @@ export const replicateHandoffStorageObjects = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const targetRef =
-      parity?.target_ref ??
-      (handoff.metadata as any)?.target_project_ref ??
-      null;
+    const targetRef = parity?.target_ref ?? (handoff.metadata as any)?.target_project_ref ?? null;
     if (!targetRef) {
       return { ok: false as const, error: "no_target_ref_pinned" };
     }
@@ -1153,15 +1158,17 @@ export const replicateHandoffStorageObjects = createServerFn({ method: "POST" })
     // Decrypt client PAT.
     const { data: acct, error: aErr } = await context.supabase
       .from("client_supabase_accounts")
-      .select("id, pat_ciphertext, status")
+      // `status` has never been a column here — the revocation flag is
+      // `revoked_at`. PostgREST answers 42703 to the whole select, and `aErr`
+      // is thrown two lines down, so this path could never reach the decrypt.
+      .select("id, pat_ciphertext, revoked_at")
       .eq("id", handoff.client_account_id)
       .maybeSingle();
     if (aErr) throw aErr;
     if (!acct?.pat_ciphertext) return { ok: false as const, error: "no_client_pat" };
-    if (acct.status === "revoked")
-      return { ok: false as const, error: "client_pat_revoked" };
-    const { decryptSecret } = await import("@/server/crypto.server");
-    const targetPat = decryptSecret(String(acct.pat_ciphertext));
+    if (acct.revoked_at) return { ok: false as const, error: "client_pat_revoked" };
+    const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+    const targetPat = decryptSecret(decodeBytea(acct.pat_ciphertext));
 
     // Load prior per-bucket replication state so we can resume.
     const { data: priorStates } = await context.supabase
@@ -1169,9 +1176,7 @@ export const replicateHandoffStorageObjects = createServerFn({ method: "POST" })
       .select("bucket_id, status, cursor_prefix")
       .eq("handoff_id", data.handoff_id);
 
-    const { replicateStorageObjects } = await import(
-      "@/server/handoff-storage-replication.server"
-    );
+    const { replicateStorageObjects } = await import("@/server/handoff-storage-replication.server");
 
     let outcome;
     try {
@@ -1197,17 +1202,15 @@ export const replicateHandoffStorageObjects = createServerFn({ method: "POST" })
 
     // Upsert per-bucket ledger rows. Preserve counters by adding to prior
     // totals so re-runs accumulate scanned/copied numbers correctly.
-    const priorByBucket = new Map(
-      (priorStates ?? []).map((s: any) => [s.bucket_id, s]),
-    );
+    const priorByBucket = new Map((priorStates ?? []).map((s: any) => [s.bucket_id, s]));
     // Refetch counters we don't already have to avoid clobbering totals.
     const { data: priorCounts } = await context.supabase
       .from("handoff_storage_replications")
-      .select("bucket_id, objects_scanned, objects_copied, objects_skipped, objects_failed, bytes_copied")
+      .select(
+        "bucket_id, objects_scanned, objects_copied, objects_skipped, objects_failed, bytes_copied",
+      )
       .eq("handoff_id", data.handoff_id);
-    const countsByBucket = new Map(
-      (priorCounts ?? []).map((c: any) => [c.bucket_id, c]),
-    );
+    const countsByBucket = new Map((priorCounts ?? []).map((c: any) => [c.bucket_id, c]));
 
     for (const b of outcome.buckets) {
       const prev = countsByBucket.get(b.bucket_id) ?? {
@@ -1505,9 +1508,3 @@ export const rollbackHandoffCutover = createServerFn({ method: "POST" })
       results,
     };
   });
-
-
-
-
-
-

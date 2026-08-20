@@ -65,8 +65,8 @@ export async function pollClientBackendHealth(handoffId: string): Promise<{
 
   let pat: string;
   try {
-    const { decryptSecret } = await import("@/server/crypto.server");
-    pat = decryptSecret(String(acct.pat_ciphertext));
+    const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
+    pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
   } catch (e: any) {
     return { ok: false, error: "pat_decrypt_failed", detail: String(e?.message ?? e) };
   }
