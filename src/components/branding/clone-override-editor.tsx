@@ -306,7 +306,7 @@ export function CloneOverrideEditorDialog({
                                 type="color"
                                 value={overrideValue ?? baseValue ?? "#000000"}
                                 onChange={(e) => setField(group, f.key, e.target.value)}
-                                className="h-9 w-14 cursor-pointer rounded border border-input bg-background"
+                                className="h-9 w-14 cursor-pointer border border-input bg-background"
                               />
                               <Input
                                 value={overrideValue ?? ""}

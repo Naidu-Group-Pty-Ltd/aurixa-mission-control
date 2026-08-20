@@ -49,7 +49,7 @@ export function RouteError({ error, reset }: { error: Error; reset: () => void }
           Something went wrong rendering this route. The rest of the app is still working.
         </p>
         {import.meta.env.DEV && error?.message && (
-          <pre className="mt-4 max-h-40 overflow-auto rounded-md bg-muted p-3 text-left font-mono text-[11px] text-destructive">
+          <pre className="mt-4 max-h-40 overflow-auto bg-muted p-3 text-left font-mono text-[11px] text-destructive">
             {error.message}
           </pre>
         )}

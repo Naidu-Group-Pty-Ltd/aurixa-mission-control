@@ -14,7 +14,10 @@ import type { EdgeProviderSlug, EdgePosture } from "./edge";
 const admin = supabaseAdmin;
 
 function hashPayload(payload: unknown): string {
-  return crypto.createHash("sha256").update(JSON.stringify(payload ?? {})).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(payload ?? {}))
+    .digest("hex");
 }
 
 const PostureSchema = z.object({
@@ -69,19 +72,17 @@ export const enqueueEdgeJob = createServerFn({ method: "POST" })
     // If provider is a mock, resolve the job immediately so the UI updates
     // without needing the worker.
     if (data.providerSlug !== "cloudflare") {
-      await admin
-        .from("clone_edge_config")
-        .upsert(
-          {
-            clone_id: data.cloneId,
-            provider_slug: data.providerSlug,
-            hostname: data.payload.hostname ?? null,
-            external_ref: `mock-${data.providerSlug}-${data.cloneId}`,
-            status: "waitlisted",
-            status_detail: "Provider not yet available. You will be notified.",
-          },
-          { onConflict: "clone_id,provider_slug" },
-        );
+      await admin.from("clone_edge_config").upsert(
+        {
+          clone_id: data.cloneId,
+          provider_slug: data.providerSlug,
+          hostname: data.payload.hostname ?? null,
+          external_ref: `mock-${data.providerSlug}-${data.cloneId}`,
+          status: "waitlisted",
+          status_detail: "Provider not yet available. You will be notified.",
+        },
+        { onConflict: "clone_id,provider_slug" },
+      );
       await admin
         .from("edge_provisioning_jobs")
         .update({ status: "succeeded", completed_at: new Date().toISOString() })
@@ -102,9 +103,7 @@ export const enqueueEdgeJob = createServerFn({ method: "POST" })
 
 export const getCloneEdgeStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { cloneId: string }) =>
-    z.object({ cloneId: z.string().uuid() }).parse(d),
-  )
+  .inputValidator((d: { cloneId: string }) => z.object({ cloneId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { data: configs } = await (supabase as any)

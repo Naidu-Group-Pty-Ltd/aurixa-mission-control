@@ -34,7 +34,10 @@ export type IntakeSource = {
 
 export interface SecurityIntakeAdapter {
   slug: string;
-  ingestFinding(finding: NormalizedFinding, source: IntakeSource): Promise<{ id: string; created: boolean }>;
+  ingestFinding(
+    finding: NormalizedFinding,
+    source: IntakeSource,
+  ): Promise<{ id: string; created: boolean }>;
   updateStatus(externalId: string, state: string): Promise<void>;
   linkExternalTicket(
     findingId: string,
@@ -120,7 +123,10 @@ async function linkTicket(
     .single();
   if (res.error) throw new Error(res.error.message);
   if (ticket.url) {
-    await admin.from("codex_findings").update({ external_ticket_url: ticket.url }).eq("id", findingId);
+    await admin
+      .from("codex_findings")
+      .update({ external_ticket_url: ticket.url })
+      .eq("id", findingId);
   }
   return { id: res.data.id as string };
 }

@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import {
   UserPlus,
-  Users,
   Filter,
   X,
   Inbox,
@@ -37,8 +36,6 @@ import {
   Building2,
   Globe,
   CalendarClock,
-  CalendarCheck,
-  ClipboardCheck,
   Sparkles,
   Briefcase,
   Hash,
@@ -48,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "@/lib/format";
 import { EmptyState } from "@/components/empty-state";
 import { RefreshButton } from "@/components/refresh-button";
+import { MetricCell } from "@/components/metric-bar";
 import { toast } from "sonner";
 import { convertLead } from "@/lib/crm.functions";
 
@@ -469,14 +467,12 @@ function LeadsPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
             <UserPlus className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              lead capture
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Waitlist Leads</h1>
+            <p className="label-mono">lead capture</p>
+            <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Waitlist Leads</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Every lead captured by the Aurixa Systems waitlist form — live, with full history.
             </p>
@@ -490,13 +486,13 @@ function LeadsPage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <StatTile icon={Users} label="Total leads" value={stats?.total} />
-        <StatTile icon={Sparkles} label="Last 24 hours" value={stats?.last24h} accent />
-        <StatTile icon={CalendarClock} label="Last 7 days" value={stats?.last7d} />
-        <StatTile icon={Inbox} label="Awaiting triage" value={stats?.untriaged} />
-        <StatTile icon={ClipboardCheck} label="Stage 2 complete" value={stats?.stageTwo} />
-        <StatTile icon={CalendarCheck} label="Stage 3 booked" value={stats?.stageThree} accent />
+      <div className="glass grid grid-cols-2 overflow-hidden lg:grid-cols-3 xl:grid-cols-6">
+        <StatTile label="Total leads" value={stats?.total} />
+        <StatTile label="Last 24 hours" value={stats?.last24h} accent />
+        <StatTile label="Last 7 days" value={stats?.last7d} />
+        <StatTile label="Awaiting triage" value={stats?.untriaged} />
+        <StatTile label="Stage 2 complete" value={stats?.stageTwo} />
+        <StatTile label="Stage 3 booked" value={stats?.stageThree} accent />
       </div>
 
       <Card>
@@ -616,7 +612,7 @@ function LeadsPage() {
           {loading ? (
             <div className="space-y-3 p-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-md bg-muted/40" />
+                <div key={i} className="h-14 animate-pulse bg-muted/40" />
               ))}
             </div>
           ) : leads.length === 0 ? (
@@ -651,37 +647,21 @@ function LeadsPage() {
 }
 
 function StatTile({
-  icon: Icon,
   label,
   value,
   accent,
 }: {
-  icon: typeof Users;
   label: string;
   value: number | undefined;
   accent?: boolean;
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div
-          className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-md ring-1",
-            accent ? "bg-accent/15 ring-accent/40" : "bg-primary/15 ring-primary/40",
-          )}
-        >
-          <Icon className={cn("h-4 w-4", accent ? "text-accent" : "text-primary")} />
-        </div>
-        <div className="min-w-0">
-          <div className="text-2xl font-semibold tabular-nums tracking-tight">
-            {value === undefined ? "—" : value.toLocaleString()}
-          </div>
-          <div className="truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {label}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <MetricCell
+      label={label}
+      value={value === undefined ? "—" : value.toLocaleString()}
+      tone="accent"
+      alarm={Boolean(accent)}
+    />
   );
 }
 
@@ -770,7 +750,7 @@ function LeadRow({
       </div>
 
       {expanded && (
-        <div className="ml-6 mt-3 space-y-3 rounded-md border border-border/60 bg-surface p-3">
+        <div className="ml-6 mt-3 space-y-3 border bg-surface p-3">
           <div className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
             <DetailItem
               icon={Hash}

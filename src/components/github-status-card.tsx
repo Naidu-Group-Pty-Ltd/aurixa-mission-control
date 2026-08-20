@@ -96,7 +96,7 @@ export function GitHubStatusCard() {
         {!status ? (
           <div className="text-sm text-muted-foreground">Checking GitHub App…</div>
         ) : !status.configured ? (
-          <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+          <div className="flex items-start gap-3 border border-destructive/40 bg-destructive/5 p-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <div className="space-y-1 text-sm">
               <div className="font-medium text-destructive">Not configured</div>
@@ -110,7 +110,7 @@ export function GitHubStatusCard() {
                   <strong>App ID</strong> — found in your GitHub App's General settings (numeric,
                   e.g. 123456). <strong>Installation ID</strong> — the number at the end of the URL
                   when you click <em>Configure</em> on the installed app (
-                  <code className="rounded bg-muted px-1">
+                  <code className="bg-muted px-1">
                     github.com/settings/installations/<strong>{"<ID>"}</strong>
                   </code>
                   ).
@@ -157,7 +157,7 @@ export function GitHubStatusCard() {
 
               {/* Failed repos summary */}
               {failedRepos.length > 0 && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                <div className="border border-destructive/30 bg-destructive/5 p-3 space-y-2">
                   <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-destructive">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     {failedRepos.length} repo{failedRepos.length > 1 ? "s" : ""} failed
@@ -171,7 +171,7 @@ export function GitHubStatusCard() {
               )}
 
               {status.repos.length === 0 ? (
-                <div className="rounded-md border border-border bg-surface p-3 text-sm text-muted-foreground">
+                <div className="border border-border bg-surface p-3 text-sm text-muted-foreground">
                   No prime or clones configured yet.
                 </div>
               ) : (
@@ -211,7 +211,7 @@ function RepoRow({
   };
 
   return (
-    <li className="rounded-md border border-border bg-surface text-sm">
+    <li className="border border-border bg-surface text-sm">
       <button
         type="button"
         onClick={onToggle}
@@ -252,7 +252,7 @@ function RepoRow({
             <div className="font-mono text-[10px] uppercase tracking-wider text-destructive">
               GitHub API Error
             </div>
-            <pre className="whitespace-pre-wrap break-words rounded-md border border-destructive/20 bg-destructive/5 p-2 font-mono text-[11px] text-destructive">
+            <pre className="whitespace-pre-wrap break-words border border-destructive/20 bg-destructive/5 p-2 font-mono text-[11px] text-destructive">
               {r.error || "Unknown error"}
             </pre>
             <Button variant="ghost" size="sm" onClick={copyError} className="h-6 text-[10px]">
@@ -270,17 +270,17 @@ function RepoRow({
                   <li className="flex items-start gap-1.5">
                     <span className="mt-0.5 text-warning">•</span>
                     GitHub App is not installed on the{" "}
-                    <code className="rounded bg-muted px-1">{r.owner}</code> organization/account.
+                    <code className="bg-muted px-1">{r.owner}</code> organization/account.
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="mt-0.5 text-warning">•</span>
-                    Repository <code className="rounded bg-muted px-1">{r.repo}</code> is not
-                    included in the app's repository access list.
+                    Repository <code className="bg-muted px-1">{r.repo}</code> is not included in
+                    the app's repository access list.
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="mt-0.5 text-warning">•</span>
-                    Branch <code className="rounded bg-muted px-1">{r.branch}</code> does not exist
-                    in the repository.
+                    Branch <code className="bg-muted px-1">{r.branch}</code> does not exist in the
+                    repository.
                   </li>
                 </>
               ) : r.error?.includes("401") || r.error?.includes("Bad credentials") ? (
@@ -326,7 +326,7 @@ function RepoRow({
               href={`https://github.com/${r.owner}/${r.repo}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex items-center gap-1 border border-border bg-surface px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
             >
               <ExternalLink className="h-3 w-3" /> View on GitHub
             </a>
@@ -334,7 +334,7 @@ function RepoRow({
               href={`https://github.com/settings/installations`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex items-center gap-1 border border-border bg-surface px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
             >
               <ExternalLink className="h-3 w-3" /> GitHub App settings
             </a>
@@ -347,7 +347,7 @@ function RepoRow({
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <div className="border border-border bg-surface p-3">
       <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         {label}
       </div>

@@ -45,7 +45,10 @@ async function fetchClone(supabase: any, cloneId: string) {
   return data;
 }
 
-function toRow(clone: { id: string; name: string; github_owner: string; github_repo: string }, r: GithubPreflightResult): CloneGithubAccessRow {
+function toRow(
+  clone: { id: string; name: string; github_owner: string; github_repo: string },
+  r: GithubPreflightResult,
+): CloneGithubAccessRow {
   return {
     clone_id: clone.id,
     clone_name: clone.name,
@@ -96,71 +99,75 @@ export const verifyCloneRepoGithubAccess = createServerFn({ method: "POST" })
 
 export const auditFleetGithubAccess = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .handler(async ({ context }): Promise<{
-    checked: number;
-    ok: number;
-    failing: CloneGithubAccessRow[];
-    generated_at: string;
-  }> => {
-    // `clones` has no `status` column and no archived concept of any kind —
-    // the `.not("status", "eq", "archived")` this replaces was copied from
-    // `modules`, which does have one. PostgREST answered 42703 to the whole
-    // select and the error is thrown two lines down, so this sweep has never
-    // completed a single run.
-    const { data: clones, error } = await context.supabase
-      .from("clones")
-      .select("id, name, github_owner, github_repo");
-    if (error) throw new Error(error.message);
+  .handler(
+    async ({
+      context,
+    }): Promise<{
+      checked: number;
+      ok: number;
+      failing: CloneGithubAccessRow[];
+      generated_at: string;
+    }> => {
+      // `clones` has no `status` column and no archived concept of any kind —
+      // the `.not("status", "eq", "archived")` this replaces was copied from
+      // `modules`, which does have one. PostgREST answered 42703 to the whole
+      // select and the error is thrown two lines down, so this sweep has never
+      // completed a single run.
+      const { data: clones, error } = await context.supabase
+        .from("clones")
+        .select("id, name, github_owner, github_repo");
+      if (error) throw new Error(error.message);
 
-    const rows: CloneGithubAccessRow[] = [];
-    // Sequential to stay under GitHub App rate-limit budget; there are rarely
-    // more than a few dozen clones per fleet.
-    for (const c of clones ?? []) {
-      if (!c.github_owner || !c.github_repo) continue;
-      try {
-        const r = await checkGithubAppPreflight({
-          data: { targetOwner: c.github_owner, targetRepo: c.github_repo },
-        });
-        rows.push(toRow(c, r));
-      } catch (e) {
-        rows.push({
-          clone_id: c.id,
-          clone_name: c.name,
-          github_owner: c.github_owner,
-          github_repo: c.github_repo,
-          ok: false,
-          installation_found: false,
-          repo_accessible: null,
-          repository_selection: null,
-          contents_write: null,
-          message: e instanceof Error ? e.message : String(e),
-        });
+      const rows: CloneGithubAccessRow[] = [];
+      // Sequential to stay under GitHub App rate-limit budget; there are rarely
+      // more than a few dozen clones per fleet.
+      for (const c of clones ?? []) {
+        if (!c.github_owner || !c.github_repo) continue;
+        try {
+          const r = await checkGithubAppPreflight({
+            data: { targetOwner: c.github_owner, targetRepo: c.github_repo },
+          });
+          rows.push(toRow(c, r));
+        } catch (e) {
+          rows.push({
+            clone_id: c.id,
+            clone_name: c.name,
+            github_owner: c.github_owner,
+            github_repo: c.github_repo,
+            ok: false,
+            installation_found: false,
+            repo_accessible: null,
+            repository_selection: null,
+            contents_write: null,
+            message: e instanceof Error ? e.message : String(e),
+          });
+        }
       }
-    }
 
-    const failing = rows.filter((r) => !r.ok);
-    // Emit a notification when the fleet has any failures — actionable signal
-    // for operators to reinstall / re-grant the App before the next cascade.
-    if (failing.length > 0) {
-      try {
-        await context.supabase.from("notifications").insert({
-          kind: "github_app_access_drift",
-          title: `GitHub App access drift on ${failing.length} clone(s)`,
-          body: failing
-            .slice(0, 5)
-            .map((f) => `${f.github_owner}/${f.github_repo}: ${f.message ?? "no access"}`)
-            .join("\n"),
-          severity: "warning",
-        });
-      } catch {
-        /* best-effort */
+      const failing = rows.filter((r) => !r.ok);
+      // Emit a notification when the fleet has any failures — actionable signal
+      // for operators to reinstall / re-grant the App before the next cascade.
+      if (failing.length > 0) {
+        try {
+          await context.supabase.from("notifications").insert({
+            kind: "github_app_access_drift",
+            title: `GitHub App access drift on ${failing.length} clone(s)`,
+            body: failing
+              .slice(0, 5)
+              .map((f) => `${f.github_owner}/${f.github_repo}: ${f.message ?? "no access"}`)
+              .join("\n"),
+            severity: "warning",
+          });
+        } catch {
+          /* best-effort */
+        }
       }
-    }
 
-    return {
-      checked: rows.length,
-      ok: rows.filter((r) => r.ok).length,
-      failing,
-      generated_at: new Date().toISOString(),
-    };
-  });
+      return {
+        checked: rows.length,
+        ok: rows.filter((r) => r.ok).length,
+        failing,
+        generated_at: new Date().toISOString(),
+      };
+    },
+  );

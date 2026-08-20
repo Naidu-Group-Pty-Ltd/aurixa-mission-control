@@ -49,8 +49,7 @@ async function executeEdgeFunctionEnv(row: any): Promise<ExecuteOutcome> {
   if (!projectRef || !secretName || !secretValue || !clientAccountId) {
     return {
       status: "failed",
-      error:
-        "metadata must include project_ref, secret_name, secret_value, client_account_id",
+      error: "metadata must include project_ref, secret_name, secret_value, client_account_id",
       audit: { missing: true },
     };
   }
@@ -73,17 +72,14 @@ async function executeEdgeFunctionEnv(row: any): Promise<ExecuteOutcome> {
   const pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
 
   // Supabase Mgmt API — set project secret (idempotent upsert).
-  const res = await fetch(
-    `https://api.supabase.com/v1/projects/${projectRef}/secrets`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${pat}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify([{ name: secretName, value: secretValue }]),
+  const res = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${pat}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify([{ name: secretName, value: secretValue }]),
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     return {
@@ -190,14 +186,11 @@ async function rollbackEdgeFunctionEnv(row: any): Promise<RollbackOutcome> {
 
   const { decryptSecret, decodeBytea } = await import("@/server/crypto.server");
   const pat = decryptSecret(decodeBytea(acct.pat_ciphertext));
-  const res = await fetch(
-    `https://api.supabase.com/v1/projects/${projectRef}/secrets`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${pat}`, "Content-Type": "application/json" },
-      body: JSON.stringify([{ name: secretName, value: previous }]),
-    },
-  );
+  const res = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/secrets`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${pat}`, "Content-Type": "application/json" },
+    body: JSON.stringify([{ name: secretName, value: previous }]),
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     return {
@@ -237,7 +230,6 @@ export async function rollbackRotation(row: any): Promise<RollbackOutcome> {
     return { status: "failed", error: String(e?.message ?? e), audit: {} };
   }
 }
-
 
 // The default rotation plan enqueued when a handoff enters cutover. Each entry
 // is `(target, key_ref, hint)`; hint lands in `metadata.hint` so operators

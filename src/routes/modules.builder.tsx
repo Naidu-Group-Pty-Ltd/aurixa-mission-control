@@ -15,10 +15,8 @@ function ModuleBuilderPage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-          configuration
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Module Builder</h1>
+        <p className="label-mono">configuration</p>
+        <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Module Builder</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Drag and drop modules to attach or detach them per clone.
         </p>

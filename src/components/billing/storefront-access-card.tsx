@@ -157,7 +157,7 @@ export function StorefrontAccessCard() {
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {minted && (
-          <div className="flex items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 p-3">
+          <div className="flex items-center justify-between gap-2 border border-primary/40 bg-primary/5 p-3">
             <div className="min-w-0">
               <p className="text-xs font-medium">Share this link</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{linkFor(minted)}</p>
@@ -167,7 +167,7 @@ export function StorefrontAccessCard() {
         )}
 
         {grants.length > 0 && (
-          <div className="rounded-md border">
+          <div className="border">
             <Table>
               <TableHeader>
                 <TableRow>

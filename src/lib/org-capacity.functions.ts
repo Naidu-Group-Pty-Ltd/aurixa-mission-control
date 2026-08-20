@@ -18,9 +18,7 @@ export const getPrimeOrgCapacity = createServerFn({ method: "GET" })
 
 export const getClientOrgCapacity = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((input) =>
-    z.object({ client_account_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input) => z.object({ client_account_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: acct, error } = await context.supabase
       .from("client_supabase_accounts")

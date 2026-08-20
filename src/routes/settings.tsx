@@ -56,13 +56,11 @@ function SettingsLayout() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-          configuration
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Settings</h1>
+        <p className="label-mono">configuration</p>
+        <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Settings</h1>
       </header>
 
-      <nav className="flex gap-1 overflow-x-auto rounded-md border border-border bg-surface p-1">
+      <nav className="flex overflow-x-auto border border-border">
         {TABS.map((t) => {
           const active = t.exact ? loc.pathname === t.to : loc.pathname.startsWith(t.to);
           const Icon = t.icon;
@@ -71,9 +69,11 @@ function SettingsLayout() {
               key={t.to}
               to={t.to}
               className={cn(
-                "flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded px-3 py-2 font-mono text-[11px] uppercase tracking-wider transition-colors",
+                // A divided strip, not thirteen filled pills. The active tab
+                // is the one that is lit; the rest are dividers between words.
+                "flex shrink-0 items-center justify-center gap-2 border-l border-border px-3 py-2 font-mono text-[10px] tracking-[0.14em] whitespace-nowrap uppercase transition-colors first:border-l-0",
                 active
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-foreground/[0.08] text-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >

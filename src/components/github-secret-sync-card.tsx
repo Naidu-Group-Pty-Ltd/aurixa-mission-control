@@ -114,7 +114,7 @@ export function GitHubSecretSyncCard(props: Props) {
       <CardContent className="space-y-3">
         {/* What will be pushed */}
         {preview && (
-          <div className="space-y-1 rounded-md border p-2 text-xs">
+          <div className="space-y-1 border p-2 text-xs">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               will push {preview.configuredCount}/{preview.entries.length} secrets
             </div>
@@ -146,7 +146,7 @@ export function GitHubSecretSyncCard(props: Props) {
         )}
 
         {missingRequired.length > 0 && (
-          <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 p-2 text-xs">
+          <div className="flex items-start gap-2 border border-warning/40 bg-warning/5 p-2 text-xs">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
             <div>
               <span className="font-mono">{missingRequired.join(", ")}</span> is not configured in
@@ -172,7 +172,7 @@ export function GitHubSecretSyncCard(props: Props) {
 
         {/* Per-repo outcome of the fleet run just performed */}
         {lastRun?.results?.length > 0 && (
-          <div className="space-y-1 rounded-md border p-2 text-xs">
+          <div className="space-y-1 border p-2 text-xs">
             {lastRun.results.map((r: any) => (
               <div key={r.cloneId} className="flex items-start justify-between gap-2">
                 <span className="truncate font-mono">{r.target}</span>
@@ -189,7 +189,7 @@ export function GitHubSecretSyncCard(props: Props) {
 
         {/* Failure detail for a single-repo run */}
         {lastRun && !lastRun.ok && !lastRun.results && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 font-mono text-xs text-destructive">
+          <div className="border border-destructive/40 bg-destructive/5 p-2 font-mono text-xs text-destructive">
             {lastRun.failed?.length
               ? lastRun.failed.map((f: any) => (
                   <div key={f.name} className="break-words">
@@ -201,7 +201,7 @@ export function GitHubSecretSyncCard(props: Props) {
         )}
 
         {rows.length > 0 && (
-          <div className="space-y-1 rounded-md border p-2 text-xs">
+          <div className="space-y-1 border p-2 text-xs">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               history
             </div>
@@ -224,7 +224,7 @@ export function GitHubSecretSyncCard(props: Props) {
         )}
 
         {last?.failed?.length > 0 && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 font-mono text-xs text-destructive">
+          <div className="border border-destructive/40 bg-destructive/5 p-2 font-mono text-xs text-destructive">
             {last.failed.map((f: any) => (
               <div key={f.name} className="break-words">
                 {f.name}: {f.error}

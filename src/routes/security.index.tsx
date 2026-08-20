@@ -17,12 +17,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import {
-  listScanJobs,
-  listCloneCodexOverview,
-} from "@/lib/codex-security.functions";
+import { listScanJobs, listCloneCodexOverview } from "@/lib/codex-security.functions";
 import { listRemediations } from "@/lib/codex-remediation.functions";
 
 export const Route = createFileRoute("/security/")({
@@ -95,8 +97,7 @@ function SecurityOverviewPage() {
     ["pending_review", "review_requested", "open", "draft"].includes(r.pr_state),
   );
   const prsMerged24h = remediations.filter(
-    (r: any) =>
-      r.merged_at && Date.now() - new Date(r.merged_at).getTime() < 86_400_000,
+    (r: any) => r.merged_at && Date.now() - new Date(r.merged_at).getTime() < 86_400_000,
   );
 
   const cascadesInFlight = remediations.filter(
@@ -107,8 +108,8 @@ function SecurityOverviewPage() {
     .filter((c) => (c.openFindings?.critical ?? 0) + (c.openFindings?.high ?? 0) > 0)
     .sort(
       (a, b) =>
-        (b.openFindings.critical - a.openFindings.critical) ||
-        (b.openFindings.high - a.openFindings.high),
+        b.openFindings.critical - a.openFindings.critical ||
+        b.openFindings.high - a.openFindings.high,
     )
     .slice(0, 8);
 
@@ -139,61 +140,58 @@ function SecurityOverviewPage() {
       {anyLoading && clones.length === 0 && jobs.length === 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-[120px] animate-pulse rounded-lg border border-border/60 bg-card/40"
-            />
+            <div key={i} className="h-[120px] animate-pulse border /40" />
           ))}
         </div>
       ) : (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Tile
-          icon={<ShieldAlert className="h-4 w-4" />}
-          label="Open findings (fleet)"
-          to="/security/scans"
-        >
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {sevOrder.map((s) => (
-              <Badge key={s} className={sevColor[s]}>
-                {s}: {fleetOpen[s]}
-              </Badge>
-            ))}
-          </div>
-        </Tile>
-        <Tile
-          icon={<PlayCircle className="h-4 w-4" />}
-          label="Scans"
-          to="/security/scans"
-          hint={
-            lastNightly
-              ? `Last nightly: ${(lastNightly.completed_at || lastNightly.started_at || "").slice(0, 16).replace("T", " ")}`
-              : "No nightly run yet"
-          }
-        >
-          <div className="text-3xl font-semibold tabular-nums">{inflight}</div>
-          <div className="text-xs text-muted-foreground">
-            in flight · {failedRecent} failed (last 100)
-          </div>
-        </Tile>
-        <Tile
-          icon={<GitPullRequest className="h-4 w-4" />}
-          label="Remediation PRs"
-          to="/approvals"
-          hint={`${prsMerged24h.length} merged in last 24h`}
-        >
-          <div className="text-3xl font-semibold tabular-nums">{prsAwaiting.length}</div>
-          <div className="text-xs text-muted-foreground">awaiting review</div>
-        </Tile>
-        <Tile
-          icon={<Waves className="h-4 w-4" />}
-          label="Fleet cascades"
-          to="/cascades"
-          hint={`${clones.length} clones covered`}
-        >
-          <div className="text-3xl font-semibold tabular-nums">{cascadesInFlight}</div>
-          <div className="text-xs text-muted-foreground">security patches in flight</div>
-        </Tile>
-      </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Tile
+            icon={<ShieldAlert className="h-4 w-4" />}
+            label="Open findings (fleet)"
+            to="/security/scans"
+          >
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {sevOrder.map((s) => (
+                <Badge key={s} className={sevColor[s]}>
+                  {s}: {fleetOpen[s]}
+                </Badge>
+              ))}
+            </div>
+          </Tile>
+          <Tile
+            icon={<PlayCircle className="h-4 w-4" />}
+            label="Scans"
+            to="/security/scans"
+            hint={
+              lastNightly
+                ? `Last nightly: ${(lastNightly.completed_at || lastNightly.started_at || "").slice(0, 16).replace("T", " ")}`
+                : "No nightly run yet"
+            }
+          >
+            <div className="text-3xl font-semibold tabular-nums">{inflight}</div>
+            <div className="text-xs text-muted-foreground">
+              in flight · {failedRecent} failed (last 100)
+            </div>
+          </Tile>
+          <Tile
+            icon={<GitPullRequest className="h-4 w-4" />}
+            label="Remediation PRs"
+            to="/approvals"
+            hint={`${prsMerged24h.length} merged in last 24h`}
+          >
+            <div className="text-3xl font-semibold tabular-nums">{prsAwaiting.length}</div>
+            <div className="text-xs text-muted-foreground">awaiting review</div>
+          </Tile>
+          <Tile
+            icon={<Waves className="h-4 w-4" />}
+            label="Fleet cascades"
+            to="/cascades"
+            hint={`${clones.length} clones covered`}
+          >
+            <div className="text-3xl font-semibold tabular-nums">{cascadesInFlight}</div>
+            <div className="text-xs text-muted-foreground">security patches in flight</div>
+          </Tile>
+        </div>
       )}
 
       {/* Hotspots + PRs awaiting */}

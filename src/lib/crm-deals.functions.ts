@@ -103,7 +103,6 @@ export const setDealStage = createServerFn({ method: "POST" })
       .single();
     if (error) throw error;
 
-
     await context.supabase.from("crm_activities").insert({
       account_id: deal.account_id,
       kind: "status_change",
@@ -134,7 +133,10 @@ export const setDealStage = createServerFn({ method: "POST" })
       await context.supabase.rpc("crm_seed_onboarding", { _account_id: deal.account_id });
       await context.supabase
         .from("crm_accounts")
-        .update({ mrr_cents: deal.expected_mrr_cents ?? 0, arr_cents: (deal.expected_mrr_cents ?? 0) * 12 })
+        .update({
+          mrr_cents: deal.expected_mrr_cents ?? 0,
+          arr_cents: (deal.expected_mrr_cents ?? 0) * 12,
+        })
         .eq("id", deal.account_id);
     }
     return deal;
@@ -187,7 +189,10 @@ async function recalcDealTotals(sb: any, dealId: string) {
     if (i.recurring) mrr += total;
     else setup += total;
   }
-  await sb.from("crm_deals").update({ expected_mrr_cents: mrr, setup_fee_cents: setup }).eq("id", dealId);
+  await sb
+    .from("crm_deals")
+    .update({ expected_mrr_cents: mrr, setup_fee_cents: setup })
+    .eq("id", dealId);
   return { expected_mrr_cents: mrr, setup_fee_cents: setup };
 }
 
@@ -196,9 +201,21 @@ export const quoteCatalog = createServerFn({ method: "GET" })
   .middleware([requireOperator])
   .handler(async ({ context }) => {
     const [plans, addons, setups] = await Promise.all([
-      context.supabase.from("seat_plans").select("id, slug, name, price_cents, seat_limit").eq("is_active", true).order("price_cents"),
-      context.supabase.from("addon_modules").select("id, slug, name, price_cents").eq("is_active", true).order("name"),
-      context.supabase.from("setup_packages").select("id, slug, name, price_cents").eq("is_active", true).order("price_cents"),
+      context.supabase
+        .from("seat_plans")
+        .select("id, slug, name, price_cents, seat_limit")
+        .eq("is_active", true)
+        .order("price_cents"),
+      context.supabase
+        .from("addon_modules")
+        .select("id, slug, name, price_cents")
+        .eq("is_active", true)
+        .order("name"),
+      context.supabase
+        .from("setup_packages")
+        .select("id, slug, name, price_cents")
+        .eq("is_active", true)
+        .order("price_cents"),
     ]);
     return {
       seat_plans: plans.data ?? [],

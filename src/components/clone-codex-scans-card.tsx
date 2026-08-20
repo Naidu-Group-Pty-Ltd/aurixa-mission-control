@@ -8,7 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
   listCloneScanJobs,
@@ -101,7 +106,7 @@ export function CloneCodexScansCard({ cloneId }: { cloneId: string }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between rounded-md border p-3">
+        <div className="flex items-center justify-between border p-3">
           <div>
             <Label className="font-medium">Include in nightly fleet scans</Label>
             <p className="text-xs text-muted-foreground">

@@ -217,7 +217,7 @@ export function BrandPlaygroundDialog({
                         type="color"
                         value={draftValue ?? baseValue}
                         onChange={(e) => setField(key, e.target.value)}
-                        className="h-8 w-12 cursor-pointer rounded border border-input"
+                        className="h-8 w-12 cursor-pointer border border-input"
                       />
                       <Input
                         value={draftValue ?? baseValue}
@@ -348,7 +348,7 @@ function BrandAiValidator({ brandConfig }: { brandConfig: Record<string, unknown
     }
   };
   return (
-    <div className="rounded-md border border-border/60 bg-surface/50 p-3">
+    <div className="border bg-surface/50 p-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5 text-primary" /> AI accessibility & tone audit

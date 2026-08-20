@@ -59,11 +59,8 @@ export function KeyboardShortcuts() {
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
-            Press{" "}
-            <kbd className="rounded border border-border/60 bg-surface px-1 font-mono text-[10px]">
-              ?
-            </kbd>{" "}
-            any time to toggle this list.
+            Press <kbd className="border bg-surface px-1 font-mono text-[10px]">?</kbd> any time to
+            toggle this list.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -94,13 +91,13 @@ export function KeyboardShortcuts() {
 
 function Row({ keys, label }: { keys: string[]; label: string }) {
   return (
-    <li className="flex items-center justify-between gap-3 rounded px-2 py-1 hover:bg-sidebar-accent/40">
+    <li className="flex items-center justify-between gap-3 px-2 py-1 hover:bg-sidebar-accent/40">
       <span className="text-foreground/90">{label}</span>
       <span className="flex items-center gap-1">
         {keys.map((k, i) => (
           <kbd
             key={i}
-            className="rounded border border-border/60 bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+            className="border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
           >
             {k}
           </kbd>

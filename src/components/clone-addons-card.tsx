@@ -235,7 +235,7 @@ export function CloneAddonsCard({ cloneId }: { cloneId: string }) {
                       type="button"
                       disabled={busy === m.slug}
                       onClick={() => doGrant(m.slug)}
-                      className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50"
+                      className="inline-flex items-center gap-1 border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50"
                     >
                       {busy === m.slug ? (
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />

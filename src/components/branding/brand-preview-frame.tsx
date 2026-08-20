@@ -48,7 +48,7 @@ export function BrandPreviewFrame({
             />
           ) : (
             <div
-              className="h-7 w-7 rounded flex items-center justify-center text-xs font-bold"
+              className="h-7 w-7 flex items-center justify-center text-xs font-bold"
               style={{ background: primary, color: "#fff" }}
             >
               {(cfg.brand_name?.[0] ?? "B").toUpperCase()}
@@ -73,14 +73,14 @@ export function BrandPreviewFrame({
         <div className="flex gap-2 pt-1">
           <button
             type="button"
-            className="px-3 py-1.5 rounded text-xs font-medium"
+            className="px-3 py-1.5 text-xs font-medium"
             style={{ background: primary, color: "#fff" }}
           >
             Primary action
           </button>
           <button
             type="button"
-            className="px-3 py-1.5 rounded text-xs font-medium border"
+            className="px-3 py-1.5 text-xs font-medium border"
             style={{ borderColor: accent, color: accent }}
           >
             Secondary
@@ -101,7 +101,7 @@ export function BrandPreviewFrame({
         ).map(([key, label]) => (
           <div key={key} className="space-y-1 pt-2">
             <div
-              className="h-6 w-full rounded border"
+              className="h-6 w-full border"
               style={{
                 background: cfg[key] || "#888",
                 borderColor: `${fg}20`,

@@ -153,9 +153,7 @@ function SeatsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            monetization
-          </p>
+          <p className="label-mono">monetization</p>
           <h2 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <Users className="h-6 w-6" /> Seat Plans
           </h2>
@@ -263,7 +261,7 @@ function SeatsPage() {
                   ? `${meta.included_credits_min}–${meta.included_credits_max} / mo`
                   : "—";
               return (
-                <Card key={p.id} className="border-border/60 flex flex-col">
+                <Card key={p.id} className="flex flex-col">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-base">{p.name}</CardTitle>

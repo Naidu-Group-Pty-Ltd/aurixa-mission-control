@@ -122,7 +122,7 @@ export function CloneHealthCard({ cloneId }: { cloneId: string }) {
               />
             </div>
             {health.aiSummary && (
-              <div className="rounded-md border border-accent/30 bg-accent/5 p-3">
+              <div className="border border-accent/30 bg-accent/5 p-3">
                 <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-accent">
                   <Sparkles className="h-3 w-3" /> Last 7 days
                 </div>
@@ -168,7 +168,7 @@ function Stat({
     muted: "text-muted-foreground",
   };
   return (
-    <div className="rounded-md border border-border/60 bg-surface p-3">
+    <div className="border bg-surface p-3">
       <div className={cn("mb-1 flex items-center gap-1.5 [&>svg]:h-3.5 [&>svg]:w-3.5", map[tone])}>
         {icon}
         <span className="font-mono text-[10px] uppercase tracking-wider">{label}</span>

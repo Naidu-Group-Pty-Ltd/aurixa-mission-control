@@ -10,7 +10,11 @@ async function fetchJson(url: string, token: string) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   const body = await res.text();
   let json: any = null;
-  try { json = body ? JSON.parse(body) : null; } catch { json = null; }
+  try {
+    json = body ? JSON.parse(body) : null;
+  } catch {
+    json = null;
+  }
   return { ok: res.ok, status: res.status, body: json, raw: body };
 }
 
@@ -76,7 +80,12 @@ export async function pollClientBackendHealth(handoffId: string): Promise<{
   const [projectRes, healthRes, usageRes] = await Promise.all([
     fetchJson(`${MGMT_API}/projects/${projectRef}`, pat),
     fetchJson(`${MGMT_API}/projects/${projectRef}/health`, pat),
-    fetchJson(`${MGMT_API}/projects/${projectRef}/usage`, pat).catch(() => ({ ok: false, status: 0, body: null, raw: "" })),
+    fetchJson(`${MGMT_API}/projects/${projectRef}/usage`, pat).catch(() => ({
+      ok: false,
+      status: 0,
+      body: null,
+      raw: "",
+    })),
   ]);
 
   const projectStatus = projectRes.body?.status ?? projectRes.body?.state ?? null;
@@ -87,9 +96,18 @@ export async function pollClientBackendHealth(handoffId: string): Promise<{
 
   let severity: "ok" | "warn" | "critical" = "ok";
   const problems: string[] = [];
-  if (!projectRes.ok) { severity = "critical"; problems.push(`project=${projectRes.status}`); }
-  if (!healthRes.ok) { if (severity !== "critical") severity = "warn"; problems.push(`health=${healthRes.status}`); }
-  if (projectStatus && !["ACTIVE_HEALTHY", "ACTIVE", "HEALTHY"].includes(String(projectStatus).toUpperCase())) {
+  if (!projectRes.ok) {
+    severity = "critical";
+    problems.push(`project=${projectRes.status}`);
+  }
+  if (!healthRes.ok) {
+    if (severity !== "critical") severity = "warn";
+    problems.push(`health=${healthRes.status}`);
+  }
+  if (
+    projectStatus &&
+    !["ACTIVE_HEALTHY", "ACTIVE", "HEALTHY"].includes(String(projectStatus).toUpperCase())
+  ) {
     severity = "warn";
     problems.push(`project_status=${projectStatus}`);
   }
@@ -165,8 +183,13 @@ export async function drainDueObservabilityPolls(limit = 20): Promise<{
   for (const r of rows) {
     try {
       const res = await pollClientBackendHealth(r.handoff_id);
-      if (res.ok) { succeeded++; results.push({ handoff_id: r.handoff_id, ok: true, status: res.status }); }
-      else { failed++; results.push({ handoff_id: r.handoff_id, ok: false, error: res.error }); }
+      if (res.ok) {
+        succeeded++;
+        results.push({ handoff_id: r.handoff_id, ok: true, status: res.status });
+      } else {
+        failed++;
+        results.push({ handoff_id: r.handoff_id, ok: false, error: res.error });
+      }
     } catch (e: any) {
       failed++;
       results.push({ handoff_id: r.handoff_id, ok: false, error: String(e?.message ?? e) });

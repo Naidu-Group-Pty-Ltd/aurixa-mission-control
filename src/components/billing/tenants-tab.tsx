@@ -357,7 +357,7 @@ function TenantUsageCard({ tenantId }: { tenantId: string }) {
                 {pct}% used · {fmt(s.period_spent)} / {fmt(s.monthly_allowance)}
               </span>
             </div>
-            <div className="mt-1 h-2 overflow-hidden rounded bg-muted">
+            <div className="mt-1 h-2 overflow-hidden bg-muted">
               <div
                 className={`h-full ${pct >= 100 ? "bg-destructive" : pct >= 80 ? "bg-amber-500" : "bg-primary"}`}
                 style={{ width: `${Math.min(100, pct)}%` }}

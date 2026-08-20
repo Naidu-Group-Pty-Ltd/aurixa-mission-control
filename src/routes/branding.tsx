@@ -65,9 +65,6 @@ import {
   Save,
   Upload,
   Rocket,
-  ShieldAlert,
-  CheckCircle2,
-  AlertTriangle,
   History as HistoryIcon,
   Trash2,
   Star,
@@ -84,6 +81,7 @@ import { cn } from "@/lib/utils";
 import { BrandVersionTimelineDialog } from "@/components/branding/brand-version-timeline";
 import { CloneOverrideEditorDialog } from "@/components/branding/clone-override-editor";
 import { BrandPlaygroundDialog } from "@/components/branding/brand-playground";
+import { MetricCell } from "@/components/metric-bar";
 
 export const Route = createFileRoute("/branding")({
   errorComponent: RouteError,
@@ -413,10 +411,8 @@ function BrandingPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            white-label cascade
-          </p>
-          <h1 className="mt-1 flex items-center gap-2 text-3xl font-semibold tracking-tight">
+          <p className="label-mono">white-label cascade</p>
+          <h1 className="mt-1 flex items-center gap-2 font-display text-[2.125rem] leading-[1.05]">
             <Palette className="h-7 w-7 text-primary" />
             Branding
           </h1>
@@ -456,24 +452,17 @@ function BrandingPage() {
       </header>
 
       {/* Health strip */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Profiles" value={profiles.length} icon={Palette} />
-        <StatCard
-          label="Pending"
-          value={pendingClones.length}
-          icon={AlertTriangle}
-          tone="warning"
-        />
+      <div className="glass grid grid-cols-2 overflow-hidden md:grid-cols-4">
+        <StatCard label="Profiles" value={profiles.length} />
+        <StatCard label="Pending" value={pendingClones.length} tone="warning" />
         <StatCard
           label="Drifted"
           value={driftedClones.length}
-          icon={ShieldAlert}
           tone={driftedClones.length > 0 ? "warning" : "default"}
         />
         <StatCard
           label="Failed"
           value={failedClones.length}
-          icon={AlertTriangle}
           tone={failedClones.length > 0 ? "danger" : "default"}
         />
       </div>
@@ -881,7 +870,7 @@ function BrandingPage() {
                 Profile
               </Label>
               <select
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="mt-1 w-full border border-input bg-background px-3 py-2 text-sm"
                 value={bulkProfileId}
                 onChange={(e) => setBulkProfileId(e.target.value)}
               >
@@ -914,7 +903,7 @@ function BrandingPage() {
                   </button>
                 </div>
               </div>
-              <div className="max-h-64 overflow-auto rounded-md border border-border">
+              <div className="max-h-64 overflow-auto border border-border">
                 {clones.map((c) => {
                   const checked = bulkCloneIds.has(c.id);
                   return (
@@ -1051,13 +1040,10 @@ function ProfileCard({
             return (
               <div
                 key={k}
-                className="flex items-center gap-1 rounded-md border border-border/60 bg-surface px-2 py-1 text-[10px] font-mono"
+                className="flex items-center gap-1 border bg-surface px-2 py-1 text-[10px] font-mono"
                 title={k}
               >
-                <span
-                  className="h-3 w-3 rounded-sm border border-border"
-                  style={{ background: c }}
-                />
+                <span className="h-3 w-3 border border-border" style={{ background: c }} />
                 {c}
               </div>
             );
@@ -1104,26 +1090,19 @@ function ProfileCard({
 function StatCard({
   label,
   value,
-  icon: Icon,
   tone = "default",
 }: {
   label: string;
   value: number;
-  icon: React.ComponentType<{ className?: string }>;
   tone?: "default" | "warning" | "danger";
 }) {
-  const toneClass =
-    tone === "warning" ? "text-amber-300" : tone === "danger" ? "text-destructive" : "text-primary";
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3 py-4">
-        <Icon className={cn("h-5 w-5", toneClass)} />
-        <div>
-          <div className="text-2xl font-semibold tabular-nums">{value}</div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-        </div>
-      </CardContent>
-    </Card>
+    <MetricCell
+      label={label}
+      value={value}
+      tone={tone === "danger" ? "destructive" : "warning"}
+      alarm={tone !== "default"}
+    />
   );
 }
 
@@ -1351,9 +1330,9 @@ function ProfileEditor({
               return (
                 <div
                   key={def.field}
-                  className="flex items-center gap-3 rounded-md border border-border bg-surface p-3"
+                  className="flex items-center gap-3 border border-border bg-surface p-3"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded border border-border bg-background">
+                  <div className="flex h-12 w-12 items-center justify-center border border-border bg-background">
                     {url ? (
                       <img src={url} alt="" className="max-h-10 max-w-10 object-contain" />
                     ) : (
@@ -1418,8 +1397,8 @@ function ProfileEditor({
             </div>
             <div className="border-t pt-3">
               <p className="mb-2 text-xs text-muted-foreground">
-                Legal identity — printed on generated legal documents (agreements, reports):
-                the registered entity, its ABN/ACN and licence details.
+                Legal identity — printed on generated legal documents (agreements, reports): the
+                registered entity, its ABN/ACN and licence details.
               </p>
               <div className="space-y-3">
                 <Field
@@ -1519,7 +1498,7 @@ function ColorField({
           type="color"
           value={value || "#000000"}
           onChange={(e) => onChange(e.target.value)}
-          className="h-9 w-14 cursor-pointer rounded border border-input bg-background"
+          className="h-9 w-14 cursor-pointer border border-input bg-background"
         />
         <Input
           value={value ?? ""}

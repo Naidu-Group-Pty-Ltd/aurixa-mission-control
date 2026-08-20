@@ -324,9 +324,7 @@ export type StripeWalletTruth = {
  * Never throws: an unreachable Stripe yields verified:false, which the caller
  * renders as "couldn't confirm" rather than as a discrepancy.
  */
-export async function readStripeWalletTruth(
-  rows: PaymentMethodRow[],
-): Promise<StripeWalletTruth> {
+export async function readStripeWalletTruth(rows: PaymentMethodRow[]): Promise<StripeWalletTruth> {
   const customerId = rows.find((r) => r.stripe_customer_id)?.stripe_customer_id;
   if (!customerId) {
     return { verified: true, defaultPaymentMethodId: null, attachedIds: new Set() };
@@ -343,8 +341,7 @@ export async function readStripeWalletTruth(
     const defaultPm = live?.invoice_settings?.default_payment_method ?? null;
     return {
       verified: true,
-      defaultPaymentMethodId:
-        typeof defaultPm === "string" ? defaultPm : (defaultPm?.id ?? null),
+      defaultPaymentMethodId: typeof defaultPm === "string" ? defaultPm : (defaultPm?.id ?? null),
       attachedIds: new Set(attached.data.map((pm) => pm.id)),
     };
   } catch (err) {

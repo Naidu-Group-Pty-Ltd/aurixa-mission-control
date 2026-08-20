@@ -12,7 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle2, ExternalLink, ShieldCheck, KeyRound, FileSignature } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  ExternalLink,
+  ShieldCheck,
+  KeyRound,
+  FileSignature,
+} from "lucide-react";
 
 type InviteContext = {
   invite: {
@@ -77,10 +84,9 @@ function ClientHandoffWizard() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
-          `/api/public/handoffs/consent?token=${encodeURIComponent(token)}`,
-          { headers: { Accept: "application/json" } },
-        );
+        const res = await fetch(`/api/public/handoffs/consent?token=${encodeURIComponent(token)}`, {
+          headers: { Accept: "application/json" },
+        });
         const body = await res.json();
         if (!res.ok || !body.ok) {
           if (!cancelled) setLoadError(body.error ?? `error_${res.status}`);
@@ -153,9 +159,9 @@ function ClientHandoffWizard() {
               <CardTitle>Consent received</CardTitle>
             </div>
             <CardDescription>
-              Thanks. Your Supabase org details and signed DPA were handed over
-              securely. Your Aurixa contact will kick off the twin provisioning
-              step next and email you when it's ready to review.
+              Thanks. Your Supabase org details and signed DPA were handed over securely. Your
+              Aurixa contact will kick off the twin provisioning step next and email you when it's
+              ready to review.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -218,15 +224,15 @@ function ClientHandoffWizard() {
         <header className="space-y-1">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-semibold">
+            <h1 className="font-display text-[1.75rem] leading-[1.1]">
               Handoff for {ctx.handoff?.clone_name ?? "your Aurixa clone"}
             </h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Complete these steps to transfer ownership of your dedicated Aurixa
-            Systems backend into your own Supabase organisation. Everything you
-            submit is encrypted at rest — your personal access token is stored
-            with AES-256-GCM and only used to provision the new project.
+            Complete these steps to transfer ownership of your dedicated Aurixa Systems backend into
+            your own Supabase organisation. Everything you submit is encrypted at rest — your
+            personal access token is stored with AES-256-GCM and only used to provision the new
+            project.
           </p>
           <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
             <Badge variant="outline">Terms {ctx.invite.terms_version}</Badge>
@@ -256,8 +262,8 @@ function ClientHandoffWizard() {
                 in a new tab and sign up (or sign in).
               </li>
               <li>
-                Create a new organisation. Any plan tier that's on the allowlist
-                for this handoff will work.
+                Create a new organisation. Any plan tier that's on the allowlist for this handoff
+                will work.
               </li>
               <li>
                 From <em>Organization settings</em>, copy your <strong>Organization ID</strong>{" "}
@@ -318,7 +324,7 @@ function ClientHandoffWizard() {
                 <select
                   value={form.target_region}
                   onChange={(e) => setForm({ ...form, target_region: e.target.value })}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 w-full border border-input bg-background px-3 text-sm"
                 >
                   <option value="">Select region…</option>
                   {regionChoices.map((r) => (
@@ -332,7 +338,7 @@ function ClientHandoffWizard() {
                 <select
                   value={form.target_plan_tier}
                   onChange={(e) => setForm({ ...form, target_plan_tier: e.target.value })}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 w-full border border-input bg-background px-3 text-sm"
                 >
                   <option value="">Select plan…</option>
                   {planChoices.map((p) => (
@@ -343,11 +349,9 @@ function ClientHandoffWizard() {
                 </select>
               </Field>
             </div>
-            {(ctx.invite.region_allowlist.length > 0 ||
-              ctx.invite.plan_allowlist.length > 0) && (
+            {(ctx.invite.region_allowlist.length > 0 || ctx.invite.plan_allowlist.length > 0) && (
               <p className="text-xs text-muted-foreground">
-                Regions and plans above are restricted by your agreement with
-                Aurixa Systems.
+                Regions and plans above are restricted by your agreement with Aurixa Systems.
               </p>
             )}
           </StepCard>
@@ -403,7 +407,7 @@ function ClientHandoffWizard() {
             icon={<FileSignature className="h-5 w-5" />}
             description={`Terms version ${ctx.invite.terms_version}. Read the agreement below, then type your name to sign.`}
           >
-            <div className="max-h-64 overflow-y-auto rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+            <div className="max-h-64 overflow-y-auto border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
               {ctx.invite.terms_body}
             </div>
             <p className="text-[10px] font-mono text-muted-foreground break-all">
@@ -416,8 +420,7 @@ function ClientHandoffWizard() {
                 onCheckedChange={(v) => setForm({ ...form, dpa_accepted: v === true })}
               />
               <label htmlFor="dpa" className="text-sm">
-                I have read the terms above and I have authority to bind my
-                organisation to them.
+                I have read the terms above and I have authority to bind my organisation to them.
               </label>
             </div>
             <Field label="Type your full legal name to sign" required>
@@ -439,10 +442,7 @@ function ClientHandoffWizard() {
             Back
           </Button>
           {step < 4 ? (
-            <Button
-              onClick={() => setStep((s) => s + 1)}
-              disabled={!canNext(step)}
-            >
+            <Button onClick={() => setStep((s) => s + 1)} disabled={!canNext(step)}>
               Continue <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           ) : (
@@ -459,9 +459,7 @@ function ClientHandoffWizard() {
 function FullBleed({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen bg-background px-4 py-10">
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-start gap-6">
-        {children}
-      </div>
+      <div className="mx-auto flex w-full max-w-3xl flex-col items-start gap-6">{children}</div>
     </main>
   );
 }

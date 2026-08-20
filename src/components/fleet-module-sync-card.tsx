@@ -111,7 +111,7 @@ export function FleetModuleSyncCard() {
   };
 
   return (
-    <Card className="border-border/80">
+    <Card>
       <CardHeader className="space-y-1">
         <div className="flex items-center gap-2">
           <Boxes className="h-4 w-4 text-primary" />
@@ -182,7 +182,7 @@ export function FleetModuleSyncCard() {
           </div>
           <div className="space-y-1">
             <Label>After install</Label>
-            <label className="flex h-9 items-center gap-2 rounded-md border border-input px-3 text-sm">
+            <label className="flex h-9 items-center gap-2 border border-input px-3 text-sm">
               <Checkbox
                 checked={cascade}
                 onCheckedChange={(v) => setCascade(Boolean(v))}
@@ -194,13 +194,13 @@ export function FleetModuleSyncCard() {
         </div>
 
         {selectedModule && (
-          <div className="rounded-md border border-border/60 bg-muted/30 p-3">
+          <div className="border bg-muted/30 p-3">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               file_globs scope
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1">
               {(selectedModule.file_globs ?? []).slice(0, 8).map((g) => (
-                <code key={g} className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px]">
+                <code key={g} className="bg-background px-1.5 py-0.5 font-mono text-[11px]">
                   {g}
                 </code>
               ))}
@@ -251,7 +251,7 @@ export function FleetModuleSyncCard() {
               className="pl-9 font-mono text-sm"
             />
           </div>
-          <div className="max-h-72 overflow-y-auto rounded-md border border-border/60">
+          <div className="max-h-72 overflow-y-auto border">
             {clonesLoading ? (
               <div className="p-4 text-sm text-muted-foreground">Loading clones…</div>
             ) : filteredClones.length === 0 ? (

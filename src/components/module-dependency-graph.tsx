@@ -130,10 +130,7 @@ export function ModuleDependencyGraphButton({
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1">
                           {d.shared_files.slice(0, 6).map((f) => (
-                            <code
-                              key={f}
-                              className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
-                            >
+                            <code key={f} className="bg-muted px-1.5 py-0.5 font-mono text-[10px]">
                               {f}
                             </code>
                           ))}
@@ -155,7 +152,7 @@ export function ModuleDependencyGraphButton({
                 <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                   External imports ({data.externalTargets.length})
                 </div>
-                <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
+                <div className="max-h-32 overflow-y-auto border border-border bg-muted/30 p-2 space-y-0.5">
                   {data.externalTargets.map((f) => (
                     <code key={f} className="block font-mono text-[10px] text-muted-foreground">
                       {f}
@@ -169,7 +166,7 @@ export function ModuleDependencyGraphButton({
               <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
                 Owned files ({data.ownFiles.length})
               </summary>
-              <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
+              <div className="mt-2 max-h-40 overflow-y-auto border border-border bg-muted/30 p-2 space-y-0.5">
                 {data.ownFiles.map((f) => (
                   <code key={f} className="block font-mono text-[10px] text-muted-foreground">
                     {f}

@@ -23,7 +23,10 @@ export const Route = createFileRoute("/settings/clone-stripe")({
   head: () => ({
     meta: [
       { title: "Per-clone Stripe routing — Aurixa Mission Control" },
-      { name: "description", content: "Configure per-clone Stripe webhooks and connected accounts." },
+      {
+        name: "description",
+        content: "Configure per-clone Stripe webhooks and connected accounts.",
+      },
     ],
   }),
   component: CloneStripePage,
@@ -47,10 +50,7 @@ function CloneStripePage() {
   const clones = useQuery({
     queryKey: ["clones", "picker"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clones")
-        .select("id, name, slug")
-        .order("name");
+      const { data, error } = await supabase.from("clones").select("id, name, slug").order("name");
       if (error) throw error;
       return (data ?? []) as Clone[];
     },
@@ -111,18 +111,18 @@ function CloneStripePage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Per-clone Stripe routing</h1>
+        <h1 className="font-display text-[1.75rem] leading-[1.1]">Per-clone Stripe routing</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Point a handed-off or isolated clone at its own Stripe webhook without
-          touching the platform receiver. Secrets are stored encrypted; only
-          the last four characters are shown here.
+          Point a handed-off or isolated clone at its own Stripe webhook without touching the
+          platform receiver. Secrets are stored encrypted; only the last four characters are shown
+          here.
         </p>
       </div>
 
-      <div className="rounded-lg border p-4 space-y-3">
+      <div className="border p-4 space-y-3">
         <label className="text-sm font-medium">Clone</label>
         <select
-          className="w-full border rounded-md h-9 px-2 bg-background"
+          className="w-full border h-9 px-2 bg-background"
           value={selected}
           onChange={(e) => {
             setSelected(e.target.value);
@@ -142,21 +142,31 @@ function CloneStripePage() {
       </div>
 
       {selected && (
-        <div className="rounded-lg border p-4 space-y-4">
+        <div className="border p-4 space-y-4">
           <div className="text-sm">
             <div className="text-muted-foreground">Webhook URL (paste into Stripe)</div>
-            <code className="block mt-1 p-2 bg-muted rounded text-xs break-all">
+            <code className="block mt-1 p-2 bg-muted text-xs break-all">
               {webhookUrl || "loading…"}
             </code>
           </div>
 
           {cfg && (
             <div className="text-xs text-muted-foreground grid grid-cols-2 gap-2">
-              <div>Status: <strong>{cfg.status}</strong></div>
-              <div>Mode: <strong>{cfg.mode}</strong></div>
-              <div>Account: <strong>{cfg.stripe_account_id ?? "—"}</strong></div>
-              <div>Secret last4: <strong>{cfg.webhook_secret_last4 ?? "—"}</strong></div>
-              <div className="col-span-2">Forward URL: <strong>{cfg.forward_url ?? "—"}</strong></div>
+              <div>
+                Status: <strong>{cfg.status}</strong>
+              </div>
+              <div>
+                Mode: <strong>{cfg.mode}</strong>
+              </div>
+              <div>
+                Account: <strong>{cfg.stripe_account_id ?? "—"}</strong>
+              </div>
+              <div>
+                Secret last4: <strong>{cfg.webhook_secret_last4 ?? "—"}</strong>
+              </div>
+              <div className="col-span-2">
+                Forward URL: <strong>{cfg.forward_url ?? "—"}</strong>
+              </div>
               <div className="col-span-2">Rotated at: {cfg.rotated_at ?? "—"}</div>
             </div>
           )}
@@ -165,7 +175,7 @@ function CloneStripePage() {
             <label className="text-sm">
               Mode
               <select
-                className="w-full mt-1 border rounded-md h-9 px-2 bg-background"
+                className="w-full mt-1 border h-9 px-2 bg-background"
                 value={mode}
                 onChange={(e) => setMode(e.target.value as typeof mode)}
               >
@@ -178,7 +188,7 @@ function CloneStripePage() {
             <label className="text-sm">
               Stripe account id (acct_…)
               <input
-                className="w-full mt-1 border rounded-md h-9 px-2 bg-background"
+                className="w-full mt-1 border h-9 px-2 bg-background"
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
                 placeholder="acct_…"
@@ -189,7 +199,7 @@ function CloneStripePage() {
               Webhook signing secret (whsec_… — will be encrypted)
               <input
                 type="password"
-                className="w-full mt-1 border rounded-md h-9 px-2 bg-background"
+                className="w-full mt-1 border h-9 px-2 bg-background"
                 value={webhookSecret}
                 onChange={(e) => setWebhookSecret(e.target.value)}
                 placeholder="whsec_…"
@@ -200,7 +210,7 @@ function CloneStripePage() {
             <label className="text-sm">
               Forward URL (optional — client backend that receives verified events)
               <input
-                className="w-full mt-1 border rounded-md h-9 px-2 bg-background"
+                className="w-full mt-1 border h-9 px-2 bg-background"
                 value={forwardUrl}
                 onChange={(e) => setForwardUrl(e.target.value)}
                 placeholder="https://client-backend.example.com/hooks/stripe"
@@ -210,21 +220,21 @@ function CloneStripePage() {
 
           <div className="flex gap-2 flex-wrap">
             <button
-              className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm"
+              className="h-9 px-3 bg-primary text-primary-foreground text-sm"
               disabled={!selected || upsertMut.isPending}
               onClick={() => upsertMut.mutate()}
             >
               {upsertMut.isPending ? "Saving…" : "Save"}
             </button>
             <button
-              className="h-9 px-3 rounded-md border text-sm"
+              className="h-9 px-3 border text-sm"
               disabled={!cfg || rotateMut.isPending}
               onClick={() => rotateMut.mutate()}
             >
               Rotate webhook secret
             </button>
             <button
-              className="h-9 px-3 rounded-md border text-sm text-destructive"
+              className="h-9 px-3 border text-sm text-destructive"
               disabled={!cfg || revokeMut.isPending}
               onClick={() => revokeMut.mutate()}
             >
@@ -234,7 +244,7 @@ function CloneStripePage() {
         </div>
       )}
 
-      <div className="rounded-lg border">
+      <div className="border">
         <div className="p-3 border-b text-sm font-medium">Configured clones</div>
         <div className="divide-y">
           {(configs.data?.rows ?? []).length === 0 && (

@@ -61,7 +61,7 @@ export function ModuleCoverageStrip({
   }, [moduleId]);
 
   if (!counts) {
-    return <div className="h-6 w-32 animate-pulse rounded bg-muted/40" aria-hidden />;
+    return <div className="h-6 w-32 animate-pulse bg-muted/40" aria-hidden />;
   }
 
   if (counts.total === 0) {

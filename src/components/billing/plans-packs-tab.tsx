@@ -72,7 +72,7 @@ function PlansCard() {
           <button
             key={p.id}
             onClick={() => edit(p)}
-            className="flex w-full items-center justify-between rounded border border-border p-2 text-left hover:bg-muted/30"
+            className="flex w-full items-center justify-between border border-border p-2 text-left hover:bg-muted/30"
           >
             <div>
               <div className="font-medium">
@@ -213,7 +213,7 @@ function PacksCard() {
           <button
             key={p.id}
             onClick={() => edit(p)}
-            className="flex w-full items-center justify-between rounded border border-border p-2 text-left hover:bg-muted/30"
+            className="flex w-full items-center justify-between border border-border p-2 text-left hover:bg-muted/30"
           >
             <div>
               <div className="font-medium">

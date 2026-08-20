@@ -190,7 +190,7 @@ export function GitHubSetupWizard() {
                         <div className="text-[11px] italic text-muted-foreground/70">
                           The number at the end of the URL when you click <em>Configure</em> on the
                           installed app (
-                          <code className="rounded bg-muted px-0.5">
+                          <code className="bg-muted px-0.5">
                             …/installations/<strong>{"<ID>"}</strong>
                           </code>
                           ).
@@ -204,7 +204,7 @@ export function GitHubSetupWizard() {
               </div>
             )}
             {error && (
-              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              <div className="flex items-start gap-2 border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 {error}
               </div>
@@ -234,7 +234,7 @@ export function GitHubSetupWizard() {
               details.
             </p>
             {ghStatus && !ghStatus.configured && (
-              <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <div className="flex items-start gap-3 border border-destructive/40 bg-destructive/5 p-3 text-sm">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                 <div>
                   <div className="font-medium text-destructive">Connection failed</div>
@@ -261,7 +261,7 @@ export function GitHubSetupWizard() {
               </div>
             )}
             {error && (
-              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              <div className="flex items-start gap-2 border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 {error}
               </div>
@@ -326,7 +326,7 @@ export function GitHubSetupWizard() {
                     {ghStatus.repos.map((r) => (
                       <li
                         key={r.id}
-                        className="flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                        className="flex items-center gap-3 border border-border bg-surface px-3 py-2 text-sm"
                       >
                         {r.ok ? (
                           <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />

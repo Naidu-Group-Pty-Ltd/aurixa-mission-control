@@ -62,9 +62,9 @@ function ResetPasswordPage() {
   return (
     <div className="grid-bg flex min-h-dvh items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6">
-        <Card className="border-border/80 bg-card/90 backdrop-blur">
+        <Card>
           <CardHeader className="items-center text-center">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
               <Radio className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="font-mono tracking-wide">SET A NEW PASSWORD</CardTitle>

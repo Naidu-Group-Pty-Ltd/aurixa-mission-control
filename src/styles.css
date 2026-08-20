@@ -6,16 +6,40 @@
 
 /*
  * Mission Control — design system
- * Aesthetic: dark, terminal-grade, neon command-center.
- * Primary: electric cyan. Accent: vivid lime. Status: amber/red/green.
+ *
+ * ONE IDEA: structure is hard, surface is glass.
+ *
+ *   Brutalism owns STRUCTURE. Square corners, borders you can actually see,
+ *   hard offset shadows with no blur, mono labels, wide display numerals.
+ *   Nothing is softened to look friendly; the frame is the frame.
+ *
+ *   Glassmorphism owns SURFACE. Panels are frosted translucent planes over an
+ *   atmospheric ground, so depth reads as depth instead of as another border.
+ *
+ * The split is what keeps the screen quiet. When a border is invisible (this
+ * file used to set them at 8% white) structure does no work, so colour has to
+ * carry every distinction — which is how one clone card ended up with six
+ * differently-coloured chips on it. Make the frame legible and most of the
+ * chips become unnecessary.
+ *
+ * COLOUR DISCIPLINE — the rule that keeps it clean:
+ *   cyan    interaction and identity. Links, focus, the primary action.
+ *   status  green/amber/red MEAN status. Never decoration, never a category.
+ *   lime    "live, right now" only — the pulse, an in-flight cascade. Rare.
+ *   grey    everything else, which is most things.
+ *
+ * PERFORMANCE — backdrop-filter is expensive and compounds. Put glass on
+ * PANELS, never on anything that repeats: not table rows, not chips, not list
+ * items. `.glass` is for the container; its contents stay flat.
  */
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  /* Square. All of them. A brutalist frame that rounds one corner is not one. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -40,6 +64,7 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
@@ -60,11 +85,12 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 :root,
 .dark {
-  --radius: 0.5rem;
+  --radius: 0px;
 
   /* Surfaces — deep void with subtle blue */
   --background: oklch(0.16 0.018 250);
@@ -92,19 +118,27 @@
   --accent-foreground: oklch(0.16 0.03 250);
 
   /* Status */
-  --success: oklch(0.78 0.18 150);
+  --success: oklch(0.74 0.14 152);
   --success-foreground: oklch(0.14 0.03 250);
-  --warning: oklch(0.82 0.17 80);
+  --warning: oklch(0.79 0.13 78);
   --warning-foreground: oklch(0.14 0.03 250);
-  --destructive: oklch(0.66 0.24 25);
+  --destructive: oklch(0.63 0.19 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --info: oklch(0.72 0.14 240);
+  --info: oklch(0.7 0.11 242);
   --info-foreground: oklch(0.14 0.03 250);
 
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.78 0.16 200 / 60%);
-  --grid-line: oklch(1 0 0 / 4%);
+  /* Visible on purpose. At 8% the frame did nothing and colour had to carry
+     every distinction; at 16% the structure is legible and the chips can go. */
+  --border: oklch(1 0 0 / 16%);
+  --border-strong: oklch(1 0 0 / 30%);
+  --input: oklch(1 0 0 / 22%);
+  --ring: oklch(0.78 0.16 200 / 70%);
+  --grid-line: oklch(1 0 0 / 3.5%);
+
+  /* Glass — the translucent plane and the light caught on its top edge. */
+  --glass: oklch(0.3 0.026 250 / 42%);
+  --glass-strong: oklch(0.32 0.028 250 / 68%);
+  --glass-edge: oklch(1 0 0 / 14%);
 
   --chart-1: oklch(0.78 0.16 200);
   --chart-2: oklch(0.86 0.2 130);
@@ -159,10 +193,15 @@
   --chart-4: oklch(0.55 0.22 25);
   --chart-5: oklch(0.55 0.18 290);
 
-  --border: oklch(0 0 0 / 10%);
-  --input: oklch(0 0 0 / 14%);
-  --ring: oklch(0.55 0.18 220 / 60%);
-  --grid-line: oklch(0 0 0 / 4%);
+  --border: oklch(0 0 0 / 18%);
+  --border-strong: oklch(0 0 0 / 34%);
+  --input: oklch(0 0 0 / 24%);
+  --ring: oklch(0.55 0.18 220 / 70%);
+  --grid-line: oklch(0 0 0 / 3.5%);
+
+  --glass: oklch(1 0 0 / 62%);
+  --glass-strong: oklch(1 0 0 / 82%);
+  --glass-edge: oklch(1 0 0 / 70%);
   --sidebar: oklch(0.97 0.005 240);
   --sidebar-foreground: oklch(0.2 0.02 250);
   --sidebar-accent: oklch(0.92 0.01 240);
@@ -178,12 +217,32 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
     font-feature-settings: "ss01", "cv11";
   }
+  /* The ground the glass sits on. Glass only reads as glass when there is
+     something behind it to refract, so this is a shade stronger than the flat
+     wash it replaces — and fixed, so panels catch different light as the page
+     scrolls under them rather than moving as one sheet. */
   body {
     background-image:
-      radial-gradient(circle at 0% 0%, oklch(0.78 0.16 200 / 0.08), transparent 40%),
-      radial-gradient(circle at 100% 0%, oklch(0.86 0.2 130 / 0.05), transparent 40%);
+      /* The grid is not decoration — it is what the glass refracts. A frosted
+         plane over a flat colour is just a lighter rectangle; over a ruled
+         ground the blur has something to smear and the panel reads as a panel
+         you are looking THROUGH. It also happens to suit a console. */
+      linear-gradient(var(--color-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px),
+      /* Colour placed where the content is, not only at the page edges, so
+         panels sit over light rather than beside it. */
+        radial-gradient(46% 38% at 24% 18%, oklch(0.78 0.16 200 / 0.16), transparent 70%),
+      radial-gradient(40% 34% at 84% 44%, oklch(0.72 0.14 290 / 0.13), transparent 70%),
+      radial-gradient(52% 40% at 52% 96%, oklch(0.86 0.2 130 / 0.07), transparent 70%);
+    background-size:
+      44px 44px,
+      44px 44px,
+      auto,
+      auto,
+      auto;
     background-attachment: fixed;
   }
   ::selection {
@@ -210,10 +269,37 @@
   .font-mono {
     font-family: var(--font-mono);
   }
+  /* Display — Archivo pushed out on its width axis. Wide industrial grotesk
+     rather than a serif: this is a console for watching machines, and the
+     numerals have to hold their own at 3rem beside monospace labels. */
   .font-display {
-    font-family: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
-    font-weight: 400;
-    letter-spacing: -0.01em;
+    font-family: var(--font-sans);
+    /* font-stretch, NOT font-variation-settings. Google Fonts answers a
+       `wdth` range request with a set of STATIC instances, and the browser
+       picks between them by font-stretch — a `"wdth" 125` variation setting
+       matches nothing and silently renders at normal width, which is why this
+       read as plain Archivo for three iterations. */
+    font-stretch: 125%;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+  }
+  /* Numerals that line up in a column. Every metric on the screen uses this. */
+  .numeral {
+    font-family: var(--font-sans);
+    font-stretch: 125%;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  /* The label voice: mono, uppercase, tracked out. Says "this is machine
+     state", and is the only thing allowed to shout in small sizes. */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--color-muted-foreground);
   }
   .noise-overlay {
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
@@ -303,5 +389,92 @@
     -webkit-background-clip: initial;
     background-clip: initial;
     color: var(--color-foreground);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GLASS — surface
+   One class, three weights. Put it on a PANEL. Never on a row, a chip or a
+   list item: backdrop-filter costs a compositing pass each time and a table of
+   200 blurred rows will drop frames on hardware that renders one blurred panel
+   without noticing.
+   ────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .glass {
+    background-color: var(--glass);
+    /* Two things this declaration will not survive, both found by reading the
+       emitted rule in the browser rather than by trusting the source:
+         1. `blur(var(--token))` — Lightning CSS cannot statically validate a
+            custom property inside a filter function and drops the declaration.
+         2. A hand-written `-webkit-backdrop-filter` beside it — that makes it
+            drop BOTH. Lightning CSS adds the prefix itself when the build
+            targets need it, so writing it by hand is worse than useless.
+       Either mistake leaves a flat translucent rectangle that looks almost
+       right, which is why it went unnoticed twice. */
+    backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--color-border);
+    /* The light on the top edge is what makes a plane read as glass rather
+       than as a flat translucent rectangle. One inset line, nothing else. */
+    box-shadow: inset 0 1px 0 0 var(--glass-edge);
+  }
+  .glass-strong {
+    background-color: var(--glass-strong);
+    backdrop-filter: blur(26px) saturate(150%);
+    border: 1px solid var(--color-border);
+    box-shadow: inset 0 1px 0 0 var(--glass-edge);
+  }
+  /* Flat panel for anything inside glass — nesting blur on blur is muddy and
+     expensive, and the inner surface only needs to sit a step forward. */
+  .glass-inset {
+    background-color: oklch(1 0 0 / 4%);
+    border: 1px solid var(--color-border);
+  }
+
+  /* ───────────────────────────────────────────────────────────────────────
+     BRUTALIST — structure
+     ─────────────────────────────────────────────────────────────────────── */
+
+  /* A hard offset shadow. No blur, no fade: the panel is a slab with another
+     slab behind it. Reserved for things that are genuinely raised — a primary
+     action, an open dialog — so that "raised" keeps meaning something. */
+  .brut-raise {
+    box-shadow: 4px 4px 0 0 var(--color-border-strong);
+  }
+  .brut-raise-primary {
+    box-shadow: 4px 4px 0 0 var(--color-primary);
+  }
+
+  /* The signature: a status spine. A 3px hard edge down the left of a record,
+     coloured by state, plus one uppercase mono word. It replaces the pill, the
+     dot, the coloured border and the tinted background that used to say the
+     same thing four times — and down a column of records it reads at a glance
+     without the eye stopping on any of them. */
+  .spine {
+    border-left: 3px solid var(--color-border-strong);
+  }
+  .spine-ok {
+    border-left-color: var(--color-success);
+  }
+  .spine-warn {
+    border-left-color: var(--color-warning);
+  }
+  .spine-bad {
+    border-left-color: var(--color-destructive);
+  }
+  /* In-flight is INFO, not accent. Accent is the lime at hue 130 and success
+     is the green at hue 152 — set as two words of 10px mono beside each other,
+     "cascading" and "in sync" were the same colour, which is the one thing a
+     status colour must never be. */
+  .spine-live {
+    border-left-color: var(--color-info);
+  }
+  .spine-idle {
+    border-left-color: var(--color-border-strong);
+  }
+
+  /* Section rule. Structure by line, not by another bordered box — most of
+     what used to be a nested Card is really just a labelled division. */
+  .rule-top {
+    border-top: 1px solid var(--color-border);
   }
 }

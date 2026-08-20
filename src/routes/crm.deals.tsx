@@ -3,9 +3,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProtectedRoute } from "@/components/protected-route";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RecordRow } from "@/components/record-row";
 import { listDeals, setDealStage, DEAL_STAGES } from "@/lib/crm-deals.functions";
 import { Target, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -32,9 +33,11 @@ export const Route = createFileRoute("/crm/deals")({
 });
 
 const money = (cents: number) =>
-  new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(
-    (cents ?? 0) / 100,
-  );
+  new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: 0,
+  }).format((cents ?? 0) / 100);
 
 function DealsBoard() {
   const qc = useQueryClient();
@@ -64,7 +67,6 @@ function DealsBoard() {
     qc.invalidateQueries({ queryKey: ["crm"] });
   }
 
-
   return (
     <div className="space-y-6 p-6">
       <PageHeader
@@ -89,7 +91,7 @@ function DealsBoard() {
               </div>
               <div className="space-y-2">
                 {inStage.map((d: any) => (
-                  <Card key={d.id}>
+                  <RecordRow key={d.id}>
                     <CardContent className="space-y-2 py-3">
                       <Link
                         to="/crm/accounts/$accountId"
@@ -113,10 +115,10 @@ function DealsBoard() {
                         </div>
                       </div>
                     </CardContent>
-                  </Card>
+                  </RecordRow>
                 ))}
                 {inStage.length === 0 && (
-                  <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+                  <div className="border border-dashed p-4 text-center text-xs text-muted-foreground">
                     Empty
                   </div>
                 )}

@@ -103,14 +103,12 @@ function ProvisioningPreviewPage() {
     <div className="space-y-6">
       <header className="flex items-end justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent/15 ring-1 ring-accent/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-accent/15 ring-1 ring-accent/40">
             <Eye className="h-5 w-5 text-accent" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              schema preview
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Provisioning Preview</h1>
+            <p className="label-mono">schema preview</p>
+            <h1 className="mt-1 font-display text-[1.75rem] leading-[1.1]">Provisioning Preview</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Inspect the exact bootstrap SQL and seeded admin configuration for any clone.
             </p>
@@ -175,10 +173,7 @@ function ProvisioningPreviewPage() {
               {highlights.map((h) => {
                 const Icon = h.icon;
                 return (
-                  <div
-                    key={h.label}
-                    className="flex items-start gap-3 rounded-md border border-border/60 bg-surface p-3"
-                  >
+                  <div key={h.label} className="flex items-start gap-3 border bg-surface p-3">
                     <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div>
                       <div className="text-sm font-medium">{h.label}</div>
@@ -233,7 +228,7 @@ function ProvisioningPreviewPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-[120px_1fr] gap-2 rounded-md border border-border/60 bg-surface p-3">
+            <div className="grid grid-cols-[120px_1fr] gap-2 border bg-surface p-3">
               <span className="text-muted-foreground">Role</span>
               <span className="font-mono font-medium text-warning">super_admin (level 100)</span>
               <span className="text-muted-foreground">assigned_by</span>

@@ -69,11 +69,7 @@ export const upsertSecurityIntakeSource = createServerFn({ method: "POST" })
           .eq("id", data.id)
           .select("id, slug")
           .single()
-      : await admin
-          .from("security_intake_sources")
-          .insert(patch)
-          .select("id, slug")
-          .single();
+      : await admin.from("security_intake_sources").insert(patch).select("id, slug").single();
 
     if (res.error) throw new Error(res.error.message);
     await admin.from("audit_log").insert({

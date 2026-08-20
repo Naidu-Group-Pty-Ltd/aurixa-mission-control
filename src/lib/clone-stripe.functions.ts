@@ -160,15 +160,13 @@ export const rotateCloneStripeWebhook = createServerFn({ method: "POST" })
     if (!row) return { ok: false as const, error: "config_not_found" };
 
     if (data.handoffId) {
-      const { error: rotErr } = await context.supabase
-        .from("handoff_secret_rotations")
-        .insert({
-          handoff_id: data.handoffId,
-          target: "stripe_endpoint" as const,
-          key_ref: computeWebhookUrl(data.cloneId),
-          status: "pending" as const,
-          metadata: { reason: data.reason ?? null, rotated_at: now },
-        });
+      const { error: rotErr } = await context.supabase.from("handoff_secret_rotations").insert({
+        handoff_id: data.handoffId,
+        target: "stripe_endpoint" as const,
+        key_ref: computeWebhookUrl(data.cloneId),
+        status: "pending" as const,
+        metadata: { reason: data.reason ?? null, rotated_at: now },
+      });
       if (rotErr) {
         // Non-fatal for the rotate itself — surface but don't undo the flip.
         console.error("stripe rotation ledger insert failed", rotErr);

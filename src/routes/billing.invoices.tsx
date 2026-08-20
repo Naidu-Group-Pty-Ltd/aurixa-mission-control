@@ -171,14 +171,12 @@ function InvoicesPage() {
       </Link>
 
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
           <ReceiptText className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            billing
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Invoices &amp; Wallets</h1>
+          <p className="label-mono">billing</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Invoices &amp; Wallets</h1>
           <p className="text-sm text-muted-foreground">
             Every Stripe invoice across the fleet — subscription cycles and one-time purchases —
             plus the cards on file per workspace.
@@ -262,7 +260,7 @@ function InvoicesPage() {
             <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
           )}
           {!listQ.isLoading && rows.length === 0 && (
-            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-8 text-center text-sm text-muted-foreground">
               No invoices match these filters. Invoices appear here as the Stripe webhook mirrors
               them (subscription renewals, and one-time purchases made after invoice creation was
               enabled).
@@ -385,7 +383,7 @@ function InvoicesPage() {
             <div className="py-6 text-center text-sm text-muted-foreground">Loading…</div>
           )}
           {!walletQ.isLoading && cards.length === 0 && (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               No saved cards yet. Cards are added by workspace users from their Billing &amp; Usage
               page (Stripe-hosted capture; only brand/last4/expiry are stored here).
             </div>

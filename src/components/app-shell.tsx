@@ -70,25 +70,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <AppShellContext.Provider value={true}>
       <div className="flex min-h-dvh w-full">
         {/* Desktop sidebar */}
-        <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border/60 bg-sidebar p-4 md:flex">
-          <Link to="/dashboard" className="mb-8 flex items-center gap-2">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
-              <Radio className="h-5 w-5 text-primary" />
-              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-accent" />
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                Aurixa Systems
-              </span>
-              <span className="font-mono text-sm font-semibold tracking-wide text-foreground">
-                MISSION CONTROL
-              </span>
-            </div>
+        <aside className="glass sticky top-0 hidden h-dvh w-[15.5rem] shrink-0 flex-col border-y-0 border-l-0 border-r p-4 md:flex">
+          {/* One identity, two lines. A tinted square with a ring, a pulse dot
+              and a stacked mono lockup was four objects saying one thing. The
+              pulse stays — it is the only lime on the screen, and it means the
+              console is live. */}
+          <Link to="/dashboard" className="mb-7 block px-3 pt-1">
+            <span className="label-mono text-muted-foreground/70">Aurixa Systems</span>
+            <span className="font-display mt-1.5 flex items-center gap-2 text-[0.9375rem] leading-none text-foreground">
+              Mission Control
+              <span aria-hidden className="h-1.5 w-1.5 animate-pulse bg-accent" />
+            </span>
           </Link>
 
-          <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto pr-1">{navLinks}</nav>
+          <nav className="flex-1 min-h-0 overflow-y-auto pr-1">{navLinks}</nav>
 
-          <div className="mt-auto rounded-md border border-border/60 bg-surface p-3">
+          <div className="mt-auto rule-top pt-3">
             <div className="mb-2 truncate font-mono text-[11px] text-muted-foreground">
               {user?.email}
             </div>
@@ -108,7 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 min-w-0">
           {/* Mobile top bar */}
-          <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur">
+          <header className="glass-strong sticky top-0 z-30 flex h-14 items-center gap-3 border-x-0 border-t-0 border-b px-4 md:hidden">
             <Button
               variant="ghost"
               size="icon"
@@ -152,8 +149,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <SheetDescription>Main navigation menu</SheetDescription>
               </SheetHeader>
               <div className="flex h-full flex-col bg-sidebar">
-                <div className="flex items-center gap-2 border-b border-border/60 p-4">
-                  <div className="relative flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+                <div className="flex items-center gap-2 border-b p-4">
+                  <div className="relative flex h-8 w-8 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
                     <Radio className="h-4 w-4 text-primary" />
                     <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
                   </div>
@@ -169,7 +166,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                 <nav className="flex-1 space-y-1 overflow-y-auto p-3">{navLinks}</nav>
 
-                <div className="border-t border-border/60 p-3">
+                <div className="border-t p-3">
                   <div className="mb-2 truncate font-mono text-[10px] text-muted-foreground">
                     {user?.email}
                   </div>
@@ -191,9 +188,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Sheet>
 
           {/* Desktop top bar */}
-          <header className="hidden md:flex sticky top-0 z-30 h-12 items-center justify-end gap-2 border-b border-border/60 bg-background/80 px-6 backdrop-blur">
+          <header className="glass-strong sticky top-0 z-30 hidden h-12 items-center justify-end gap-3 border-x-0 border-t-0 border-b px-6 md:flex">
             <GitHubRateLimitMeter />
-            <kbd className="hidden lg:inline-flex items-center gap-1 rounded border border-border/60 bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+            <kbd className="hidden items-center gap-1.5 border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground lg:inline-flex">
               ⌘K
               <span className="text-muted-foreground/60">command palette</span>
             </kbd>

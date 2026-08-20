@@ -132,8 +132,8 @@ describe("buildLeadSubject", () => {
   });
 
   it("defaults a lead with no recorded stage to Stage 1", () => {
-    expect((buildLeadSubject({ email: "a@b.co" }) as Record<string, any>).funnel_stage_reached).toBe(
-      1,
-    );
+    expect(
+      (buildLeadSubject({ email: "a@b.co" }) as Record<string, any>).funnel_stage_reached,
+    ).toBe(1);
   });
 });

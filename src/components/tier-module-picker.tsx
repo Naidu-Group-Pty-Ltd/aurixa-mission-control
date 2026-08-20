@@ -264,7 +264,7 @@ export function TierModulePicker({
           </div>
 
           {modules.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               No modules detected yet. Run detection from the{" "}
               <span className="font-mono text-foreground">Modules</span> page.
             </div>

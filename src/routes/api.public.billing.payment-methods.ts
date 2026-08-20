@@ -91,9 +91,7 @@ function serialize(
     is_stripe_default: truth?.verified
       ? truth.defaultPaymentMethodId === r.stripe_payment_method_id
       : null,
-    attached_at_stripe: truth?.verified
-      ? truth.attachedIds.has(r.stripe_payment_method_id)
-      : null,
+    attached_at_stripe: truth?.verified ? truth.attachedIds.has(r.stripe_payment_method_id) : null,
     id: r.id,
     brand: r.brand,
     last4: r.last4,

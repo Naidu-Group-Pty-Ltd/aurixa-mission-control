@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { RecordRow } from "@/components/record-row";
 import { Newspaper, Sparkles, RefreshCw } from "lucide-react";
 import { aiGenerateFleetDigest, listFleetDigests } from "@/server/ai-features.functions";
 import { toast } from "sonner";
@@ -44,14 +45,12 @@ function DigestsPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent/15 ring-1 ring-accent/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-accent/15 ring-1 ring-accent/40">
           <Newspaper className="h-5 w-5 text-accent" />
         </div>
         <div className="flex-1">
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            ai briefings
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Fleet Digests</h1>
+          <p className="label-mono">ai briefings</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Fleet Digests</h1>
           <p className="text-sm text-muted-foreground">
             AI-summarized weekly fleet operations briefings.
           </p>
@@ -75,7 +74,7 @@ function DigestsPage() {
       ) : (
         <div className="space-y-4">
           {pageDigests.map((d) => (
-            <Card key={d.id}>
+            <RecordRow key={d.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -102,7 +101,7 @@ function DigestsPage() {
                   ))}
                 </div>
               </CardContent>
-            </Card>
+            </RecordRow>
           ))}
           <ListPager page={clampedPage} pageCount={pageCount} onPage={setPage} />
         </div>

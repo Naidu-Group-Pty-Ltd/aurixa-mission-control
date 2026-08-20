@@ -150,7 +150,7 @@ export function PricingMapPanel() {
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> loading…
           </div>
         ) : rows.length === 0 ? (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
             No mapping yet — press <span className="font-mono text-foreground">Re-derive</span> to
             build it from the pricing catalogue and the detected modules.
           </div>
@@ -220,10 +220,7 @@ export function PricingMapPanel() {
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       {r.module_slugs.length > 0 ? (
                         r.module_slugs.map((s) => (
-                          <code
-                            key={s}
-                            className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
-                          >
+                          <code key={s} className="bg-muted px-1.5 py-0.5 font-mono text-[10px]">
                             {s}
                           </code>
                         ))

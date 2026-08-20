@@ -196,7 +196,7 @@ export function CloneDriftPolicyCard({ cloneId }: { cloneId: string }) {
         </div>
 
         {policy?.last_applied_at && (
-          <div className="flex items-center gap-2 border-t border-border/60 pt-3 font-mono text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 border-t pt-3 font-mono text-xs text-muted-foreground">
             last fired {formatDistanceToNow(policy.last_applied_at)} ·
             <Badge variant="outline" className="text-[10px] uppercase">
               {policy.last_applied_count} applied

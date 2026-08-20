@@ -126,7 +126,7 @@ export function CloneActivityHistory({ cloneId }: { cloneId: string }) {
               {items.map((n) => {
                 const Icon = iconFor(n.kind);
                 const inner = (
-                  <div className="ml-12 rounded-md border border-border/60 bg-surface p-3 transition-colors hover:bg-muted/30">
+                  <div className="ml-12 border bg-surface p-3 transition-colors hover:bg-muted/30">
                     <div className="flex items-start gap-2">
                       <span className="text-sm font-medium text-foreground">{n.title}</span>
                       <Badge

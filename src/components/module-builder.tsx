@@ -19,7 +19,6 @@ import {
   History,
   RotateCcw,
   AlertTriangle,
-  CheckCircle2,
   Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -347,7 +346,7 @@ export function ModuleBuilder() {
                 Available ({available.length})
               </span>
               {available.length === 0 ? (
-                <div className="rounded-md border border-border bg-surface/50 p-4 text-center text-xs text-muted-foreground">
+                <div className="border border-border bg-surface/50 p-4 text-center text-xs text-muted-foreground">
                   All modules attached
                 </div>
               ) : (
@@ -383,7 +382,7 @@ export function ModuleBuilder() {
                 Attached ({attached.length})
               </span>
               {attached.length === 0 ? (
-                <div className="rounded-md border border-success/20 bg-surface/50 p-4 text-center text-xs text-muted-foreground">
+                <div className="border border-success/20 bg-surface/50 p-4 text-center text-xs text-muted-foreground">
                   Drag modules here to attach
                 </div>
               ) : (
@@ -414,7 +413,7 @@ export function ModuleBuilder() {
             {snapshotsLoading ? (
               <div className="text-xs text-muted-foreground">Loading…</div>
             ) : snapshots.length === 0 ? (
-              <div className="rounded-md border border-border bg-surface/50 p-3 text-center text-xs text-muted-foreground">
+              <div className="border border-border bg-surface/50 p-3 text-center text-xs text-muted-foreground">
                 No saved versions yet.
               </div>
             ) : (
@@ -422,7 +421,7 @@ export function ModuleBuilder() {
                 {snapshots.map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                    className="flex items-center gap-3 border border-border bg-surface px-3 py-2 text-sm"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -454,7 +453,7 @@ export function ModuleBuilder() {
         )}
 
         {!selectedCloneId && !loading && (
-          <div className="rounded-md border border-border bg-surface/50 p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-border bg-surface/50 p-6 text-center text-sm text-muted-foreground">
             Select a clone above to manage its module configuration.
           </div>
         )}
@@ -488,7 +487,7 @@ function ModuleChip({
       onDragStart={(e) =>
         onDragStart(e, { moduleId: m.id, moduleName: m.name, moduleSlug: m.slug, source })
       }
-      className="group flex cursor-grab items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted/40 active:cursor-grabbing"
+      className="group flex cursor-grab items-center gap-2 border border-border px-3 py-2 text-sm transition-colors hover:bg-muted/40 active:cursor-grabbing"
     >
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
       <div className="flex-1 min-w-0">

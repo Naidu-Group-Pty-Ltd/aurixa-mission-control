@@ -179,7 +179,7 @@ export function CloneLibraryPinsCard({ cloneId }: { cloneId: string }) {
                 pinned ({pins.length})
               </div>
               {pins.length === 0 ? (
-                <div className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+                <div className="border border-dashed p-3 text-center text-xs text-muted-foreground">
                   No version pins yet — pick one from the list below.
                 </div>
               ) : (
@@ -269,7 +269,7 @@ export function CloneLibraryPinsCard({ cloneId }: { cloneId: string }) {
                   return (
                     <div
                       key={slug}
-                      className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2"
+                      className="flex items-center justify-between gap-2 border border-border px-3 py-2"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <code className="font-mono text-sm truncate">{slug}</code>
@@ -316,7 +316,7 @@ export function CloneLibraryPinsCard({ cloneId }: { cloneId: string }) {
             )}
 
             {approvedBySlug.size === 0 && (
-              <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+              <div className="border border-dashed p-4 text-center text-xs text-muted-foreground">
                 <CheckCircle2 className="mx-auto mb-1 h-4 w-4" />
                 No approved library entries available yet. Publish modules and have an admin approve
                 them first.

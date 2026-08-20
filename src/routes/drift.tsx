@@ -3,7 +3,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { RouteError } from "@/components/route-error";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sparkles, AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react";
@@ -15,6 +15,7 @@ import { formatDistanceToNow } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { DriftListSkeleton } from "@/components/list-skeletons";
+import { RecordRow } from "@/components/record-row";
 import { useUrlState } from "@/lib/use-url-state";
 import { useOptimisticMutation } from "@/lib/use-optimistic-mutation";
 
@@ -174,7 +175,7 @@ function DriftDashboard() {
         />
       ) : (
         Object.entries(groups).map(([cat, items]) => (
-          <Card key={cat}>
+          <RecordRow key={cat}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Badge variant="outline" className="font-mono uppercase">
@@ -187,7 +188,7 @@ function DriftDashboard() {
               {items.map((r) => (
                 <div
                   key={`${r.cloneId}:${r.suggestion.id}`}
-                  className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 md:flex-row md:items-start md:justify-between"
+                  className="flex flex-col gap-2 border border-border bg-surface p-3 md:flex-row md:items-start md:justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -225,7 +226,7 @@ function DriftDashboard() {
                 </div>
               ))}
             </CardContent>
-          </Card>
+          </RecordRow>
         ))
       )}
     </div>

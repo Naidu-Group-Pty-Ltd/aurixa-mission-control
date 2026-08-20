@@ -53,7 +53,11 @@ export const createHandoffTermsVersion = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
       .object({
-        version: z.string().min(1).max(64).regex(/^[a-zA-Z0-9._-]+$/),
+        version: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-zA-Z0-9._-]+$/),
         title: z.string().min(1).max(200),
         body_md: z.string().min(20),
         activate: z.boolean().default(false),
@@ -130,7 +134,12 @@ export const retireHandoffTermsVersion = createServerFn({ method: "POST" })
 export const getHandoffContractDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((input) =>
-    z.object({ contract_id: z.string().uuid(), expires_in: z.number().int().min(30).max(3600).default(300) }).parse(input),
+    z
+      .object({
+        contract_id: z.string().uuid(),
+        expires_in: z.number().int().min(30).max(3600).default(300),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { data: contract, error } = await context.supabase
@@ -139,8 +148,7 @@ export const getHandoffContractDocumentUrl = createServerFn({ method: "POST" })
       .eq("id", data.contract_id)
       .maybeSingle();
     if (error) throw error;
-    if (!contract?.document_storage_path)
-      return { ok: false as const, error: "no_document" };
+    if (!contract?.document_storage_path) return { ok: false as const, error: "no_document" };
     const { data: signed, error: sErr } = await context.supabase.storage
       .from("handoff-contracts")
       .createSignedUrl(contract.document_storage_path, data.expires_in);

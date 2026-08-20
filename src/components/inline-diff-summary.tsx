@@ -83,20 +83,20 @@ export function InlineDiffSummary({
 function DiffMark({ sign }: { sign: string }) {
   if (sign === "+" || sign === "A") {
     return (
-      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-success/15 text-success">
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center bg-success/15 text-success">
         <Plus className="h-3 w-3" />
       </span>
     );
   }
   if (sign === "-" || sign === "D") {
     return (
-      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-destructive/15 text-destructive">
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center bg-destructive/15 text-destructive">
         <Minus className="h-3 w-3" />
       </span>
     );
   }
   return (
-    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-info/15 text-info">
+    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center bg-info/15 text-info">
       <Edit3 className="h-3 w-3" />
     </span>
   );

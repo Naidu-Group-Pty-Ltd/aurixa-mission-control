@@ -73,13 +73,13 @@ export function BrandDiffDialog({ profileId }: { profileId: string }) {
           a !== b &&
           diffQ.data?.ok &&
           (diff.length === 0 ? (
-            <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+            <p className="border border-dashed p-4 text-center text-sm text-muted-foreground">
               No differences between these versions.
             </p>
           ) : (
             <div className="space-y-1.5 font-mono text-xs">
               {diff.map((d, i) => (
-                <div key={i} className="rounded-md border border-border bg-surface p-2">
+                <div key={i} className="border border-border bg-surface p-2">
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
@@ -96,12 +96,12 @@ export function BrandDiffDialog({ profileId }: { profileId: string }) {
                     <span className="truncate">{d.path}</span>
                   </div>
                   {d.kind !== "added" && d.before !== null && (
-                    <pre className="mt-1 whitespace-pre-wrap break-all rounded bg-destructive/5 p-2 text-destructive">
+                    <pre className="mt-1 whitespace-pre-wrap break-all bg-destructive/5 p-2 text-destructive">
                       - {d.before as string}
                     </pre>
                   )}
                   {d.kind !== "removed" && d.after !== null && (
-                    <pre className="mt-1 whitespace-pre-wrap break-all rounded bg-success/5 p-2 text-success">
+                    <pre className="mt-1 whitespace-pre-wrap break-all bg-success/5 p-2 text-success">
                       + {d.after as string}
                     </pre>
                   )}

@@ -7,11 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireOperator } from "@/integrations/supabase/role-middleware";
 import { getRequestHost } from "@tanstack/react-start/server";
-import {
-  OPERATOR_SOURCE,
-  loadValidHandoff,
-  operatorDisplayName,
-} from "@/server/purchases.server";
+import { OPERATOR_SOURCE, loadValidHandoff, operatorDisplayName } from "@/server/purchases.server";
 import { startCheckoutCore, startHandoffCheckout } from "@/server/checkout.server";
 
 const InputSchema = z.object({

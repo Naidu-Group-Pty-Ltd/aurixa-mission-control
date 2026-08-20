@@ -139,14 +139,12 @@ function AuditLogPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
             <ScrollText className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              timeline
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Audit Log</h1>
+            <p className="label-mono">timeline</p>
+            <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Audit Log</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Every cascade, detection, and drift scan in one place.
             </p>

@@ -30,6 +30,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/empty-state";
+import { MetricCell } from "@/components/metric-bar";
 import {
   ChevronLeft,
   ChevronRight,
@@ -135,14 +136,12 @@ function ReportJobsPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
           <Receipt className="h-5 w-5 text-primary" />
         </div>
         <div className="flex-1">
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            metering · admin
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Report Jobs</h1>
+          <p className="label-mono">metering · admin</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Report Jobs</h1>
           <p className="text-sm text-muted-foreground">
             Every token reservation, commit, cancel, and refund across the fleet.
           </p>
@@ -158,7 +157,7 @@ function ReportJobsPage() {
         </Link>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="glass grid grid-cols-2 overflow-hidden md:grid-cols-4">
         <StatCard label="Jobs" value={fmt(totals?.jobs)} />
         <StatCard label="Used" value={fmt(totals?.committed)} hint="tokens charged" />
         <StatCard label="Canceled" value={fmt(totals?.canceled)} hint="released" />
@@ -332,17 +331,7 @@ function ReportJobsPage() {
 }
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-        {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
-  );
+  return <MetricCell label={label} value={value} note={hint} size="sm" />;
 }
 
 // ─── Job detail drawer ─────────────────────────────────────────────────────
@@ -472,7 +461,7 @@ function JobDetailDrawer({
                 <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-destructive">
                   Error
                 </h3>
-                <pre className="overflow-x-auto rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                <pre className="overflow-x-auto border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
                   {job.error}
                 </pre>
               </section>
@@ -523,7 +512,7 @@ function JsonBlock({ value }: { value: unknown }) {
     }
   }, [value]);
   return (
-    <pre className="max-h-72 overflow-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-[11px]">
+    <pre className="max-h-72 overflow-auto border border-border bg-muted/40 p-3 font-mono text-[11px]">
       {text}
     </pre>
   );

@@ -99,7 +99,7 @@ export function FeedbackCard() {
                 hint: "overall",
               },
             ].map((s) => (
-              <div key={s.label} className="rounded-md border p-3">
+              <div key={s.label} className="border p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {s.label}
                 </p>
@@ -111,7 +111,7 @@ export function FeedbackCard() {
         )}
 
         {result && !result.ok && (
-          <p className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          <p className="border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
             {result.error ?? "Could not load feedback."}
           </p>
         )}
@@ -119,7 +119,7 @@ export function FeedbackCard() {
         {/* Delivery to Airtable is the one thing here that can silently fail,
             so it gets said rather than left to be noticed. */}
         {!!stats?.undelivered && (
-          <p className="flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+          <p className="flex items-start gap-1.5 border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {stats.undelivered} response{stats.undelivered === 1 ? "" : "s"} did not reach the
             Make.com webhook. They are recorded here in full and can be replayed — nothing is lost.
@@ -134,7 +134,7 @@ export function FeedbackCard() {
         </div>
 
         {rows.length > 0 ? (
-          <div className="rounded-md border">
+          <div className="border">
             <Table>
               <TableHeader>
                 <TableRow>

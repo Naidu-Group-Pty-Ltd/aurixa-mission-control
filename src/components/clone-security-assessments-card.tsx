@@ -6,10 +6,19 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCloneSecurityAssessments, getSecurityReportDownloadUrl } from "@/server/security-partner-dashboard.functions";
+import {
+  getCloneSecurityAssessments,
+  getSecurityReportDownloadUrl,
+} from "@/server/security-partner-dashboard.functions";
 import { formatDistanceToNow } from "@/lib/format";
 
-type Finding = { id: string; severity: string; status: string; retest_status: string; title: string };
+type Finding = {
+  id: string;
+  severity: string;
+  status: string;
+  retest_status: string;
+  title: string;
+};
 type Report = {
   id: string;
   label: string;
@@ -35,7 +44,8 @@ type Assessment = {
 
 function tone(status: string) {
   if (status === "closed") return "border-success/40 text-success";
-  if (status === "blocked" || status === "canceled") return "border-destructive/40 text-destructive";
+  if (status === "blocked" || status === "canceled")
+    return "border-destructive/40 text-destructive";
   if (["in_progress", "reporting", "retesting"].includes(status)) return "border-info/40 text-info";
   return "border-warning/40 text-warning";
 }
@@ -104,12 +114,15 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
             <ShieldCheck className="h-4 w-4 text-primary" /> Security assessments
           </CardTitle>
           <CardDescription>
-            Partner penetration-testing cycles, reports, findings, retesting and Aurixa release control.
+            Partner penetration-testing cycles, reports, findings, retesting and Aurixa release
+            control.
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
           <Link to="/security-partners" className="hidden md:inline-flex">
-            <Button size="sm" variant="outline">Manage</Button>
+            <Button size="sm" variant="outline">
+              Manage
+            </Button>
           </Link>
           <Button size="sm" variant="ghost" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -120,15 +133,24 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
         {loading ? (
           <div className="font-mono text-xs text-muted-foreground">loading security cycles…</div>
         ) : assessments.length === 0 ? (
-          <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-            No security partner assessment is active for this clone yet. Activate the Cybersecurity Module from Security Partners.
+          <div className="border border-dashed p-4 text-center text-sm text-muted-foreground">
+            No security partner assessment is active for this clone yet. Activate the Cybersecurity
+            Module from Security Partners.
           </div>
         ) : (
           <>
             <div className="grid gap-2 md:grid-cols-4">
               <Metric label="Active cycles" value={stats.active} />
-              <Metric label="Open findings" value={stats.openFindings} tone={stats.openFindings ? "text-warning" : "text-muted-foreground"} />
-              <Metric label="Critical" value={stats.criticalFindings} tone={stats.criticalFindings ? "text-destructive" : "text-muted-foreground"} />
+              <Metric
+                label="Open findings"
+                value={stats.openFindings}
+                tone={stats.openFindings ? "text-warning" : "text-muted-foreground"}
+              />
+              <Metric
+                label="Critical"
+                value={stats.criticalFindings}
+                tone={stats.criticalFindings ? "text-destructive" : "text-muted-foreground"}
+              />
               <Metric label="Reports" value={stats.reports} tone="text-success" />
             </div>
 
@@ -137,7 +159,7 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
                 const findings = assessment.security_findings ?? [];
                 const reports = assessment.security_reports ?? [];
                 return (
-                  <div key={assessment.id} className="rounded-md border border-border bg-surface p-3">
+                  <div key={assessment.id} className="border border-border bg-surface p-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -148,12 +170,17 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
                           <Badge variant="outline">{assessment.cycle.replace("_", "-")}</Badge>
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {assessment.security_partners?.name ?? "Security partner"} · review {assessment.aurixa_review_status.replaceAll("_", " ")}
-                          {assessment.due_at ? ` · due ${formatDistanceToNow(assessment.due_at)}` : ""}
+                          {assessment.security_partners?.name ?? "Security partner"} · review{" "}
+                          {assessment.aurixa_review_status.replaceAll("_", " ")}
+                          {assessment.due_at
+                            ? ` · due ${formatDistanceToNow(assessment.due_at)}`
+                            : ""}
                         </div>
                       </div>
                       {assessment.retest_required && (
-                        <Badge variant="outline" className="text-info">retest required</Badge>
+                        <Badge variant="outline" className="text-info">
+                          retest required
+                        </Badge>
                       )}
                     </div>
 
@@ -163,16 +190,26 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
                           findings
                         </div>
                         {findings.length === 0 ? (
-                          <div className="text-xs text-muted-foreground">No findings submitted yet.</div>
+                          <div className="text-xs text-muted-foreground">
+                            No findings submitted yet.
+                          </div>
                         ) : (
                           <div className="space-y-1">
                             {findings.slice(0, 4).map((finding) => (
-                              <div key={finding.id} className="flex items-center justify-between gap-2 rounded border border-border/60 px-2 py-1 text-xs">
+                              <div
+                                key={finding.id}
+                                className="flex items-center justify-between gap-2 border px-2 py-1 text-xs"
+                              >
                                 <div className="flex items-center gap-2">
                                   <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
                                   <span className="line-clamp-1">{finding.title}</span>
                                 </div>
-                                <Badge variant="outline" className={finding.severity === "critical" ? "text-destructive" : ""}>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    finding.severity === "critical" ? "text-destructive" : ""
+                                  }
+                                >
                                   {finding.severity}
                                 </Badge>
                               </div>
@@ -186,7 +223,9 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
                           reports
                         </div>
                         {reports.length === 0 ? (
-                          <div className="text-xs text-muted-foreground">No reports submitted yet.</div>
+                          <div className="text-xs text-muted-foreground">
+                            No reports submitted yet.
+                          </div>
                         ) : (
                           <div className="space-y-1">
                             {reports.slice(0, 4).map((report) => (
@@ -195,7 +234,7 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
                                 type="button"
                                 onClick={() => openReport(report)}
                                 disabled={busyReportId === report.id}
-                                className="flex w-full items-center justify-between gap-2 rounded border border-border/60 px-2 py-1 text-left text-xs hover:border-primary/40 disabled:opacity-60"
+                                className="flex w-full items-center justify-between gap-2 border px-2 py-1 text-left text-xs hover:border-primary/40 disabled:opacity-60"
                               >
                                 <span className="inline-flex min-w-0 items-center gap-2">
                                   <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -221,10 +260,20 @@ export function CloneSecurityAssessmentsCard({ cloneId }: { cloneId: string }) {
   );
 }
 
-function Metric({ label, value, tone = "text-primary" }: { label: string; value: number; tone?: string }) {
+function Metric({
+  label,
+  value,
+  tone = "text-primary",
+}: {
+  label: string;
+  value: number;
+  tone?: string;
+}) {
   return (
-    <div className="rounded-md border border-border bg-card p-3">
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <div className="border border-border p-3">
+      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
       <div className={`mt-1 font-mono text-2xl font-semibold ${tone}`}>{value}</div>
     </div>
   );

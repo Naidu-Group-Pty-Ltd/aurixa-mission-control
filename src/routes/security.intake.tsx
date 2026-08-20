@@ -14,11 +14,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { KeyRound, Plus, Trash2, Copy, PlugZap } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -40,7 +55,6 @@ export const Route = createFileRoute("/security/intake")({
   ),
   head: () => ({ meta: [{ title: "Security Intake Sources — Aurixa Systems" }] }),
 });
-
 
 const KIND_LABELS: Record<string, string> = {
   codex: "Codex Security",
@@ -65,7 +79,9 @@ function SecurityIntakePage() {
     kind: "codex" | "manual" | "ticketing" | "generic";
     active: boolean;
   }>(null);
-  const [revealedSecret, setRevealedSecret] = useState<{ slug: string; secret: string } | null>(null);
+  const [revealedSecret, setRevealedSecret] = useState<{ slug: string; secret: string } | null>(
+    null,
+  );
 
   const upsert = useMutation({
     mutationFn: (input: any) => upsertFn({ data: input }),
@@ -105,23 +121,18 @@ function SecurityIntakePage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            mission control · security intake
-          </p>
-          <h1 className="mt-1 flex items-center gap-2 text-3xl font-semibold tracking-tight">
+          <p className="label-mono">mission control · security intake</p>
+          <h1 className="mt-1 flex items-center gap-2 font-display text-[2.125rem] leading-[1.05]">
             <PlugZap className="h-7 w-7 text-primary" />
             Provider-neutral intake sources
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Any scanner or ticketing system can POST normalized findings into Mission Control via the shared
-            intake endpoint. Each source authenticates with its own rotatable HMAC secret.
+            Any scanner or ticketing system can POST normalized findings into Mission Control via
+            the shared intake endpoint. Each source authenticates with its own rotatable HMAC
+            secret.
           </p>
         </div>
-        <Button
-          onClick={() =>
-            setEditing({ slug: "", name: "", kind: "generic", active: true })
-          }
-        >
+        <Button onClick={() => setEditing({ slug: "", name: "", kind: "generic", active: true })}>
           <Plus className="mr-2 h-4 w-4" /> Add source
         </Button>
       </header>
@@ -135,8 +146,12 @@ function SecurityIntakePage() {
           <EndpointRow label="URL" value={endpoint} />
           <EndpointRow label="Method" value="POST" mono />
           <EndpointRow label="Header · x-intake-source" value="<source_slug>" mono />
-          <EndpointRow label="Header · x-intake-signature" value="sha256=<hex hmac_sha256(body, secret)>" mono />
-          <div className="rounded-md border bg-muted/30 p-3 text-xs font-mono leading-5">
+          <EndpointRow
+            label="Header · x-intake-signature"
+            value="sha256=<hex hmac_sha256(body, secret)>"
+            mono
+          />
+          <div className="border bg-muted/30 p-3 text-xs font-mono leading-5">
             {`{
   "version": "1",
   "op": "ingest" | "status" | "link_ticket",
@@ -273,10 +288,14 @@ function SecurityIntakePage() {
                   value={editing.kind}
                   onValueChange={(v: any) => setEditing({ ...editing, kind: v })}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {Object.entries(KIND_LABELS).map(([k, label]) => (
-                      <SelectItem key={k} value={k}>{label}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -289,7 +308,9 @@ function SecurityIntakePage() {
                 <Label>Active</Label>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setEditing(null)}>
+                  Cancel
+                </Button>
                 <Button
                   onClick={() => upsert.mutate(editing)}
                   disabled={upsert.isPending || !editing.slug || !editing.name}
@@ -345,7 +366,11 @@ function EndpointRow({ label, value, mono }: { label: string; value: string; mon
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="min-w-[200px] text-muted-foreground">{label}</span>
-      <code className={mono ? "rounded bg-muted px-2 py-1 text-xs" : "rounded bg-muted px-2 py-1 text-xs"}>
+      <code
+        className={
+          mono ? "rounded bg-muted px-2 py-1 text-xs" : "rounded bg-muted px-2 py-1 text-xs"
+        }
+      >
         {value}
       </code>
       <Button

@@ -17,9 +17,7 @@ function BillingDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            monetization
-          </p>
+          <p className="label-mono">monetization</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">Billing &amp; Tokens</h2>
         </div>
         <Link

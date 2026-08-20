@@ -13,26 +13,15 @@ import {
 import {
   Boxes,
   GitBranch,
-  Waves,
-  CalendarClock,
   Sparkles,
-  ScrollText,
   Plus,
-  Settings,
-  Bot,
-  Shield,
-  LayoutDashboard,
   Bell,
   Package,
   GitFork,
   History,
   GitMerge,
   Send,
-  Zap,
   Tag,
-  Search,
-  TreePine,
-  UserPlus,
 } from "lucide-react";
 import { useClones, useModules, useCascadeEvents } from "@/lib/queries";
 import { formatDistanceToNow } from "@/lib/format";

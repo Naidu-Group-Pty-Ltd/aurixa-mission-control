@@ -113,14 +113,12 @@ function OversightPage() {
     <div className="space-y-6">
       <header className="flex items-end justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-warning/15 ring-1 ring-warning/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-warning/15 ring-1 ring-warning/40">
             <Crown className="h-5 w-5 text-warning" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              the throne sees all
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">High King Oversight</h1>
+            <p className="label-mono">the throne sees all</p>
+            <h1 className="mt-1 font-display text-[1.75rem] leading-[1.1]">High King Oversight</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Every action, by every tier, across the whole system — annotated with the rank that
               took it.

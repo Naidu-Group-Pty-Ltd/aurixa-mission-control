@@ -158,7 +158,7 @@ export function LibraryReingestDialog({ onDone }: { onDone: () => void }) {
               </Button>
             ) : (
               <>
-                <div className="rounded-md border border-border p-3">
+                <div className="border border-border p-3">
                   <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                     current state
                   </p>
@@ -193,7 +193,7 @@ export function LibraryReingestDialog({ onDone }: { onDone: () => void }) {
 
         {result && (
           <div className="space-y-3">
-            <div className="rounded-md border border-border p-3">
+            <div className="border border-border p-3">
               <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 result
               </p>

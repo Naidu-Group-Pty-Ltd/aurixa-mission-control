@@ -263,11 +263,9 @@ function CloneDetail() {
 
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            clone
-          </p>
+          <p className="label-mono">clone</p>
           <div className="mt-1 flex items-center gap-2">
-            <h1 className="text-3xl font-semibold tracking-tight">{clone.name}</h1>
+            <h1 className="font-display text-[2.125rem] leading-[1.05]">{clone.name}</h1>
             <CopyButton value={clone.id} label="clone id" />
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -401,7 +399,7 @@ function ModuleInjector({
             </div>
             <div className="space-y-2">
               {installed.length === 0 && (
-                <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                <div className="border border-dashed p-4 text-center text-sm text-muted-foreground">
                   No modules installed
                 </div>
               )}
@@ -411,7 +409,7 @@ function ModuleInjector({
                 return (
                   <div
                     key={module.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2"
+                    className="flex items-center justify-between gap-2 border border-border bg-surface px-3 py-2"
                   >
                     <div className="min-w-0">
                       <div className="font-mono text-sm">{module.name}</div>
@@ -458,14 +456,14 @@ function ModuleInjector({
             </div>
             <div className="space-y-2">
               {available.length === 0 && (
-                <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                <div className="border border-dashed p-4 text-center text-sm text-muted-foreground">
                   All modules installed
                 </div>
               )}
               {available.map((module) => (
                 <div
                   key={module.id}
-                  className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2"
+                  className="flex items-center justify-between border border-border bg-surface px-3 py-2"
                 >
                   <span className="font-mono text-sm">{module.name}</span>
                   <Button
@@ -498,9 +496,9 @@ function InfoTile({
   link?: string | null;
 }) {
   const inner = (
-    <Card className="bg-card">
+    <Card>
       <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <div className="flex h-9 w-9 items-center justify-center bg-muted text-muted-foreground">
           {icon}
         </div>
         <div className="min-w-0">

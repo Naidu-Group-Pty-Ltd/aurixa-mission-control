@@ -68,9 +68,7 @@ describe("appPublicOrigin", () => {
     process.env.APP_PUBLIC_URL = "https://mc.example///";
     expect(appPublicOrigin()).toBe("https://mc.example");
     expect(scanCallbackUrl()).toBe("https://mc.example/api/public/hooks/codex-security");
-    expect(remediationCallbackUrl()).toBe(
-      "https://mc.example/api/public/hooks/codex-remediation",
-    );
+    expect(remediationCallbackUrl()).toBe("https://mc.example/api/public/hooks/codex-remediation");
   });
 
   it("falls back to the production origin when nothing is configured", () => {

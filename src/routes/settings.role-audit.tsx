@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { getRoleAuditLog } from "@/server/role-management.functions";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,14 +64,12 @@ function RoleAuditPage() {
     <div className="space-y-6">
       <header className="flex items-end justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-info/15 ring-1 ring-info/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-info/15 ring-1 ring-info/40">
             <ScrollText className="h-5 w-5 text-info" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              delegation trail
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Role Audit Log</h1>
+            <p className="label-mono">delegation trail</p>
+            <h1 className="mt-1 font-display text-[1.75rem] leading-[1.1]">Role Audit Log</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Every role assignment, revocation, and hierarchy change across all environments.
             </p>
@@ -190,7 +188,7 @@ function RoleAuditRow({ entry }: { entry: AuditEntry }) {
 
           {/* assigned_by / assigned_at detail */}
           {(isAssign || isRevoke) && (
-            <div className="mt-1.5 grid grid-cols-[80px_1fr] gap-x-2 gap-y-0.5 rounded-md border border-border/40 bg-muted/30 px-2.5 py-1.5 text-[11px]">
+            <div className="mt-1.5 grid grid-cols-[80px_1fr] gap-x-2 gap-y-0.5 border border-border/40 bg-muted/30 px-2.5 py-1.5 text-[11px]">
               <span className="text-muted-foreground">assigned_by</span>
               <span className="font-mono">
                 {entry.actor_user_id?.slice(0, 12) ?? "NULL (system)"}

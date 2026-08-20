@@ -6,7 +6,8 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { RouteError } from "@/components/route-error";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, Activity, Sparkles, Bell, Bot, ShoppingCart, Users } from "lucide-react";
+import { MetricCell } from "@/components/metric-bar";
+import { BarChart3, Activity, Sparkles, Bell, Bot } from "lucide-react";
 import { getFleetMetrics } from "@/server/metrics.functions";
 import { purchaseRollups } from "@/lib/purchases.functions";
 import { formatMoneyByCurrency } from "@/lib/purchase-rollups";
@@ -57,28 +58,26 @@ function MetricsPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
           <BarChart3 className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            observability
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Fleet Metrics</h1>
+          <p className="label-mono">observability</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Fleet Metrics</h1>
           <p className="text-sm text-muted-foreground">
             30-day rolling snapshot of cascades, drift, AI usage, and push delivery.
           </p>
         </div>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <Stat label="Clones" value={m?.clones_total ?? 0} icon={Activity} />
-        <Stat label="Drifted" value={m?.clones_drifted ?? 0} icon={Sparkles} accent="warning" />
-        <Stat label="CF wrapped" value={m?.clones_cf ?? 0} icon={BarChart3} />
-        <Stat label="Cascades 30d" value={m?.cascades_30d ?? 0} icon={Activity} />
+      <div className="glass grid overflow-hidden md:grid-cols-4">
+        <Stat label="Clones" value={m?.clones_total ?? 0} />
+        <Stat label="Drifted" value={m?.clones_drifted ?? 0} accent="warning" />
+        <Stat label="CF wrapped" value={m?.clones_cf ?? 0} />
+        <Stat label="Cascades 30d" value={m?.cascades_30d ?? 0} />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="glass grid overflow-hidden md:grid-cols-4">
         <Stat
           label="Cascade success"
           value={m ? `${Math.round(m.cascade_success_rate * 100)}%` : "—"}
@@ -86,32 +85,24 @@ function MetricsPage() {
         />
         <Stat label="Cascades failed" value={m?.cascades_failed ?? 0} accent="warning" />
         <Stat label="Drift alerts" value={m?.drift_alerts_30d ?? 0} />
-        <Stat label="AI tokens" value={(m?.ai_tokens_30d ?? 0).toLocaleString()} icon={Bot} />
+        <Stat label="AI tokens" value={(m?.ai_tokens_30d ?? 0).toLocaleString()} />
       </div>
 
       {/* Revenue attribution (user-attributed pricing workflow) */}
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="glass grid overflow-hidden md:grid-cols-4">
         <Stat
           label="Revenue 30d"
           value={rollups ? formatMoneyByCurrency(rollups.revenueByCurrency) : "—"}
-          icon={ShoppingCart}
           accent="success"
         />
-        <Stat
-          label="Purchases 30d"
-          value={rollups?.completedCount ?? "—"}
-          icon={ShoppingCart}
-        />
+        <Stat label="Purchases 30d" value={rollups?.completedCount ?? "—"} />
         <Stat
           label="Clone-initiated"
           value={rollups ? `${Math.round(rollups.attributedShare * 100)}%` : "—"}
-          icon={Users}
         />
         <Stat
           label="Top clone by spend"
-          value={
-            topClone ? (topClone.cloneName ?? (topClone.cloneId ? "unnamed" : "Prime")) : "—"
-          }
+          value={topClone ? (topClone.cloneName ?? (topClone.cloneId ? "unnamed" : "Prime")) : "—"}
         />
       </div>
 
@@ -197,26 +188,19 @@ function MetricsPage() {
 function Stat({
   label,
   value,
-  icon: Icon,
   accent,
 }: {
   label: string;
   value: string | number;
-  icon?: any;
   accent?: "warning" | "success";
 }) {
-  const color = accent === "warning" ? "text-warning" : accent === "success" ? "text-success" : "";
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="mb-2 flex items-center gap-2">
-          {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
-          <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {label}
-          </div>
-        </div>
-        <div className={`text-2xl font-semibold ${color}`}>{value}</div>
-      </CardContent>
-    </Card>
+    <MetricCell
+      label={label}
+      value={value}
+      size={typeof value === "string" ? "sm" : "lg"}
+      tone={accent === "warning" ? "warning" : "success"}
+      alarm={Boolean(accent)}
+    />
   );
 }

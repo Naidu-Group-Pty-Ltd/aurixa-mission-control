@@ -284,10 +284,8 @@ function CascadesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-          waterfall
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Cascades</h1>
+        <p className="label-mono">waterfall</p>
+        <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Cascades</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Push prime updates downstream. Strictly one-direction — clones never push back.
         </p>
@@ -362,7 +360,7 @@ function CascadesPage() {
             {scope === "tagged" && (
               <div className="mt-3 space-y-2">
                 {allTags.length === 0 ? (
-                  <div className="rounded-md border border-dashed p-3 text-center font-mono text-[11px] text-muted-foreground">
+                  <div className="border border-dashed p-3 text-center font-mono text-[11px] text-muted-foreground">
                     No tags found. Tag your clones first from the fleet overview.
                   </div>
                 ) : (
@@ -416,7 +414,7 @@ function CascadesPage() {
             )}
           </div>
           {blast.requiresApproval && (
-            <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 p-3 text-xs text-warning">
+            <div className="flex items-start gap-2 border border-warning/40 bg-warning/5 p-3 text-xs text-warning">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
               <div className="flex-1">
                 <div className="font-mono uppercase tracking-wider">Approval gate</div>
@@ -473,15 +471,13 @@ function CascadesPage() {
 
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            history
-          </h2>
+          <h2 className="label-mono">history</h2>
           <div className="flex items-center gap-2">
             {scheduleId && (
               <button
                 type="button"
                 onClick={clearScheduleFilter}
-                className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
+                className="inline-flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
               >
                 <CalendarClock className="h-3 w-3" />
                 schedule · {scheduleName ?? scheduleId.slice(0, 8)}
@@ -556,10 +552,10 @@ function CascadesPage() {
           <div className="space-y-2">
             {visibleEvents.map((e) => (
               <Link key={e.id} to="/cascades/$eventId" params={{ eventId: e.id }} className="block">
-                <Card className="border-border/80 transition-colors hover:border-primary/40">
+                <Card className="transition-colors hover:border-primary/40">
                   <CardContent className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-info/15 text-info">
+                      <div className="flex h-9 w-9 items-center justify-center bg-info/15 text-info">
                         <Waves className="h-4 w-4" />
                       </div>
                       <div>
@@ -587,7 +583,7 @@ function CascadesPage() {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <span
-                                    className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent"
+                                    className="inline-flex items-center gap-1 border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent"
                                     onClick={(ev) => ev.preventDefault()}
                                   >
                                     <Bot className="h-3 w-3" />
@@ -612,7 +608,7 @@ function CascadesPage() {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <span
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary"
+                                    className="inline-flex items-center gap-1 border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary"
                                     onClick={(ev) => ev.preventDefault()}
                                   >
                                     <Package className="h-3 w-3" />
@@ -732,7 +728,7 @@ function AiPreflightSummary({
     }
   };
   return (
-    <div className="rounded-md border border-border/60 bg-surface/50 p-3">
+    <div className="border bg-surface/50 p-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-primary" /> AI pre-flight briefing

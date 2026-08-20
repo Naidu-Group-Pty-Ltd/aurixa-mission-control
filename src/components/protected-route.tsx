@@ -73,7 +73,7 @@ export function ProtectedRoute({
   if (error) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
-        <div className="max-w-md rounded-lg border border-border bg-card p-6 text-center">
+        <div className="max-w-md border border-border p-6 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 ring-1 ring-destructive/30">
             <AlertTriangle className="h-6 w-6 text-destructive" />
           </div>
@@ -91,7 +91,7 @@ export function ProtectedRoute({
   if (!hasAnyRole) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
-        <div className="max-w-md rounded-lg border border-border bg-card p-6 text-center">
+        <div className="max-w-md border border-border p-6 text-center">
           <h2 className="font-mono text-lg font-semibold">Access denied</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Your account has no operator role assigned. Ask an admin to grant access.
@@ -104,7 +104,7 @@ export function ProtectedRoute({
   if (requireRole && highestLevel(roles ?? []) < ROLE_LEVELS[requireRole]) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
-        <div className="max-w-md rounded-lg border border-border bg-card p-6 text-center">
+        <div className="max-w-md border border-border p-6 text-center">
           <h2 className="font-mono text-lg font-semibold">Access denied</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             This area requires the <span className="font-mono text-foreground">{requireRole}</span>{" "}

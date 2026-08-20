@@ -1,27 +1,69 @@
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
 type SyncStatus = Database["public"]["Enums"]["sync_status"];
 
+/**
+ * Sync state, as one word.
+ *
+ * This used to be a tinted, bordered badge. On a list page every record then
+ * carried at least four such rectangles — status, method, security, tags — and
+ * a filled rectangle reads as something you can press. State is not an action,
+ * so it is now set as text: mono, uppercase, tone-coloured, with a square tick
+ * rather than a round dot because nothing in this system is round.
+ *
+ * On a record card, pair it with `syncSpine(status)` on the container. The
+ * spine is what you actually see scanning a column; the word is the detail you
+ * read once you have stopped.
+ */
 const META: Record<SyncStatus, { label: string; cls: string }> = {
-  in_sync: { label: "in sync", cls: "bg-success/15 text-success border-success/30" },
-  behind: { label: "behind", cls: "bg-warning/15 text-warning border-warning/30" },
-  cascading: { label: "cascading", cls: "bg-info/15 text-info border-info/30 animate-pulse" },
-  failed: { label: "failed", cls: "bg-destructive/15 text-destructive border-destructive/30" },
-  unknown: { label: "unknown", cls: "bg-muted text-muted-foreground border-border" },
+  in_sync: { label: "in sync", cls: "text-success" },
+  behind: { label: "behind", cls: "text-warning" },
+  cascading: { label: "cascading", cls: "text-info" },
+  failed: { label: "failed", cls: "text-destructive" },
+  unknown: { label: "unknown", cls: "text-muted-foreground" },
 };
 
-export function StatusPill({ status, behind }: { status: SyncStatus; behind?: number }) {
-  const m = META[status];
+/** Spine class for a record whose state is a sync status. */
+export function syncSpine(status: SyncStatus | null | undefined) {
+  switch (status) {
+    case "in_sync":
+      return "spine-ok";
+    case "behind":
+      return "spine-warn";
+    case "cascading":
+      return "spine-live";
+    case "failed":
+      return "spine-bad";
+    default:
+      return "spine-idle";
+  }
+}
+
+export function StatusPill({
+  status,
+  behind,
+  className,
+}: {
+  status: SyncStatus;
+  behind?: number;
+  className?: string;
+}) {
+  const meta = META[status] ?? META.unknown;
   return (
-    <Badge
-      variant="outline"
-      className={cn("font-mono text-[10px] uppercase tracking-wider", m.cls)}
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] whitespace-nowrap",
+        meta.cls,
+        className,
+      )}
     >
-      <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
-      {m.label}
+      <span
+        aria-hidden
+        className={cn("h-1.5 w-1.5 bg-current", status === "cascading" && "animate-pulse")}
+      />
+      {meta.label}
       {status === "behind" && behind ? ` · ${behind}` : ""}
-    </Badge>
+    </span>
   );
 }

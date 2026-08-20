@@ -19,8 +19,6 @@ import {
   Zap,
   TrendingDown,
   Download,
-  Bookmark,
-  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "@/lib/format";
@@ -97,10 +95,8 @@ function FleetHealthPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            workspace
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Fleet health</h1>
+          <p className="label-mono">workspace</p>
+          <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Fleet health</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Live uptime + 7-day cascade & drift roll-up across every clone.
             {refreshedAt && (
@@ -337,7 +333,7 @@ function FilteredBreakdown({
       </CardHeader>
       <CardContent className="space-y-2">
         {filtered.length === 0 ? (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
             {data.rows.length === 0
               ? "No clones in the fleet yet."
               : "No clones match the current filter."}
@@ -407,7 +403,7 @@ function FleetRow({
       <Link
         to="/clones/$cloneId"
         params={{ cloneId: row.cloneId }}
-        className="absolute inset-0 z-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute inset-0 z-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={`Open clone ${row.name}`}
       />
       <div className="relative z-10 flex flex-1 items-start gap-3 min-w-0 pointer-events-none">

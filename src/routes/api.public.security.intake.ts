@@ -113,7 +113,11 @@ export const Route = createFileRoute("/api/public/security/intake")({
             await admin.from("audit_log").insert({
               action: "security.intake.status",
               entity_type: "codex_finding",
-              metadata: { source: source.slug, external_id: payload.external_id, state: payload.state },
+              metadata: {
+                source: source.slug,
+                external_id: payload.external_id,
+                state: payload.state,
+              },
             });
             return json({ ok: true });
           }
@@ -125,7 +129,12 @@ export const Route = createFileRoute("/api/public/security/intake")({
             .eq("codex_finding_id", `${source.slug}:${payload.finding_external_id}`)
             .maybeSingle();
           if (!findRes.data?.id) return json({ error: "finding not found" }, 404);
-          const link = await adapter.linkExternalTicket(findRes.data.id, payload.ticket, source, null);
+          const link = await adapter.linkExternalTicket(
+            findRes.data.id,
+            payload.ticket,
+            source,
+            null,
+          );
           await admin.from("audit_log").insert({
             action: "security.intake.link_ticket",
             entity_type: "security_external_ticket",

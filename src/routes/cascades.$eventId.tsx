@@ -361,14 +361,12 @@ function CascadeDetailPage() {
 
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-info/15 text-info">
+          <div className="flex h-10 w-10 items-center justify-center bg-info/15 text-info">
             <ModeIcon mode={event.mode} />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              cascade · {event.trigger}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            <p className="label-mono">cascade · {event.trigger}</p>
+            <h1 className="mt-1 font-display text-[1.75rem] leading-[1.1]">
               {event.mode.replace("_", " ")} cascade
             </h1>
             <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
@@ -419,7 +417,7 @@ function CascadeDetailPage() {
                 <Link
                   to="/cascades/$eventId"
                   params={{ eventId: scopeMeta.rollback_of }}
-                  className="inline-flex items-center gap-1 rounded border border-warning/40 px-1.5 py-0.5 font-mono text-[10px] uppercase text-warning hover:bg-warning/10"
+                  className="inline-flex items-center gap-1 border border-warning/40 px-1.5 py-0.5 font-mono text-[10px] uppercase text-warning hover:bg-warning/10"
                 >
                   <History className="h-3 w-3" /> rollback of {scopeMeta.rollback_of.slice(0, 8)}
                 </Link>
@@ -428,7 +426,7 @@ function CascadeDetailPage() {
                 <Link
                   to="/cascades/$eventId"
                   params={{ eventId: scopeMeta.retry_of }}
-                  className="inline-flex items-center gap-1 rounded border border-info/40 px-1.5 py-0.5 font-mono text-[10px] uppercase text-info hover:bg-info/10"
+                  className="inline-flex items-center gap-1 border border-info/40 px-1.5 py-0.5 font-mono text-[10px] uppercase text-info hover:bg-info/10"
                 >
                   <RotateCcw className="h-3 w-3" /> retry of {scopeMeta.retry_of.slice(0, 8)}
                 </Link>
@@ -527,7 +525,7 @@ function CascadeDetailPage() {
       </header>
 
       {event.summary && (
-        <Card className="border-border/80">
+        <Card>
           <CardContent className="p-4 font-mono text-xs text-muted-foreground">
             {event.summary}
           </CardContent>
@@ -559,7 +557,7 @@ function CascadeDetailPage() {
                 {(scopeMeta.module_globs ?? []).map((g) => (
                   <code
                     key={g}
-                    className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[11px]"
+                    className="border border-border bg-surface px-1.5 py-0.5 font-mono text-[11px]"
                   >
                     {g}
                   </code>
@@ -610,7 +608,7 @@ function CascadeDetailPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {results.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               No clones queued for this cascade.
             </div>
           ) : (
@@ -709,11 +707,11 @@ function ResultsGroup({
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-md border border-border/80 bg-card px-3 py-2 text-left transition-colors hover:bg-muted/40"
+          className="flex w-full items-center gap-3 border px-3 py-2 text-left transition-colors hover:bg-muted/40"
         >
           <ResultStatusIcon status={status} />
           <span className={cn("font-mono text-xs uppercase tracking-wider", tone)}>{label}</span>
-          <Badge variant="outline" className="border-border/60 font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-[10px]">
             {items.length}
           </Badge>
           <ChevronDown
@@ -799,7 +797,7 @@ function ResultRow({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border/80 bg-surface p-3 md:flex-row md:items-center">
+    <div className="flex flex-col gap-3 border bg-surface p-3 md:flex-row md:items-center">
       <div className="flex flex-1 items-center gap-3 min-w-0">
         <ResultStatusIcon status={result.status} />
         <div className="min-w-0 flex-1">
@@ -856,14 +854,14 @@ function ResultRow({
             href={`https://github.com/${clone.github_owner}/${clone.github_repo}/commit/${result.commit_sha}`}
             target="_blank"
             rel="noreferrer"
-            className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] hover:bg-muted/70 hover:underline"
+            className="bg-muted px-1.5 py-0.5 font-mono text-[10px] hover:bg-muted/70 hover:underline"
             title="View commit on GitHub"
           >
             {result.commit_sha.slice(0, 7)}
           </a>
         )}
         {result.commit_sha && !clone && (
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+          <code className="bg-muted px-1.5 py-0.5 font-mono text-[10px]">
             {result.commit_sha.slice(0, 7)}
           </code>
         )}
@@ -991,7 +989,7 @@ function CountTile({
     accent: "text-accent",
   };
   return (
-    <div className="rounded-md border border-border/80 bg-card p-3">
+    <div className="border p-3">
       <div className={cn("mb-1 flex items-center gap-1.5 [&>svg]:h-3.5 [&>svg]:w-3.5", map[tone])}>
         {icon}
         <span className="font-mono text-[10px] uppercase tracking-wider">{label}</span>

@@ -56,7 +56,6 @@ import {
   Camera,
   KeyRound,
   FileDown,
-  ScrollText,
   ShieldCheck,
   Github,
   Link as LinkIcon,
@@ -347,7 +346,9 @@ function HandoffDetail() {
     <div className="p-6 space-y-6 max-w-5xl">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{h.clones?.name ?? h.clone_id}</h1>
+          <h1 className="font-display text-[1.75rem] leading-[1.1]">
+            {h.clones?.name ?? h.clone_id}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {h.path} · {h.target_region ?? "no region"} · {h.target_plan_tier ?? "no plan"}
           </p>
@@ -470,7 +471,7 @@ function HandoffDetail() {
                   (r.metadata as any)?.last_execution?.rotated_via ??
                   (r.metadata as any)?.hint;
                 return (
-                  <li key={r.id} className="rounded border p-2 space-y-1">
+                  <li key={r.id} className="border p-2 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-mono text-xs truncate">
@@ -626,7 +627,7 @@ function HandoffDetail() {
               {authReplicate.isPending ? "Replicating…" : "Replicate auth users"}
             </Button>
             {authReplicate.data && (
-              <div className="mt-2 rounded border p-2 text-xs">
+              <div className="mt-2 border p-2 text-xs">
                 <div>
                   scanned <b>{authReplicate.data.scanned}</b> · imported{" "}
                   <b>{authReplicate.data.imported}</b> · skipped <b>{authReplicate.data.skipped}</b>{" "}
@@ -673,7 +674,7 @@ function HandoffDetail() {
               {storageReplicate.isPending ? "Replicating…" : "Run storage replication"}
             </Button>
             {(d.storage_replications?.length ?? 0) > 0 && (
-              <div className="mt-2 rounded border p-2 text-xs">
+              <div className="mt-2 border p-2 text-xs">
                 <table className="w-full text-left">
                   <thead className="text-muted-foreground">
                     <tr>
@@ -738,7 +739,7 @@ function HandoffDetail() {
               {parity.isPending ? "Running…" : "Run parity dry-run"}
             </Button>
             {d.parity_reports[0] && (
-              <div className="rounded border p-2 text-xs space-y-1">
+              <div className="border p-2 text-xs space-y-1">
                 <div className="flex items-center justify-between">
                   <span>Latest report</span>
                   <Badge
@@ -780,7 +781,7 @@ function HandoffDetail() {
               <div className="space-y-1 pt-2 border-t">
                 <div className="text-xs font-medium">Signed records (G13)</div>
                 {d.contracts.map((c: any) => (
-                  <div key={c.id} className="rounded border p-2 text-xs space-y-1">
+                  <div key={c.id} className="border p-2 text-xs space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">v{c.version}</span>
                       <span className="text-muted-foreground">
@@ -847,7 +848,7 @@ function HandoffDetail() {
               {ghCheck.isPending ? "Checking…" : "Verify installation access"}
             </Button>
             {gh && (
-              <div className="rounded border p-2 text-xs space-y-1">
+              <div className="border p-2 text-xs space-y-1">
                 <div className="flex items-center justify-between">
                   <span>
                     {gh.github_owner}/{gh.github_repo}
@@ -1030,7 +1031,7 @@ function ClientPortalInvitesCard({ handoffId }: { handoffId: string }) {
         </Button>
 
         {freshLink && (
-          <div className="rounded border border-primary/40 bg-primary/5 p-3 text-xs space-y-2">
+          <div className="border border-primary/40 bg-primary/5 p-3 text-xs space-y-2">
             <div className="font-medium">Copy this link now — it will not be shown again.</div>
             <div className="flex items-center gap-2">
               <code className="flex-1 break-all text-[11px]">{freshLink}</code>
@@ -1154,7 +1155,7 @@ function ObservabilityCard({ handoffId }: { handoffId: string }) {
           <div>
             <Label>Mode</Label>
             <select
-              className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+              className="mt-1 w-full border bg-background px-2 py-1 text-sm"
               value={mode}
               onChange={(e) => setMode(e.target.value)}
             >
@@ -1203,7 +1204,7 @@ function ObservabilityCard({ handoffId }: { handoffId: string }) {
         </div>
 
         {cfg && (
-          <div className="text-xs text-muted-foreground border rounded p-2">
+          <div className="text-xs text-muted-foreground border p-2">
             <div>
               <strong>Current:</strong> {cfg.mode}
               {cfg.last_poll_at
@@ -1412,7 +1413,7 @@ function BillingSplitCard({ handoffId }: { handoffId: string }) {
         </div>
 
         {s && (
-          <div className="text-xs text-muted-foreground border rounded p-2 space-y-1">
+          <div className="text-xs text-muted-foreground border p-2 space-y-1">
             {s.disclosed_to_client_at && (
               <div>Disclosed to client: {new Date(s.disclosed_to_client_at).toLocaleString()}</div>
             )}
@@ -1576,7 +1577,7 @@ function AuditShipperCard({ handoffId }: { handoffId: string }) {
             </div>
 
             {installer.data && (installer.data as any)?.ok && (
-              <details className="border rounded p-2">
+              <details className="border p-2">
                 <summary className="cursor-pointer text-xs">Installer SQL preview</summary>
                 <pre className="mt-2 text-[10px] whitespace-pre-wrap max-h-64 overflow-auto">
                   {(installer.data as any).sql}
@@ -1588,7 +1589,7 @@ function AuditShipperCard({ handoffId }: { handoffId: string }) {
               <div className="text-xs text-muted-foreground mb-1">
                 Recent shipped events ({data?.events?.length ?? 0} of {data?.total_events ?? 0})
               </div>
-              <ul className="text-xs space-y-1 max-h-56 overflow-auto border rounded p-2">
+              <ul className="text-xs space-y-1 max-h-56 overflow-auto border p-2">
                 {(data?.events ?? []).map((e: any) => (
                   <li
                     key={e.id}

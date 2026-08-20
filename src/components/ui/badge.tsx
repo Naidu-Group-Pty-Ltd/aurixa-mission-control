@@ -3,21 +3,31 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * A badge is a LABEL, not a decoration.
+ *
+ * These are deliberately quiet. The previous set were filled, rounded and
+ * semibold, so four of them on one record competed with each other and with
+ * the record's actual name. Here the default is a hairline outline in the mono
+ * label voice; the filled variants stay for the rare case that genuinely needs
+ * to stop someone (a destructive state, a primary count).
+ *
+ * Status does NOT belong in a badge. Use the `.spine` on the record and one
+ * uppercase word — see `styles.css`.
+ */
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center border px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-[0.14em] transition-colors focus:outline-none focus:ring-1 focus:ring-ring",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
-        outline: "text-foreground",
+        default: "border-primary/40 bg-primary/10 text-primary",
+        secondary: "border-border bg-transparent text-muted-foreground",
+        destructive: "border-destructive/45 bg-destructive/10 text-destructive",
+        outline: "border-border bg-transparent text-muted-foreground",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "outline",
     },
   },
 );

@@ -414,7 +414,9 @@ export const getModuleBackend = createServerFn({ method: "POST" })
       // the row to `GenericStringError` and silently un-checks every field read
       // off it.
       // prettier-ignore
-      .select("id, name, slug, layer, edge_functions, database_tables, database_rpcs, storage_buckets, cron_jobs, required_secrets, required_migrations, backend_file_globs, external_hosts, backend_manifest, file_globs");
+      .select(
+        "id, name, slug, layer, edge_functions, database_tables, database_rpcs, storage_buckets, cron_jobs, required_secrets, required_migrations, backend_file_globs, external_hosts, backend_manifest, file_globs",
+      );
     query = data.moduleId ? query.eq("id", data.moduleId) : query.eq("slug", data.slug!);
 
     const { data: module, error } = await query.maybeSingle();

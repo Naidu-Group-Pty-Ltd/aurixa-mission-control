@@ -114,7 +114,14 @@ export const cloudflareApi = {
   },
   createDnsRecord: (
     zoneId: string,
-    body: { type: "A" | "AAAA" | "CNAME"; name: string; content: string; proxied?: boolean; ttl?: number; comment?: string },
+    body: {
+      type: "A" | "AAAA" | "CNAME";
+      name: string;
+      content: string;
+      proxied?: boolean;
+      ttl?: number;
+      comment?: string;
+    },
   ) =>
     cf<{ id: string; name: string; type: string; content: string; proxied: boolean }>(
       `/zones/${zoneId}/dns_records`,
@@ -132,4 +139,3 @@ export const cloudflareApi = {
   deleteDnsRecord: (zoneId: string, recordId: string) =>
     cf<{ id: string }>(`/zones/${zoneId}/dns_records/${recordId}`, { method: "DELETE" }),
 };
-

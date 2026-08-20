@@ -119,7 +119,7 @@ function GiftTokensPage() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="label-mono flex items-center gap-2">
           <Sparkles className="h-3.5 w-3.5" /> promotions
         </div>
         <h2 className="mt-1 text-2xl font-semibold tracking-tight">Gift tokens</h2>
@@ -247,7 +247,7 @@ function GiftTokensPage() {
                 value={tenantSearch}
                 onChange={(e) => setTenantSearch(e.target.value)}
               />
-              <div className="max-h-64 overflow-y-auto rounded border border-border">
+              <div className="max-h-64 overflow-y-auto border border-border">
                 {(tenantsQ.data?.tenants ?? []).map((t: any) => {
                   const on = tenantIds.includes(t.id);
                   return (
@@ -283,7 +283,7 @@ function GiftTokensPage() {
             </div>
           )}
 
-          <div className="rounded-md border border-border bg-surface p-4">
+          <div className="border border-border bg-surface p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
               <div className="flex-1 text-sm">
@@ -332,7 +332,7 @@ function GiftTokensPage() {
               {(campaignsQ.data?.campaigns ?? []).map((c: any) => (
                 <div
                   key={c.campaignId}
-                  className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm"
+                  className="flex items-center justify-between border border-border px-3 py-2 text-sm"
                 >
                   <div>
                     <div className="font-medium">{c.campaignName}</div>

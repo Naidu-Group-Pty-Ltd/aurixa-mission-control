@@ -82,7 +82,7 @@ function NewHandoffPage() {
   return (
     <div className="p-6 max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">New Handoff</h1>
+        <h1 className="font-display text-[1.75rem] leading-[1.1]">New Handoff</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Register a handoff intent. Dry-run parity, snapshot, twin provisioning, and cutover run in
           later steps.

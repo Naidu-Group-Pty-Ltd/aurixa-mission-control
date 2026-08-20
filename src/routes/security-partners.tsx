@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MetricCell } from "@/components/metric-bar";
 import {
   Select,
   SelectContent,
@@ -109,7 +110,8 @@ function shortDate(value?: string | null) {
 
 function statusTone(status: string) {
   if (status === "closed") return "border-success/40 text-success";
-  if (status === "blocked" || status === "canceled") return "border-destructive/40 text-destructive";
+  if (status === "blocked" || status === "canceled")
+    return "border-destructive/40 text-destructive";
   if (status === "in_progress" || status === "reporting" || status === "retesting") {
     return "border-info/40 text-info";
   }
@@ -143,9 +145,9 @@ function SecurityPartnersPage() {
 
   const [assessmentPartnerId, setAssessmentPartnerId] = useState("");
   const [assessmentCloneId, setAssessmentCloneId] = useState("");
-  const [assessmentCycle, setAssessmentCycle] = useState<"quarterly" | "bi_annual" | "annual" | "one_off">(
-    "quarterly",
-  );
+  const [assessmentCycle, setAssessmentCycle] = useState<
+    "quarterly" | "bi_annual" | "annual" | "one_off"
+  >("quarterly");
   const [assessmentTitle, setAssessmentTitle] = useState("");
   const [scopeSummary, setScopeSummary] = useState("");
   const [rulesOfEngagement, setRulesOfEngagement] = useState("");
@@ -186,9 +188,14 @@ function SecurityPartnersPage() {
 
   const stats = useMemo(() => {
     const open = assessments.filter((a) =>
-      ["pending", "scheduled", "in_progress", "reporting", "remediation_review", "retesting"].includes(
-        a.status,
-      ),
+      [
+        "pending",
+        "scheduled",
+        "in_progress",
+        "reporting",
+        "remediation_review",
+        "retesting",
+      ].includes(a.status),
     ).length;
     const reporting = assessments.filter((a) => a.status === "reporting").length;
     const closed = assessments.filter((a) => a.status === "closed").length;
@@ -369,10 +376,8 @@ function SecurityPartnersPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            mission control · restricted partner governance
-          </p>
-          <h1 className="mt-1 flex items-center gap-2 text-3xl font-semibold tracking-tight">
+          <p className="label-mono">mission control · restricted partner governance</p>
+          <h1 className="mt-1 flex items-center gap-2 font-display text-[2.125rem] leading-[1.05]">
             <ShieldCheck className="h-7 w-7 text-primary" />
             Security Partner Portal
           </h1>
@@ -387,7 +392,7 @@ function SecurityPartnersPage() {
         </Button>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-4">
+      <section className="glass grid overflow-hidden md:grid-cols-4">
         <StatTile label="Active cycles" value={stats.open} />
         <StatTile label="Reporting" value={stats.reporting} tone="text-info" />
         <StatTile label="Critical findings" value={stats.critical} tone="text-destructive" />
@@ -400,7 +405,9 @@ function SecurityPartnersPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4 text-primary" /> Partner company
             </CardTitle>
-            <CardDescription>Create delivery partners. EC-Council is seeded by the migration.</CardDescription>
+            <CardDescription>
+              Create delivery partners. EC-Council is seeded by the migration.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Field label="Partner name">
@@ -410,10 +417,18 @@ function SecurityPartnersPage() {
               <Input value={partnerContact} onChange={(e) => setPartnerContact(e.target.value)} />
             </Field>
             <Field label="Primary contact email">
-              <Input type="email" value={partnerEmail} onChange={(e) => setPartnerEmail(e.target.value)} />
+              <Input
+                type="email"
+                value={partnerEmail}
+                onChange={(e) => setPartnerEmail(e.target.value)}
+              />
             </Field>
             <Field label="Notes">
-              <Textarea value={partnerNotes} onChange={(e) => setPartnerNotes(e.target.value)} rows={3} />
+              <Textarea
+                value={partnerNotes}
+                onChange={(e) => setPartnerNotes(e.target.value)}
+                rows={3}
+              />
             </Field>
             <Button onClick={createPartner} disabled={busy === "partner"}>
               Create partner
@@ -426,7 +441,9 @@ function SecurityPartnersPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <UserPlus className="h-4 w-4 text-primary" /> Partner user approval
             </CardTitle>
-            <CardDescription>Every partner user is individually approved before portal access.</CardDescription>
+            <CardDescription>
+              Every partner user is individually approved before portal access.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Field label="Partner">
@@ -447,10 +464,17 @@ function SecurityPartnersPage() {
               <Input value={memberName} onChange={(e) => setMemberName(e.target.value)} />
             </Field>
             <Field label="Email">
-              <Input type="email" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} />
+              <Input
+                type="email"
+                value={memberEmail}
+                onChange={(e) => setMemberEmail(e.target.value)}
+              />
             </Field>
             <Field label="Role">
-              <Select value={memberRole} onValueChange={(v) => setMemberRole(v as typeof memberRole)}>
+              <Select
+                value={memberRole}
+                onValueChange={(v) => setMemberRole(v as typeof memberRole)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -474,7 +498,7 @@ function SecurityPartnersPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {partners.map((partner) => (
-              <div key={partner.id} className="rounded-md border border-border bg-surface p-3">
+              <div key={partner.id} className="border border-border bg-surface p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-mono text-sm font-semibold">{partner.name}</div>
                   <Badge variant="outline">{partner.status}</Badge>
@@ -492,7 +516,10 @@ function SecurityPartnersPage() {
                 </div>
                 <div className="max-h-40 space-y-1 overflow-auto">
                   {members.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between rounded border px-2 py-1 text-xs">
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between border px-2 py-1 text-xs"
+                    >
                       <span>{m.display_name || m.email}</span>
                       <span className="font-mono text-muted-foreground">
                         {m.role} · {m.status}
@@ -509,11 +536,12 @@ function SecurityPartnersPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ClipboardCheck className="h-4 w-4 text-primary" /> Activate client penetration-testing cycle
+            <ClipboardCheck className="h-4 w-4 text-primary" /> Activate client penetration-testing
+            cycle
           </CardTitle>
           <CardDescription>
-            This creates the client-specific testing record, assignment boundary, rules of engagement,
-            partner access workflow, report lane, and audit trail.
+            This creates the client-specific testing record, assignment boundary, rules of
+            engagement, partner access workflow, report lane, and audit trail.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-3">
@@ -546,7 +574,10 @@ function SecurityPartnersPage() {
             </Select>
           </Field>
           <Field label="Testing cycle">
-            <Select value={assessmentCycle} onValueChange={(v) => setAssessmentCycle(v as typeof assessmentCycle)}>
+            <Select
+              value={assessmentCycle}
+              onValueChange={(v) => setAssessmentCycle(v as typeof assessmentCycle)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -563,10 +594,18 @@ function SecurityPartnersPage() {
             <Input value={assessmentTitle} onChange={(e) => setAssessmentTitle(e.target.value)} />
           </Field>
           <Field label="Test window start">
-            <Input type="datetime-local" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
+            <Input
+              type="datetime-local"
+              value={windowStart}
+              onChange={(e) => setWindowStart(e.target.value)}
+            />
           </Field>
           <Field label="Test window end">
-            <Input type="datetime-local" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
+            <Input
+              type="datetime-local"
+              value={windowEnd}
+              onChange={(e) => setWindowEnd(e.target.value)}
+            />
           </Field>
           <Field label="Due date">
             <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
@@ -587,27 +626,47 @@ function SecurityPartnersPage() {
           </Field>
           <div className="lg:col-span-3">
             <Field label="Target URLs (comma or newline separated)">
-              <Textarea value={targetUrls} onChange={(e) => setTargetUrls(e.target.value)} rows={2} />
+              <Textarea
+                value={targetUrls}
+                onChange={(e) => setTargetUrls(e.target.value)}
+                rows={2}
+              />
             </Field>
           </div>
           <div className="lg:col-span-3">
             <Field label="Scope summary">
-              <Textarea value={scopeSummary} onChange={(e) => setScopeSummary(e.target.value)} rows={3} />
+              <Textarea
+                value={scopeSummary}
+                onChange={(e) => setScopeSummary(e.target.value)}
+                rows={3}
+              />
             </Field>
           </div>
           <div className="lg:col-span-3">
             <Field label="Rules of engagement">
-              <Textarea value={rulesOfEngagement} onChange={(e) => setRulesOfEngagement(e.target.value)} rows={3} />
+              <Textarea
+                value={rulesOfEngagement}
+                onChange={(e) => setRulesOfEngagement(e.target.value)}
+                rows={3}
+              />
             </Field>
           </div>
           <div className="lg:col-span-3">
             <Field label="Exclusions and out-of-scope areas">
-              <Textarea value={exclusions} onChange={(e) => setExclusions(e.target.value)} rows={3} />
+              <Textarea
+                value={exclusions}
+                onChange={(e) => setExclusions(e.target.value)}
+                rows={3}
+              />
             </Field>
           </div>
           <div className="lg:col-span-3">
             <Field label="Escalation contacts (comma or newline separated)">
-              <Textarea value={escalationContacts} onChange={(e) => setEscalationContacts(e.target.value)} rows={2} />
+              <Textarea
+                value={escalationContacts}
+                onChange={(e) => setEscalationContacts(e.target.value)}
+                rows={2}
+              />
             </Field>
           </div>
           <div className="lg:col-span-3">
@@ -622,20 +681,21 @@ function SecurityPartnersPage() {
         <CardHeader>
           <CardTitle className="text-base">Assessment governance queue</CardTitle>
           <CardDescription>
-            Aurixa remains the client communication gateway. Partner updates stay restricted to assigned cycles.
+            Aurixa remains the client communication gateway. Partner updates stay restricted to
+            assigned cycles.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading…</div>
           ) : assessments.length === 0 ? (
-            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-8 text-center text-sm text-muted-foreground">
               No cybersecurity assessments have been activated yet.
             </div>
           ) : (
             <div className="space-y-3">
               {assessments.map((assessment) => (
-                <div key={assessment.id} className="rounded-md border border-border bg-surface p-4">
+                <div key={assessment.id} className="border border-border bg-surface p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -646,7 +706,8 @@ function SecurityPartnersPage() {
                         <Badge variant="outline">{assessment.cycle.replace("_", "-")}</Badge>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {assessment.clones?.name ?? "Unknown clone"} · {assessment.security_partners?.name ?? "Unknown partner"}
+                        {assessment.clones?.name ?? "Unknown clone"} ·{" "}
+                        {assessment.security_partners?.name ?? "Unknown partner"}
                         {assessment.clones?.deploy_url && (
                           <a
                             href={assessment.clones.deploy_url}
@@ -660,7 +721,10 @@ function SecurityPartnersPage() {
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                         <span>due {shortDate(assessment.due_at)}</span>
-                        <span>window {shortDate(assessment.testing_window_start)} → {shortDate(assessment.testing_window_end)}</span>
+                        <span>
+                          window {shortDate(assessment.testing_window_start)} →{" "}
+                          {shortDate(assessment.testing_window_end)}
+                        </span>
                         <span>{assessment.security_findings?.length ?? 0} findings</span>
                         <span>{assessment.security_reports?.length ?? 0} reports</span>
                         <span>{assessment.security_assessment_comments?.length ?? 0} comments</span>
@@ -692,7 +756,8 @@ function SecurityPartnersPage() {
                         onValueChange={(review) =>
                           updateAssessment(assessment.id, {
                             aurixaReviewStatus: review as (typeof SECURITY_REVIEW_STATUSES)[number],
-                            clientReleaseApproved: review === "released_to_client" ? true : undefined,
+                            clientReleaseApproved:
+                              review === "released_to_client" ? true : undefined,
                           })
                         }
                         disabled={busy === `assessment:${assessment.id}`}
@@ -733,7 +798,9 @@ function SecurityPartnersPage() {
                       onClick={() => syncCodex(assessment.id)}
                       disabled={busy === `codex:${assessment.id}`}
                     >
-                      {busy === `codex:${assessment.id}` ? "Syncing Codex…" : "Mirror Codex findings"}
+                      {busy === `codex:${assessment.id}`
+                        ? "Syncing Codex…"
+                        : "Mirror Codex findings"}
                     </Button>
                     <Button
                       size="sm"
@@ -763,21 +830,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function StatTile({
-  label,
-  value,
-  tone = "text-primary",
-}: {
-  label: string;
-  value: number;
-  tone?: string;
-}) {
-  return (
-    <Card className="border-border/80 bg-card">
-      <CardContent className="p-5">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-        <div className={`mt-2 font-mono text-3xl font-semibold ${tone}`}>{value}</div>
-      </CardContent>
-    </Card>
-  );
+const TONE_CLASS_TO_TONE = {
+  "text-success": "success",
+  "text-destructive": "destructive",
+  "text-warning": "warning",
+  "text-info": "primary",
+} as const;
+
+function StatTile({ label, value, tone }: { label: string; value: number; tone?: string }) {
+  const mapped = tone ? TONE_CLASS_TO_TONE[tone as keyof typeof TONE_CLASS_TO_TONE] : undefined;
+  return <MetricCell label={label} value={value} tone={mapped} alarm={Boolean(mapped)} />;
 }

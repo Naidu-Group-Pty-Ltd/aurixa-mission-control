@@ -20,7 +20,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { listAccounts, upsertAccount, LIFECYCLE_STAGES } from "@/lib/crm.functions";
 import { Users, Plus, Search } from "lucide-react";
@@ -54,9 +60,11 @@ export const Route = createFileRoute("/crm/accounts/")({
 });
 
 const money = (cents: number) =>
-  new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(
-    (cents ?? 0) / 100,
-  );
+  new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: 0,
+  }).format((cents ?? 0) / 100);
 
 export function stageVariant(stage: string) {
   if (stage === "active") return "default";
@@ -194,7 +202,8 @@ function AccountsPage() {
       ) : (
         <div className="grid gap-3">
           {rows.map((a: any) => {
-            const primary = (a.crm_contacts ?? []).find((c: any) => c.is_primary) ?? a.crm_contacts?.[0];
+            const primary =
+              (a.crm_contacts ?? []).find((c: any) => c.is_primary) ?? a.crm_contacts?.[0];
             return (
               <Link key={a.id} to="/crm/accounts/$accountId" params={{ accountId: a.id }}>
                 <Card className="transition-colors hover:bg-muted/40">

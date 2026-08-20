@@ -27,7 +27,7 @@ export function RouteLoading({
 export function PageHeaderSkeleton() {
   return (
     <div className="flex items-start gap-3">
-      <Skeleton className="h-10 w-10 rounded-md" />
+      <Skeleton className="h-10 w-10" />
       <div className="space-y-2">
         <Skeleton className="h-3 w-20" />
         <Skeleton className="h-7 w-56" />

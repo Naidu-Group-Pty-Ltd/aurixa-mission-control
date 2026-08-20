@@ -159,7 +159,7 @@ function SuccessPage() {
           )}
 
           {target && (
-            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+            <div className="flex items-center gap-2 border bg-muted/40 px-3 py-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <div className="text-xs">
                 <div className="text-muted-foreground">Billed to client</div>
@@ -169,7 +169,7 @@ function SuccessPage() {
           )}
 
           {(info?.originUsername || info?.originUserId) && (
-            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+            <div className="flex items-center gap-2 border bg-muted/40 px-3 py-2">
               <UserRound className="h-4 w-4 text-muted-foreground" />
               <div className="text-xs">
                 <div className="text-muted-foreground">Purchased by</div>
@@ -195,21 +195,21 @@ function SuccessPage() {
           )}
 
           {session_id && !fulfilled && !webhookError && !timedOut && (
-            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs">
+            <div className="flex items-center gap-2 border bg-muted/40 px-3 py-2 text-xs">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span>Finalising your purchase…</span>
             </div>
           )}
 
           {fulfilled && (
-            <div className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs">
+            <div className="flex items-center gap-2 border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               <span>Fulfilment complete — credits / seats / setup are live.</span>
             </div>
           )}
 
           {webhookError && (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+            <div className="flex items-center gap-2 border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
               <AlertTriangle className="h-4 w-4 text-destructive" />
               <span>
                 Fulfilment hit an error. Our team has been notified — refresh in a moment.
@@ -218,7 +218,7 @@ function SuccessPage() {
           )}
 
           {timedOut && !fulfilled && !webhookError && (
-            <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+            <div className="flex items-center gap-2 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <span>
                 Still finalising. Your payment is safe — refresh in a minute, and ping support if it

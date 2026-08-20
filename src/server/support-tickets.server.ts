@@ -479,10 +479,7 @@ export async function ingestAssistantActivity(request: Request): Promise<IngestO
       .from("support_assistant_activity")
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspaceId)
-      .gte(
-        "created_at",
-        new Date(Date.now() - ACTIVITY_WINDOW_MINUTES * 60_000).toISOString(),
-      );
+      .gte("created_at", new Date(Date.now() - ACTIVITY_WINDOW_MINUTES * 60_000).toISOString());
     if ((count ?? 0) >= ACTIVITY_WINDOW_LIMIT) {
       return { status: 202, body: { ok: true, dropped: true, reason: "workspace_flood_cap" } };
     }

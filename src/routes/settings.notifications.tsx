@@ -197,7 +197,7 @@ function SettingsNotificationsPage() {
             onCheckedChange={(v) => handlePush(!v)}
             disabled={loading}
           />
-          <div className="rounded-md border border-border/60 p-3">
+          <div className="border p-3">
             <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
               Digest mode
             </Label>
@@ -292,7 +292,7 @@ function SettingsNotificationsPage() {
             return (
               <div
                 key={k.value}
-                className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-surface p-3"
+                className="flex items-center justify-between gap-3 border bg-surface p-3"
               >
                 <div className="flex items-start gap-3">
                   <Icon
@@ -426,7 +426,7 @@ function WebPushCard({ userId }: { userId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Subscribe/Unsubscribe this device */}
-        <div className="flex items-center justify-between rounded-md border border-border/60 bg-surface p-3">
+        <div className="flex items-center justify-between border bg-surface p-3">
           <div className="min-w-0">
             <Label className="font-mono text-sm">This device</Label>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -463,7 +463,7 @@ function WebPushCard({ userId }: { userId: string }) {
               return (
                 <div
                   key={d.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-surface p-3"
+                  className="flex items-center justify-between gap-3 border bg-surface p-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <DevIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -520,7 +520,7 @@ function ChannelToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-md border border-border/60 bg-surface p-3">
+    <div className="flex items-start justify-between gap-4 border bg-surface p-3">
       <div className="min-w-0">
         <Label htmlFor={id} className="font-mono text-sm">
           {label}
