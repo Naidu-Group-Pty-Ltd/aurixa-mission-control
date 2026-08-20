@@ -27,8 +27,10 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 
 // `response` is present on both members (optional on success) so call sites can
 // read `auth.response` after an `if (!auth.ok)` guard without relying on
-// discriminated-union narrowing — which this project's non-strict tsconfig does
-// not perform. On success it is simply absent.
+// discriminated-union narrowing. That was written when the project compiled
+// without strictNullChecks and narrowing did not hold; the flag is on now, so
+// this shape is belt-and-braces rather than load-bearing. On success it is
+// simply absent.
 export type CronAuthResult = { ok: true; response?: undefined } | { ok: false; response: Response };
 
 /**

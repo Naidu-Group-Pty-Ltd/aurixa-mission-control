@@ -39,6 +39,11 @@ jobs:
       - name: '@ts-nocheck budget'
         run: npm run check:ts-nocheck
 
+      # A table with RLS on and no policy is closed, and closed reads answer
+      # with an empty array rather than an error — so nothing at runtime says so.
+      - name: RLS policy coverage
+        run: npm run check:rls
+
       - name: Typecheck
         run: npm run typecheck
 
