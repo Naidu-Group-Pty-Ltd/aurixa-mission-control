@@ -7020,6 +7020,129 @@ export type Database = {
         }
         Relationships: []
       }
+      remediation_runs: {
+        Row: {
+          action_type: Database["public"]["Enums"]["remediation_action_type"]
+          approved_at: string | null
+          approved_by: string | null
+          attempts: number
+          clone_id: string | null
+          completed_at: string | null
+          created_at: string
+          destructive: boolean
+          finding_id: string | null
+          id: string
+          last_error: string | null
+          max_attempts: number
+          next_attempt_at: string
+          plan: Json
+          policy: Json
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          rejected_at: string | null
+          rejected_by: string | null
+          rejected_reason: string | null
+          remediation_id: string | null
+          requires_human: boolean
+          result: Json
+          started_at: string | null
+          status: Database["public"]["Enums"]["remediation_run_status"]
+          ticket_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: Database["public"]["Enums"]["remediation_action_type"]
+          approved_at?: string | null
+          approved_by?: string | null
+          attempts?: number
+          clone_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          destructive?: boolean
+          finding_id?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          plan?: Json
+          policy?: Json
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejected_reason?: string | null
+          remediation_id?: string | null
+          requires_human?: boolean
+          result?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["remediation_run_status"]
+          ticket_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: Database["public"]["Enums"]["remediation_action_type"]
+          approved_at?: string | null
+          approved_by?: string | null
+          attempts?: number
+          clone_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          destructive?: boolean
+          finding_id?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          plan?: Json
+          policy?: Json
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejected_reason?: string | null
+          remediation_id?: string | null
+          requires_human?: boolean
+          result?: Json
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["remediation_run_status"]
+          ticket_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remediation_runs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_runs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "remediation_runs_finding_id_fkey"
+            columns: ["finding_id"]
+            isOneToOne: false
+            referencedRelation: "codex_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_runs_remediation_id_fkey"
+            columns: ["remediation_id"]
+            isOneToOne: false
+            referencedRelation: "codex_remediations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_runs_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       repo_blob_analysis: {
         Row: {
           analysis: Json
@@ -8283,6 +8406,279 @@ export type Database = {
           },
         ]
       }
+      support_assistant_activity: {
+        Row: {
+          asked_at: string | null
+          clone_id: string | null
+          created_at: string
+          escalate_reason: string | null
+          escalated: boolean
+          id: string
+          latency_ms: number | null
+          mode: string
+          question: string
+          source: string | null
+          tenant_id: string | null
+          user_external_id: string | null
+          verified_source: boolean
+          workspace_id: string | null
+        }
+        Insert: {
+          asked_at?: string | null
+          clone_id?: string | null
+          created_at?: string
+          escalate_reason?: string | null
+          escalated?: boolean
+          id?: string
+          latency_ms?: number | null
+          mode: string
+          question: string
+          source?: string | null
+          tenant_id?: string | null
+          user_external_id?: string | null
+          verified_source?: boolean
+          workspace_id?: string | null
+        }
+        Update: {
+          asked_at?: string | null
+          clone_id?: string | null
+          created_at?: string
+          escalate_reason?: string | null
+          escalated?: boolean
+          id?: string
+          latency_ms?: number | null
+          mode?: string
+          question?: string
+          source?: string | null
+          tenant_id?: string | null
+          user_external_id?: string | null
+          verified_source?: boolean
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_assistant_activity_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_assistant_activity_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "support_assistant_activity_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ingest_requests: {
+        Row: {
+          created_at: string
+          id: string
+          ip_hash: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_hash: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_hash?: string
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      support_ticket_events: {
+        Row: {
+          actor: string
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          ticket_id: string
+        }
+        Insert: {
+          actor?: string
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          ticket_id: string
+        }
+        Update: {
+          actor?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_events_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          auto_remediable: boolean
+          breakage_vector: Database["public"]["Enums"]["support_breakage_vector"]
+          category: Database["public"]["Enums"]["support_ticket_category"]
+          classification: Json
+          client_meta: Json
+          clone_id: string | null
+          codex_finding_id: string | null
+          created_at: string
+          description: string
+          first_response_at: string | null
+          id: string
+          impact: string | null
+          metadata: Json
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          priority_overridden_at: string | null
+          priority_overridden_by: string | null
+          priority_score: number
+          reference: string
+          remediation_lane: string | null
+          reporter_email: string | null
+          reporter_name: string | null
+          requires_human: boolean
+          resolution: string | null
+          resolved_at: string | null
+          sla_breached_at: string | null
+          sla_due_at: string | null
+          source_slug: string
+          status: Database["public"]["Enums"]["support_ticket_status"]
+          subject: string
+          tenant_id: string | null
+          updated_at: string
+          user_external_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          auto_remediable?: boolean
+          breakage_vector?: Database["public"]["Enums"]["support_breakage_vector"]
+          category: Database["public"]["Enums"]["support_ticket_category"]
+          classification?: Json
+          client_meta?: Json
+          clone_id?: string | null
+          codex_finding_id?: string | null
+          created_at?: string
+          description: string
+          first_response_at?: string | null
+          id?: string
+          impact?: string | null
+          metadata?: Json
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          priority_overridden_at?: string | null
+          priority_overridden_by?: string | null
+          priority_score?: number
+          reference: string
+          remediation_lane?: string | null
+          reporter_email?: string | null
+          reporter_name?: string | null
+          requires_human?: boolean
+          resolution?: string | null
+          resolved_at?: string | null
+          sla_breached_at?: string | null
+          sla_due_at?: string | null
+          source_slug?: string
+          status?: Database["public"]["Enums"]["support_ticket_status"]
+          subject: string
+          tenant_id?: string | null
+          updated_at?: string
+          user_external_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          auto_remediable?: boolean
+          breakage_vector?: Database["public"]["Enums"]["support_breakage_vector"]
+          category?: Database["public"]["Enums"]["support_ticket_category"]
+          classification?: Json
+          client_meta?: Json
+          clone_id?: string | null
+          codex_finding_id?: string | null
+          created_at?: string
+          description?: string
+          first_response_at?: string | null
+          id?: string
+          impact?: string | null
+          metadata?: Json
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          priority_overridden_at?: string | null
+          priority_overridden_by?: string | null
+          priority_score?: number
+          reference?: string
+          remediation_lane?: string | null
+          reporter_email?: string | null
+          reporter_name?: string | null
+          requires_human?: boolean
+          resolution?: string | null
+          resolved_at?: string | null
+          sla_breached_at?: string | null
+          sla_due_at?: string | null
+          source_slug?: string
+          status?: Database["public"]["Enums"]["support_ticket_status"]
+          subject?: string
+          tenant_id?: string | null
+          updated_at?: string
+          user_external_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+          {
+            foreignKeyName: "support_tickets_codex_finding_id_fkey"
+            columns: ["codex_finding_id"]
+            isOneToOne: false
+            referencedRelation: "codex_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_source_slug_fkey"
+            columns: ["source_slug"]
+            isOneToOne: false
+            referencedRelation: "security_intake_sources"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "support_tickets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           billing_exempt: boolean
@@ -9479,9 +9875,30 @@ export type Database = {
         | "crm_task_assigned"
         | "lead_stage_two"
         | "lead_stage_three"
+        | "support_ticket_created"
+        | "support_ticket_escalated"
+        | "remediation_awaiting_validation"
+        | "remediation_auto_completed"
+        | "remediation_failed"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
+      remediation_action_type:
+        | "pr_merge"
+        | "sql_migration"
+        | "edge_function_deploy"
+        | "monitor_recovery"
+        | "rescan"
+        | "manual"
+      remediation_run_status:
+        | "planned"
+        | "awaiting_validation"
+        | "approved"
+        | "rejected"
+        | "executing"
+        | "succeeded"
+        | "failed"
+        | "skipped"
       report_job_status:
         | "pending"
         | "reserved"
@@ -9489,8 +9906,38 @@ export type Database = {
         | "failed"
         | "refunded"
         | "canceled"
+      support_breakage_vector:
+        | "full_outage"
+        | "partial_outage"
+        | "degraded_performance"
+        | "single_feature"
+        | "intermittent"
+        | "cosmetic"
+        | "none"
+      support_ticket_category:
+        | "security_threat"
+        | "api_outage"
+        | "provider_downtime"
+        | "bug"
+        | "performance"
+        | "data_issue"
+        | "access"
+        | "billing"
+        | "feature_request"
+        | "question"
+        | "other"
+      support_ticket_status:
+        | "new"
+        | "triaged"
+        | "remediating"
+        | "awaiting_validation"
+        | "remediated"
+        | "resolved"
+        | "closed"
+        | "failed"
       sync_status: "in_sync" | "behind" | "cascading" | "failed" | "unknown"
       tenant_status: "active" | "past_due" | "canceled"
+      ticket_priority: "P0" | "P1" | "P2" | "P3" | "P4"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9847,10 +10294,33 @@ export const Constants = {
         "crm_task_assigned",
         "lead_stage_two",
         "lead_stage_three",
+        "support_ticket_created",
+        "support_ticket_escalated",
+        "remediation_awaiting_validation",
+        "remediation_auto_completed",
+        "remediation_failed",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
       provisioning_method: ["fork", "template", "clone"],
+      remediation_action_type: [
+        "pr_merge",
+        "sql_migration",
+        "edge_function_deploy",
+        "monitor_recovery",
+        "rescan",
+        "manual",
+      ],
+      remediation_run_status: [
+        "planned",
+        "awaiting_validation",
+        "approved",
+        "rejected",
+        "executing",
+        "succeeded",
+        "failed",
+        "skipped",
+      ],
       report_job_status: [
         "pending",
         "reserved",
@@ -9859,8 +10329,41 @@ export const Constants = {
         "refunded",
         "canceled",
       ],
+      support_breakage_vector: [
+        "full_outage",
+        "partial_outage",
+        "degraded_performance",
+        "single_feature",
+        "intermittent",
+        "cosmetic",
+        "none",
+      ],
+      support_ticket_category: [
+        "security_threat",
+        "api_outage",
+        "provider_downtime",
+        "bug",
+        "performance",
+        "data_issue",
+        "access",
+        "billing",
+        "feature_request",
+        "question",
+        "other",
+      ],
+      support_ticket_status: [
+        "new",
+        "triaged",
+        "remediating",
+        "awaiting_validation",
+        "remediated",
+        "resolved",
+        "closed",
+        "failed",
+      ],
       sync_status: ["in_sync", "behind", "cascading", "failed", "unknown"],
       tenant_status: ["active", "past_due", "canceled"],
+      ticket_priority: ["P0", "P1", "P2", "P3", "P4"],
     },
   },
 } as const
