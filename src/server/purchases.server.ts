@@ -275,7 +275,10 @@ export async function markPurchaseRefunded(
     .from("purchases")
     .update({
       status: fullyRefunded ? "refunded" : "completed",
-      metadata: asJson({ refund_amount_cents: refundAmountCents, partially_refunded: !fullyRefunded }),
+      metadata: asJson({
+        refund_amount_cents: refundAmountCents,
+        partially_refunded: !fullyRefunded,
+      }),
       updated_at: new Date().toISOString(),
     })
     .eq("stripe_payment_intent_id", paymentIntentId);

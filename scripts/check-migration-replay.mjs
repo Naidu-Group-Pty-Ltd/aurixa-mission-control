@@ -28,7 +28,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const DIR = "supabase/migrations";
-const files = readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
+const files = readdirSync(DIR)
+  .filter((f) => f.endsWith(".sql"))
+  .sort();
 
 const RULES = [
   {
@@ -94,8 +96,9 @@ if (findings.length > 0) {
   console.error("A replay halts on the first failure, so a collision here truncates every");
   console.error("rebuild of this database from that point on — `supabase db reset`, a");
   console.error("staging copy, a restore. The live database is built incrementally and");
-  console.error("looks fine regardless, which is why this needs a check rather than a\n" +
-                "runtime signal.\n");
+  console.error(
+    "looks fine regardless, which is why this needs a check rather than a\n" + "runtime signal.\n",
+  );
   process.exit(1);
 }
 

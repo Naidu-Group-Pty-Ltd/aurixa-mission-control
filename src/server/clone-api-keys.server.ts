@@ -120,7 +120,10 @@ export async function ensureTenant(
       }
     }
     if (Object.keys(patch).length > 0) {
-      await dbAny.from("tenants").update(asRow<TablesUpdate<"tenants">>(patch)).eq("id", existing.data.id);
+      await dbAny
+        .from("tenants")
+        .update(asRow<TablesUpdate<"tenants">>(patch))
+        .eq("id", existing.data.id);
     }
     return {
       ok: true,

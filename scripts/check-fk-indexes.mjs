@@ -159,7 +159,6 @@ function splitStatements(sql) {
   return out;
 }
 
-
 let parseFailures = 0;
 for (const f of files) {
   const sql = readFileSync(join(MIGRATIONS, f), "utf8");
@@ -174,7 +173,6 @@ for (const f of files) {
       addIndex(pair[1].toLowerCase(), [pair[2].toLowerCase()]);
     }
   }
-
 
   // Whole-file parsing fails on the first construct the grammar does not cover
   // (procedural blocks, `CREATE POLICY`, extension DDL), which would silently
@@ -191,7 +189,6 @@ for (const f of files) {
     for (const st of statements) handleStatement(st, f);
   }
 }
-
 
 const missing = [];
 for (const fk of foreignKeys) {

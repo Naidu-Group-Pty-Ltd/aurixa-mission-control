@@ -495,7 +495,9 @@ async function finalize(row: DeploymentRow, outcome: StepOutcome) {
     from_status: row.status,
     to_status: toStatus,
     payload: { project_id: row.project_id, domain: row.domain },
-    result: asJson((outcome.kind === "advance" || outcome.kind === "done" ? outcome.result : null) ?? {}),
+    result: asJson(
+      (outcome.kind === "advance" || outcome.kind === "done" ? outcome.result : null) ?? {},
+    ),
     success: outcome.kind !== "error",
     error_message: outcome.kind === "error" ? outcome.error : null,
   });

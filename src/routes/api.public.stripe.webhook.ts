@@ -87,7 +87,9 @@ async function markProcessed(eventId: string, error?: string) {
 }
 
 async function audit(action: string, metadata: Record<string, unknown>) {
-  await adminAny.from("audit_log").insert({ action, entity_type: "stripe", metadata: asJson(metadata) });
+  await adminAny
+    .from("audit_log")
+    .insert({ action, entity_type: "stripe", metadata: asJson(metadata) });
 }
 
 // Operator-facing signal that an attributed purchase landed. Best effort —
@@ -309,7 +311,13 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
     } else {
       await adminAny
         .from("clone_seat_entitlements")
-        .insert(asRow<TablesInsert<"clone_seat_entitlements">>({ clone_id: cloneId, seats_used: 0, ...patch }));
+        .insert(
+          asRow<TablesInsert<"clone_seat_entitlements">>({
+            clone_id: cloneId,
+            seats_used: 0,
+            ...patch,
+          }),
+        );
     }
 
     // The tier's included credits. Until this, buying a plan wrote the
@@ -384,7 +392,12 @@ async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
   if ((bySub.data?.length ?? 0) === 0 && cloneId) {
     await adminAny
       .from("clone_seat_entitlements")
-      .update(asRow<TablesUpdate<"clone_seat_entitlements">>({ ...patch, stripe_subscription_id: sub.id }))
+      .update(
+        asRow<TablesUpdate<"clone_seat_entitlements">>({
+          ...patch,
+          stripe_subscription_id: sub.id,
+        }),
+      )
       .eq("clone_id", cloneId);
   }
 
@@ -542,7 +555,9 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     metadata: asJson({
       charge_id: charge.id,
       payment_intent_id:
-        typeof charge.payment_intent === "string" ? charge.payment_intent : (charge.payment_intent?.id ?? null),
+        typeof charge.payment_intent === "string"
+          ? charge.payment_intent
+          : (charge.payment_intent?.id ?? null),
       refunded,
     }),
   });

@@ -23,7 +23,8 @@ const DIR = "supabase/migrations";
 
 // Words that make a nearby high-entropy literal a credential rather than a
 // hostname, a slug or an enum value.
-const CONTEXT = /(secret|token|password|passwd|api[_-]?key|apikey|credential|bearer|private[_-]?key|access[_-]?key)/i;
+const CONTEXT =
+  /(secret|token|password|passwd|api[_-]?key|apikey|credential|bearer|private[_-]?key|access[_-]?key)/i;
 
 // Calls whose argument is a secret by definition, whatever it looks like.
 const SECRET_SINK = /vault\.(create|update)_secret\s*\(\s*'/i;
@@ -94,7 +95,9 @@ function stripComments(sql) {
 }
 
 const findings = [];
-const files = readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
+const files = readdirSync(DIR)
+  .filter((f) => f.endsWith(".sql"))
+  .sort();
 
 for (const file of files) {
   const raw = readFileSync(join(DIR, file), "utf8");

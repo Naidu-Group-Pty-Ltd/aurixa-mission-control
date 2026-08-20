@@ -150,7 +150,10 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
           patch.completed_at = nowIso;
         }
 
-        await admin.from("codex_remediations").update(asRow<TablesUpdate<"codex_remediations">>(patch)).eq("id", rem.id);
+        await admin
+          .from("codex_remediations")
+          .update(asRow<TablesUpdate<"codex_remediations">>(patch))
+          .eq("id", rem.id);
 
         // Mirror finding state where applicable.
         const findingState = EVENT_FINDING_STATE[payload.event];
@@ -159,7 +162,10 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
           if (payload.pr_url) findingPatch.remediation_pr_url = payload.pr_url;
           if (payload.pr_state) findingPatch.remediation_pr_state = payload.pr_state;
           if (payload.event === "pr.merged") findingPatch.resolved_at = nowIso;
-          await admin.from("codex_findings").update(asRow<TablesUpdate<"codex_findings">>(findingPatch)).eq("id", rem.finding_id);
+          await admin
+            .from("codex_findings")
+            .update(asRow<TablesUpdate<"codex_findings">>(findingPatch))
+            .eq("id", rem.finding_id);
         }
 
         // A failed remediation must not leave the finding parked in a state
