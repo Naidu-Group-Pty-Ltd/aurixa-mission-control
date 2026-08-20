@@ -1333,9 +1333,10 @@ create table if not exists aurixa.schema_migrations (
 );
 `.trim();
 
-function sqlLiteral(value: string): string {
+export function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
+
 
 export type PrimeMigrationResult = {
   id: string;
