@@ -58,17 +58,18 @@ function Stat({
   tone,
 }: {
   label: string;
-  value: string;
+  value: string | number;
   hint?: string;
-  tone?: "success" | "warning" | "destructive" | "primary";
+  /** `danger` is this page's own spelling; the shared cell calls it `destructive`. */
+  tone?: "success" | "warning" | "danger" | "primary";
 }) {
   return (
     <MetricCell
       label={label}
       value={value}
       note={hint}
-      size="sm"
-      tone={tone}
+      size={typeof value === "string" ? "sm" : "lg"}
+      tone={tone === "danger" ? "destructive" : tone}
       alarm={Boolean(tone)}
     />
   );

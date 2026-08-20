@@ -264,7 +264,6 @@ function ApiUsagePage() {
           tone={loadError ? "warning" : "default"}
         />
         <StatCard
-          icon={AlertTriangle}
           label="Unbillable calls"
           value={loadError ? "—" : gaps.reduce((s, g) => s + g.count, 0).toLocaleString()}
           hint="Uncatalogued or unattributable — spend we cannot recover"
