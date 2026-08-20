@@ -59,6 +59,9 @@ jobs:
       - name: Cron coverage
         run: npm run check:cron
 
+      - name: No scheduled job can send an empty credential
+        run: npm run check:cron-auth
+
       # A credential written into a migration produces no runtime signal at all:
       # the migration runs correctly, every check stays green, and the value is
       # readable by anyone with repository access. One shipped the live

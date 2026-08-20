@@ -309,15 +309,13 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
         : adminAny.from("clone_seat_entitlements").update(typedPatch).is("clone_id", null);
       await updQ;
     } else {
-      await adminAny
-        .from("clone_seat_entitlements")
-        .insert(
-          asRow<TablesInsert<"clone_seat_entitlements">>({
-            clone_id: cloneId,
-            seats_used: 0,
-            ...patch,
-          }),
-        );
+      await adminAny.from("clone_seat_entitlements").insert(
+        asRow<TablesInsert<"clone_seat_entitlements">>({
+          clone_id: cloneId,
+          seats_used: 0,
+          ...patch,
+        }),
+      );
     }
 
     // The tier's included credits. Until this, buying a plan wrote the

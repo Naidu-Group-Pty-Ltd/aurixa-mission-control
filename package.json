@@ -12,6 +12,7 @@
     "check:supabase-types": "node scripts/check-supabase-types.mjs",
     "check:ts-nocheck": "node scripts/check-ts-nocheck-budget.mjs",
     "check:rls": "node scripts/check-rls-policies.mjs",
+    "check:cron-auth": "node scripts/check-cron-auth.mjs",
     "check:cron": "node scripts/check-cron-coverage.mjs",
     "check:migration-secrets": "node scripts/check-migration-secrets.mjs",
     "check:migration-replay": "node scripts/check-migration-replay.mjs",
