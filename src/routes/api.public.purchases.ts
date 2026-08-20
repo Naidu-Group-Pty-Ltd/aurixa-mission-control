@@ -80,7 +80,6 @@ export const Route = createFileRoute("/api/public/purchases")({
           tenantId = tenant.id;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- item_name postdates the generated DB types
         const adminAny = supabaseAdmin;
         let q = adminAny
           .from("purchases")

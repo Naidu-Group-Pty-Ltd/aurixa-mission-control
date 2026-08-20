@@ -23,8 +23,7 @@ import {
 } from "@/server/feedback.server";
 import { buildFeedbackForm } from "@/lib/feedback/feedback-form";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 type Caller = {
   tenantId: string | null;
@@ -101,9 +100,7 @@ export const Route = createFileRoute("/api/public/storefront/feedback")({
             .select("display_name, external_ref")
             .eq("id", caller.tenantId)
             .maybeSingle()
-            .then(
-              (r: { data?: { display_name?: string; external_ref?: string } }) => r.data ?? null,
-            ),
+            .then((r) => r.data ?? null),
         ]);
 
         return storefrontJson({

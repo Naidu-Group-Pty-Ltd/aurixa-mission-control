@@ -16,7 +16,6 @@ export const Route = createFileRoute("/api/public/edge/status")({
         if (!key) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
         if (!key.clone_id) return jsonResponse({ ok: false, error: "key_not_clone_scoped" }, 400);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const admin = supabaseAdmin;
         const { data: configs, error } = await admin
           .from("clone_edge_config")

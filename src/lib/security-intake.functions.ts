@@ -7,11 +7,13 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { asRow } from "@/lib/json-cast";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { requireAdmin, requireOperator } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { adapterFor, loadSourceBySlug } from "@/server/security-intake/adapters";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 const SourceKind = z.enum(["codex", "manual", "ticketing", "generic"]);
 
@@ -65,11 +67,11 @@ export const upsertSecurityIntakeSource = createServerFn({ method: "POST" })
     const res = data.id
       ? await admin
           .from("security_intake_sources")
-          .update(patch)
+          .update(asRow<TablesUpdate<"security_intake_sources">>(patch))
           .eq("id", data.id)
           .select("id, slug")
           .single()
-      : await admin.from("security_intake_sources").insert(patch).select("id, slug").single();
+      : await admin.from("security_intake_sources").insert(asRow<TablesInsert<"security_intake_sources">>(patch)).select("id, slug").single();
 
     if (res.error) throw new Error(res.error.message);
     await admin.from("audit_log").insert({
@@ -119,7 +121,12 @@ export const deleteSecurityIntakeSource = createServerFn({ method: "POST" })
       .select("slug, metadata")
       .eq("id", data.id)
       .maybeSingle();
-    if (existing.data?.metadata?.built_in) throw new Error("built_in_source_cannot_be_deleted");
+    const existingMeta = existing.data?.metadata;
+    const isBuiltIn =
+      existingMeta && typeof existingMeta === "object" && !Array.isArray(existingMeta)
+        ? existingMeta["built_in"] === true
+        : false;
+    if (isBuiltIn) throw new Error("built_in_source_cannot_be_deleted");
     const res = await admin.from("security_intake_sources").delete().eq("id", data.id);
     if (res.error) throw new Error(res.error.message);
     await admin.from("audit_log").insert({

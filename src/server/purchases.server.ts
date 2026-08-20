@@ -6,10 +6,11 @@
 // Fulfilment itself stays in token_ledger / setup_purchases /
 // clone_seat_entitlements — nothing here grants credits or seats.
 import type Stripe from "stripe";
+import type { Database } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson, asRow } from "@/lib/json-cast";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+type PurchasesInsert = Database["public"]["Tables"]["purchases"]["Insert"];
 
 export type OriginAttribution = {
   originUserId: string | null;
@@ -197,7 +198,10 @@ export async function recordPurchaseInitiated(input: {
 }): Promise<void> {
   try {
     await writeToleratingSchemaDrift(
-      (row) => adminAny.from("purchases").insert(row),
+      async (row) => {
+        const res = await supabaseAdmin.from("purchases").insert(asRow<PurchasesInsert>(row));
+        return res;
+      },
       {
         stripe_checkout_session_id: input.sessionId,
         mode: input.mode,
@@ -218,7 +222,7 @@ export async function recordPurchaseInitiated(input: {
   } catch (err) {
     console.error("recordPurchaseInitiated failed", err);
     try {
-      await adminAny.from("audit_log").insert({
+      await supabaseAdmin.from("audit_log").insert({
         action: "purchase.initiated.record_failed",
         entity_type: "stripe",
         metadata: {
@@ -245,7 +249,12 @@ export async function finalizePurchaseFromSession(
   const row = purchaseRowFromSession(session, status, error);
   try {
     await writeToleratingSchemaDrift(
-      (r) => adminAny.from("purchases").upsert(r, { onConflict: "stripe_checkout_session_id" }),
+      async (r) => {
+        const res = await supabaseAdmin
+          .from("purchases")
+          .upsert(asRow<PurchasesInsert>(r), { onConflict: "stripe_checkout_session_id" });
+        return res;
+      },
       row,
       PURCHASE_IDENTITY_COLUMNS,
     );
@@ -262,14 +271,17 @@ export async function markPurchaseRefunded(
   fullyRefunded: boolean,
 ): Promise<void> {
   if (!paymentIntentId) return;
-  await adminAny
+  const { error: refundError } = await supabaseAdmin
     .from("purchases")
     .update({
       status: fullyRefunded ? "refunded" : "completed",
-      metadata: { refund_amount_cents: refundAmountCents, partially_refunded: !fullyRefunded },
+      metadata: asJson({ refund_amount_cents: refundAmountCents, partially_refunded: !fullyRefunded }),
       updated_at: new Date().toISOString(),
     })
     .eq("stripe_payment_intent_id", paymentIntentId);
+  if (refundError) {
+    console.warn("[purchases] refund status write failed", refundError.message);
+  }
 }
 
 export type BillingHandoff = {
@@ -287,7 +299,7 @@ export type BillingHandoff = {
 
 /** Loads a handoff token if it exists, is unexpired, and unconsumed. */
 export async function loadValidHandoff(handoffId: string): Promise<BillingHandoff | null> {
-  const { data, error } = await adminAny
+  const { data, error } = await supabaseAdmin
     .from("billing_handoffs")
     .select(
       "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at, " +
@@ -297,7 +309,7 @@ export async function loadValidHandoff(handoffId: string): Promise<BillingHandof
     .eq("id", handoffId)
     .maybeSingle();
   if (error || !data) return null;
-  const handoff = data as BillingHandoff;
+  const handoff = data as unknown as BillingHandoff;
   if (handoff.consumed_at) return null;
   if (new Date(handoff.expires_at).getTime() <= Date.now()) return null;
   return handoff;
@@ -305,11 +317,12 @@ export async function loadValidHandoff(handoffId: string): Promise<BillingHandof
 
 /** Single-use semantics: mark a handoff consumed once checkout is created. */
 export async function consumeHandoff(handoffId: string): Promise<void> {
-  await adminAny
+  const { error } = await supabaseAdmin
     .from("billing_handoffs")
     .update({ consumed_at: new Date().toISOString() })
     .eq("id", handoffId)
     .is("consumed_at", null);
+  if (error) console.warn("[purchases] handoff consume failed", error.message);
 }
 
 /**
@@ -332,14 +345,14 @@ export async function recordAdminAction(input: {
   try {
     let cloneId = input.cloneId ?? null;
     if (!cloneId && input.tenantId) {
-      const { data: t } = await adminAny
+      const { data: t } = await supabaseAdmin
         .from("tenants")
         .select("clone_id")
         .eq("id", input.tenantId)
         .maybeSingle();
       cloneId = t?.clone_id ?? null;
     }
-    const { error } = await adminAny.from("purchases").insert({
+    const { error } = await supabaseAdmin.from("purchases").insert({
       mode: input.mode,
       item_slug: input.itemSlug ?? null,
       quantity: 1,
@@ -351,7 +364,7 @@ export async function recordAdminAction(input: {
       amount_cents: 0,
       status: "completed",
       completed_at: new Date().toISOString(),
-      metadata: input.metadata ?? {},
+      metadata: asJson(input.metadata ?? {}),
     });
     if (error) throw new Error(error.message);
   } catch (err) {
@@ -365,7 +378,7 @@ export async function operatorDisplayName(
   fallbackEmail?: string | null,
 ): Promise<string | null> {
   try {
-    const { data } = await adminAny
+    const { data } = await supabaseAdmin
       .from("profiles")
       .select("display_name")
       .eq("user_id", userId)

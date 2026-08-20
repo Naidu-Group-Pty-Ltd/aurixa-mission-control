@@ -9,12 +9,13 @@
 //
 // upsertInvoiceRecord is idempotent on stripe_invoice_id and tolerant of
 // events arriving out of order (finalized vs paid vs payment_failed).
+import { asRow } from "@/lib/json-cast";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import type Stripe from "stripe";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { attributionFromMetadata } from "@/server/purchases.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 function ts(unix: number | null | undefined): string | null {
   return unix ? new Date(unix * 1000).toISOString() : null;
@@ -133,6 +134,6 @@ export async function upsertInvoiceRecord(invoice: Stripe.Invoice): Promise<void
 
   const { error } = await adminAny
     .from("invoices")
-    .upsert(row, { onConflict: "stripe_invoice_id" });
+    .upsert(asRow<TablesInsert<"invoices">>(row), { onConflict: "stripe_invoice_id" });
   if (error) throw new Error(`invoice_upsert_failed: ${error.message}`);
 }

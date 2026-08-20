@@ -18,6 +18,8 @@
 // the thing actually going wrong if it happens.
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson, asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 import { getHostingProvider, asHostingSlug } from "@/server/hosting";
 import "@/server/hosting/index"; // ensure providers register
@@ -36,7 +38,7 @@ import {
 } from "@/server/hosting/subdomainJobs.server";
 import { VercelError } from "@/server/hosting/vercel-client";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 const MAX_ROWS_PER_RUN = 6;
 /** A build or a DNS propagation that has not resolved in this long is stuck. */
@@ -374,7 +376,7 @@ async function onLive(row: DeploymentRow, origin: string | null) {
   // `active` for names that did not resolve.
   const patch: Record<string, unknown> = { deploy_url: origin };
   if (row.domain) patch.subdomain_status = "active";
-  await admin.from("clones").update(patch).eq("id", row.clone_id);
+  await admin.from("clones").update(asRow<TablesUpdate<"clones">>(patch)).eq("id", row.clone_id);
 
   const { data: clone } = await admin
     .from("clones")
@@ -481,7 +483,10 @@ async function finalize(row: DeploymentRow, outcome: StepOutcome) {
     toStatus = willRetry ? row.status : "failed";
   }
 
-  await admin.from("clone_deployments").update(base).eq("clone_id", row.clone_id);
+  await admin
+    .from("clone_deployments")
+    .update(asRow<TablesUpdate<"clone_deployments">>(base))
+    .eq("clone_id", row.clone_id);
 
   await admin.from("deployment_events").insert({
     clone_id: row.clone_id,
@@ -490,7 +495,7 @@ async function finalize(row: DeploymentRow, outcome: StepOutcome) {
     from_status: row.status,
     to_status: toStatus,
     payload: { project_id: row.project_id, domain: row.domain },
-    result: (outcome.kind === "advance" || outcome.kind === "done" ? outcome.result : null) ?? {},
+    result: asJson((outcome.kind === "advance" || outcome.kind === "done" ? outcome.result : null) ?? {}),
     success: outcome.kind !== "error",
     error_message: outcome.kind === "error" ? outcome.error : null,
   });
@@ -606,7 +611,7 @@ async function processTeardowns() {
 
       await admin
         .from("hosting_teardowns")
-        .update({ status: "done", result, completed_at: new Date().toISOString() })
+        .update({ status: "done", result: asJson(result), completed_at: new Date().toISOString() })
         .eq("id", row.id);
       done++;
     } catch (e) {
@@ -618,7 +623,7 @@ async function processTeardowns() {
           status: willRetry ? "queued" : "failed",
           attempts,
           error_message: e instanceof Error ? e.message : String(e),
-          result,
+          result: asJson(result),
           next_attempt_at: new Date(Date.now() + backoffSeconds(attempts) * 1000).toISOString(),
           completed_at: willRetry ? null : new Date().toISOString(),
         })

@@ -15,8 +15,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveCloneBillingTenant } from "@/server/billing-tenant.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 export type PlanChangeOutcome = {
   ok: boolean;
@@ -153,7 +152,7 @@ export async function advanceBillingPeriod(args: {
     const { data, error } = await adminAny.rpc("advance_tenant_billing_period", {
       _tenant_id: args.tenantId,
       _period_start: args.periodStart.toISOString(),
-      _period_end: args.periodEnd ? args.periodEnd.toISOString() : null,
+      _period_end: args.periodEnd ? args.periodEnd.toISOString() : undefined,
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true, issued: data };

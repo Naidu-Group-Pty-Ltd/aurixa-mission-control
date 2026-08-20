@@ -20,6 +20,8 @@
 //   • The individual buyer is still captured — on Customer metadata (for
 //     support lookups) and, per purchase, as the receipt email — so nobody
 //     loses their own receipt to the shared org address.
+import { asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import type Stripe from "stripe";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
@@ -379,10 +381,9 @@ export async function recordTenantTaxIdFromSession(
   if (businessName) update.tax_id_business_name = businessName;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabaseAdmin as any)
+    const { error } = await supabaseAdmin
       .from("tenants")
-      .update(update)
+      .update(asRow<TablesUpdate<"tenants">>(update))
       .eq("id", tenantId);
     if (error) {
       console.warn("[billing-contact] tenant tax id write failed", error.message);

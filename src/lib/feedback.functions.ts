@@ -41,7 +41,6 @@ export const listFeedback = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const adminAny = supabaseAdmin;
 
       let q = adminAny

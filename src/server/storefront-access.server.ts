@@ -14,8 +14,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadValidHandoff } from "@/server/purchases.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 export type AccessReason =
   | "handoff"
@@ -109,7 +108,7 @@ export async function resolveStorefrontAccess(input: {
   if (isGrantToken(token)) {
     const { data } = await adminAny
       .from("storefront_access_grants")
-      .select("id, label, revoked_at, expires_at")
+      .select("id, label, revoked_at, expires_at, use_count")
       .eq("id", token.trim())
       .maybeSingle();
     const decision = evaluateGrant((data as GrantRow) ?? null, new Date());

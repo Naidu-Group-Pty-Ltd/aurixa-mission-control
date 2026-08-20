@@ -4,8 +4,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/json-cast";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 const REPORT_BUCKET = "security-reports";
 
 async function writeSecurityEvent(input: {
@@ -25,7 +26,7 @@ async function writeSecurityEvent(input: {
     actor_kind: "aurixa",
     event_type: input.eventType,
     body: input.body ?? null,
-    metadata: input.metadata ?? {},
+    metadata: asJson(input.metadata ?? {}),
   });
 }
 

@@ -12,10 +12,12 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { cloudflareApi, CloudflareError } from "@/server/cloudflare/client";
 import { enqueueSubdomainJob, payloadHash } from "@/server/hosting/subdomainJobs.server";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
@@ -79,7 +81,7 @@ export const updatePlatformHostingConfig = createServerFn({ method: "POST" })
     };
     const { data: row, error } = await admin
       .from("platform_hosting_config")
-      .update(patch)
+      .update(asRow<TablesUpdate<"platform_hosting_config">>(patch))
       .eq("singleton", true)
       .select()
       .single();
@@ -245,6 +247,10 @@ export const reconcilePendingSubdomains = createServerFn({ method: "POST" })
     let skipped = 0;
     let awaiting = 0;
     for (const row of pending ?? []) {
+      if (!row.subdomain) {
+        skipped += 1;
+        continue;
+      }
       const { data: deployment } = await admin
         .from("clone_deployments")
         .select("dns_target_type, dns_target_value, status")

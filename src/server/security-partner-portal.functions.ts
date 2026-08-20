@@ -4,8 +4,10 @@ import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson, asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 export const SECURITY_ASSESSMENT_STATUSES = [
   "pending",
@@ -78,7 +80,7 @@ async function writeSecurityEvent(input: {
     actor_kind: input.actorKind,
     event_type: input.eventType,
     body: input.body ?? null,
-    metadata: input.metadata ?? {},
+    metadata: asJson(input.metadata ?? {}),
   });
 }
 
@@ -412,7 +414,7 @@ export const updateSecurityAssessmentAdmin = createServerFn({ method: "POST" })
 
     const { data: row, error } = await admin
       .from("security_assessments")
-      .update(patch)
+      .update(asRow<TablesUpdate<"security_assessments">>(patch))
       .eq("id", data.assessmentId)
       .select("*")
       .single();
@@ -543,7 +545,7 @@ export const updatePartnerAssessment = createServerFn({ method: "POST" })
 
     const { data: row, error } = await admin
       .from("security_assessments")
-      .update(patch)
+      .update(asRow<TablesUpdate<"security_assessments">>(patch))
       .eq("id", data.assessmentId)
       .select("*")
       .single();
@@ -675,7 +677,7 @@ export const updateSecurityFinding = createServerFn({ method: "POST" })
 
     const { data: row, error } = await admin
       .from("security_findings")
-      .update(patch)
+      .update(asRow<TablesUpdate<"security_findings">>(patch))
       .eq("id", data.findingId)
       .select("*")
       .single();

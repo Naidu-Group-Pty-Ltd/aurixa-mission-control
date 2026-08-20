@@ -6,6 +6,23 @@
 // systems (Linear, Jira) without touching downstream consumers.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import { asJson, asRow } from "@/lib/json-cast";
+
+const CODEX_FINDING_STATES = [
+  "open",
+  "triaging",
+  "fix_drafted",
+  "pr_open",
+  "fix_merged",
+  "resolved",
+  "dismissed",
+  "false_positive",
+] as const;
+type CodexFindingState = (typeof CODEX_FINDING_STATES)[number];
+function isCodexFindingState(value: string): value is CodexFindingState {
+  return (CODEX_FINDING_STATES as readonly string[]).includes(value);
+}
 
 export type NormalizedSeverity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -47,7 +64,7 @@ export interface SecurityIntakeAdapter {
   ): Promise<{ id: string }>;
 }
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 // Shared upsert used by codex/manual/generic adapters. Ticketing adapter does
 // not create findings (it only links to existing ones).
@@ -73,7 +90,7 @@ async function upsertFinding(finding: NormalizedFinding, source: IntakeSource) {
     cvss: finding.cvss ?? null,
     auto_fix_confidence: finding.auto_fix_confidence ?? null,
     source_slug: source.slug,
-    raw: finding.raw ?? {},
+    raw: asJson(finding.raw ?? {}),
   };
 
   // Try to find existing row (unique on codex_finding_id in most deployments,
@@ -85,20 +102,32 @@ async function upsertFinding(finding: NormalizedFinding, source: IntakeSource) {
     .maybeSingle();
 
   if (existing.data?.id) {
-    await admin.from("codex_findings").update(row).eq("id", existing.data.id);
+    const updated = await admin
+      .from("codex_findings")
+      .update(asRow<TablesUpdate<"codex_findings">>(row))
+      .eq("id", existing.data.id);
+    if (updated.error) throw new Error(updated.error.message);
     return { id: existing.data.id as string, created: false };
   }
 
-  const inserted = await admin.from("codex_findings").insert(row).select("id").single();
-  if (inserted.error) throw new Error(inserted.error.message);
+  const inserted = await admin
+    .from("codex_findings")
+    .insert(asRow<TablesInsert<"codex_findings">>(row))
+    .select("id")
+    .single();
+  if (inserted.error) {
+    throw new Error(inserted.error.message);
+  }
   return { id: inserted.data.id as string, created: true };
 }
 
 async function updateFindingState(externalId: string, sourceSlug: string, state: string) {
-  await admin
+  if (!isCodexFindingState(state)) return;
+  const { error } = await admin
     .from("codex_findings")
     .update({ state })
     .eq("codex_finding_id", `${sourceSlug}:${externalId}`);
+  if (error) throw new Error(error.message);
 }
 
 async function linkTicket(
@@ -118,15 +147,18 @@ async function linkTicket(
   };
   const res = await admin
     .from("security_external_tickets")
-    .upsert(payload, { onConflict: "source_slug,provider,external_id" })
+    .upsert(asRow<TablesInsert<"security_external_tickets">>(payload), {
+      onConflict: "source_slug,provider,external_id",
+    })
     .select("id")
     .single();
   if (res.error) throw new Error(res.error.message);
   if (ticket.url) {
-    await admin
+    const linked = await admin
       .from("codex_findings")
       .update({ external_ticket_url: ticket.url })
       .eq("id", findingId);
+    if (linked.error) throw new Error(linked.error.message);
   }
   return { id: res.data.id as string };
 }
@@ -171,11 +203,12 @@ export class TicketingAdapter implements SecurityIntakeAdapter {
   }
   async updateStatus(externalId: string, state: string) {
     // Ticketing status updates land on security_external_tickets instead.
-    await admin
+    const { error } = await admin
       .from("security_external_tickets")
       .update({ status: state })
       .eq("source_slug", this.slug)
       .eq("external_id", externalId);
+    if (error) throw new Error(error.message);
   }
   async linkExternalTicket(
     findingId: string,

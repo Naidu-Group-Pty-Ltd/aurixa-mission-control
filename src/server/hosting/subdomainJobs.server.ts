@@ -15,7 +15,7 @@ import crypto from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveDnsTarget, type DeploymentTarget, type FleetDefault } from "./dnsTarget.pure";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 export function payloadHash(p: unknown): string {
   return crypto

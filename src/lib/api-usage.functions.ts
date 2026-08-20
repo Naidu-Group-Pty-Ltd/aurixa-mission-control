@@ -20,8 +20,7 @@ import type { Json } from "@/integrations/supabase/types";
 type AuthContext = { supabase: unknown; user: { id?: string } | null };
 
 // The metering tables post-date the generated DB types.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 async function callerRoles(supabase: unknown, userId: string): Promise<string[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -119,7 +118,7 @@ export const getTenantApiUsage = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { data: summary, error } = await adminAny.rpc("api_usage_tenant_summary", {
       _tenant_id: data.tenant_id,
-      _period_start: data.period_start ?? null,
+      _period_start: data.period_start ?? undefined,
     });
     if (error) return { ok: false as const, error: error.message };
 

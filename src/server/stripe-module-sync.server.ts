@@ -38,7 +38,6 @@ import {
   type PricedModule,
 } from "@/lib/pricing/aurixa-catalog";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin;
 
 export type ModuleRow = {

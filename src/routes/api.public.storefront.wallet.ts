@@ -4,7 +4,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadHandoffById } from "@/server/billing-handoffs.server";
 import { storefrontJson, storefrontPreflight } from "@/server/storefront-cors.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin;
 
 /**
