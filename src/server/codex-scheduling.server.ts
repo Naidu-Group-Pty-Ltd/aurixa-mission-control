@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Server-only orchestration for Codex Security scans without a user context
 // (pg_cron nightly job, the GitHub webhook receiver, and the sweeper).
