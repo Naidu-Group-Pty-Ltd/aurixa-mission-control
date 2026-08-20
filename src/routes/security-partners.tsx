@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { Tables } from "@/integrations/supabase/types";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -67,22 +68,21 @@ type CloneRow = {
   sync_status?: string | null;
 };
 
-type Assessment = {
-  id: string;
-  title: string;
-  status: string;
-  aurixa_review_status: string;
-  cycle: string;
-  due_at?: string | null;
-  testing_window_start?: string | null;
-  testing_window_end?: string | null;
-  client_release_approved?: boolean;
-  retest_required?: boolean;
-  clones?: CloneRow | null;
-  security_partners?: Partner | null;
-  security_findings?: Array<{ id: string; severity: string; status: string; title: string }>;
-  security_reports?: Array<{ id: string; report_type: string; status: string; label: string }>;
-  security_assessment_comments?: Array<{ id: string; visibility: string }>;
+type Assessment = Tables<"security_assessments"> & {
+  clones: Pick<
+    Tables<"clones">,
+    "id" | "name" | "deploy_url" | "github_owner" | "github_repo" | "github_url"
+  > | null;
+  security_partners: Pick<Tables<"security_partners">, "id" | "name" | "slug"> | null;
+  security_findings: Array<
+    Pick<Tables<"security_findings">, "id" | "title" | "severity" | "status" | "retest_status">
+  >;
+  security_reports: Array<
+    Pick<Tables<"security_reports">, "id" | "label" | "report_type" | "status" | "submitted_at">
+  >;
+  security_assessment_comments: Array<
+    Pick<Tables<"security_assessment_comments">, "id" | "visibility" | "created_at">
+  >;
 };
 
 const CYCLES = [
@@ -168,7 +168,7 @@ function SecurityPartnersPage() {
       setPartners((data.partners ?? []) as Partner[]);
       setMembers(data.members ?? []);
       setClones((data.clones ?? []) as CloneRow[]);
-      setAssessments((data.assessments ?? []) as Assessment[]);
+      setAssessments(data.assessments ?? []);
       const firstPartner = (data.partners ?? [])[0]?.id;
       if (firstPartner) {
         setMemberPartnerId((current) => current || firstPartner);

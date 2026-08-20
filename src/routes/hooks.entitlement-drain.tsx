@@ -32,7 +32,6 @@ export const Route = createFileRoute("/hooks/entitlement-drain")({
         if (!auth.ok) return auth.response;
         try {
           const res = await drainPlanChangeReconciliations({
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             supabase: supabaseAdmin,
             limit: MAX_EVENTS_PER_RUN,
           });

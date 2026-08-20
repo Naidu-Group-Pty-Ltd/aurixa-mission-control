@@ -18,7 +18,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ensureTenant, jsonResponse, resolveCloneApiKey } from "@/server/clone-api-keys.server";
 import { checkRateLimit } from "@/server/token-rate-limit.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin;
 
 type PlanChangeRow = {

@@ -7,7 +7,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { rankTenantCandidates, type TenantCandidate } from "@/server/billing-tenant.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin;
 
 export type CurrentPlan = { slug: string; name: string | null } | null;

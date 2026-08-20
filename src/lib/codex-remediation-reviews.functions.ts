@@ -73,10 +73,12 @@ export const reviewRemediation = createServerFn({ method: "POST" })
       await supabase.from("codex_remediations").update(patch).eq("id", rem.id);
     }
 
-    // Audit event.
+    // Audit event. `codex_scan_events.job_id` is NOT NULL, so a remediation
+    // that was never tied to a scan job simply has no event trail to append to.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await (supabaseAdmin as any).from("codex_scan_events").insert({
-      job_id: rem.scan_job_id,
+    const scanJobId = rem.scan_job_id;
+    if (scanJobId) await supabaseAdmin.from("codex_scan_events").insert({
+      job_id: scanJobId,
       event_type: `remediation.review.${data.decision}`,
       actor: userId,
       payload: {
@@ -130,6 +132,8 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
     if (!rem.pr_number) throw new Error("PR not yet opened");
     if (rem.status === "merged") throw new Error("Already merged");
     if (rem.status === "rejected") throw new Error("Remediation was rejected");
+    // NOT NULL on codex_scan_events.job_id: no scan job, no event trail.
+    const scanJobId = rem.scan_job_id;
 
     // Verify approval count from DB (never trust client status).
     const { data: reviews } = await supabase
@@ -208,7 +212,7 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
         const severity = (finding?.severity || "").toUpperCase();
         const { createCascadeForAllClones } = await import("@/server/cascade-trigger.server");
         const cascade = await createCascadeForAllClones({
-          supabase: supabaseAdmin as any,
+          supabase: supabaseAdmin,
           mode,
           trigger: "commit",
           sourceBranch,
@@ -225,7 +229,7 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
       }
     }
 
-    await (supabaseAdmin as any)
+    await supabaseAdmin
       .from("codex_remediations")
       .update({
         status: "merged",
@@ -237,12 +241,12 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
         cascade_event_id: cascadeEventId,
       })
       .eq("id", rem.id);
-    await (supabaseAdmin as any)
+    await supabaseAdmin
       .from("codex_findings")
       .update({ state: "fix_merged", resolved_at: new Date().toISOString() })
       .eq("id", rem.finding_id);
-    await (supabaseAdmin as any).from("codex_scan_events").insert({
-      job_id: rem.scan_job_id,
+    if (scanJobId) await supabaseAdmin.from("codex_scan_events").insert({
+      job_id: scanJobId,
       event_type: "remediation.merged",
       actor: userId,
       payload: {
@@ -253,9 +257,9 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
         cascade_error: cascadeError,
       },
     });
-    if (cascadeEventId) {
-      await (supabaseAdmin as any).from("codex_scan_events").insert({
-        job_id: rem.scan_job_id,
+    if (cascadeEventId && scanJobId) {
+      await supabaseAdmin.from("codex_scan_events").insert({
+        job_id: scanJobId,
         event_type: "remediation.cascade_triggered",
         actor: userId,
         payload: {
@@ -264,9 +268,9 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
           source_sha: merge.sha,
         },
       });
-    } else if (cascadeError) {
-      await (supabaseAdmin as any).from("codex_scan_events").insert({
-        job_id: rem.scan_job_id,
+    } else if (cascadeError && scanJobId) {
+      await supabaseAdmin.from("codex_scan_events").insert({
+        job_id: scanJobId,
         event_type: "remediation.cascade_skipped",
         actor: userId,
         payload: { remediation_id: rem.id, reason: cascadeError },

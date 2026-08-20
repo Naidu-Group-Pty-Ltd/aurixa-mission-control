@@ -4,8 +4,9 @@ import { z } from "zod";
 import { requireAdmin, requireOperator } from "@/integrations/supabase/role-middleware";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/json-cast";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 const Cycle = z.enum(["quarterly", "bi_annual", "annual", "one_off"]);
 const REPORT_BUCKET = "security-reports";
@@ -63,7 +64,7 @@ async function writeSecurityEvent(input: {
     actor_kind: input.actorKind,
     event_type: input.eventType,
     body: input.body ?? null,
-    metadata: input.metadata ?? {},
+    metadata: asJson(input.metadata ?? {}),
   });
 }
 

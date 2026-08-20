@@ -18,7 +18,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { allocateSubdomain } from "./subdomainAllocation.pure";
 import { cloneFqdn } from "./dnsTarget.pure";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 /** Postgres unique-violation. Anything else is a real error and is rethrown. */
 const UNIQUE_VIOLATION = "23505";

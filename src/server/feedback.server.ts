@@ -18,8 +18,7 @@ import {
   type FeedbackForm,
 } from "@/lib/feedback/feedback-form";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /** Credits a workspace earns for answering. One award per campaign. */
 export const FEEDBACK_REWARD_TOKENS = 100;
@@ -48,13 +47,23 @@ export type PromptState = {
  * inherits the same cadence — first 30 days, then quarterly — without the rule
  * being copied into code that ships separately and drifts.
  */
+/** `module_ratings` is jsonb; keep only the numeric entries. */
+function toRatingMap(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof v === "number") out[k] = v;
+  }
+  return out;
+}
+
 export async function promptState(
   tenantId: string,
   originUserId?: string | null,
 ): Promise<PromptState | null> {
   const { data, error } = await adminAny.rpc("feedback_prompt_due", {
     _tenant_id: tenantId,
-    _origin_user_id: originUserId ?? null,
+    _origin_user_id: originUserId ?? undefined,
   });
   if (error || !data || (data as { ok?: boolean }).ok === false) return null;
   const r = data as Record<string, unknown>;
@@ -233,7 +242,7 @@ async function mark(submissionId: string, ok: boolean, error?: string): Promise<
     await adminAny.rpc("mark_feedback_forwarded", {
       _submission_id: submissionId,
       _ok: ok,
-      _error: error ?? null,
+      _error: error ?? undefined,
     });
   } catch (err) {
     console.warn("[feedback] could not record delivery state", err);
@@ -305,7 +314,7 @@ export async function deliverSubmission(
       planName: row.plan_name,
       overallRating: row.overall_rating,
       recommendScore: row.recommend_score,
-      moduleRatings: row.module_ratings ?? {},
+      moduleRatings: toRatingMap(row.module_ratings),
       labels,
       mostValuable: row.most_valuable,
       biggestFrustration: row.biggest_frustration,

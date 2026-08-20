@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/json-cast";
 import { runFleetDriftScan } from "@/server/fleet-drift.functions";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 
@@ -14,11 +15,10 @@ export const Route = createFileRoute("/hooks/fleet-drift")({
 
         try {
           const result = await runFleetDriftScan(supabaseAdmin);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabaseAdmin as any).from("audit_log").insert({
+          await supabaseAdmin.from("audit_log").insert({
             action: "fleet_drift_cron",
             entity_type: "cron",
-            metadata: result as Record<string, unknown>,
+            metadata: asJson(result),
           });
           return new Response(JSON.stringify({ success: true, ...result }), {
             headers: { "Content-Type": "application/json" },
@@ -26,8 +26,7 @@ export const Route = createFileRoute("/hooks/fleet-drift")({
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Scan failed";
           console.error("Drift scan failed:", msg);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabaseAdmin as any).from("audit_log").insert({
+          await supabaseAdmin.from("audit_log").insert({
             action: "fleet_drift_cron",
             entity_type: "cron",
             metadata: { error: msg },

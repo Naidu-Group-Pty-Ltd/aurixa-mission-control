@@ -13,10 +13,12 @@
  * touches into hosting — see the policy module.
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { decideRedeploy, type RedeploySkipReason } from "./redeployPolicy.pure";
 import type { DeploymentStatus } from "./deploymentState.pure";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 export type RedeployRequest =
   | { queued: true; resumedAt: "pending" | "deploying"; from: DeploymentStatus }
@@ -61,7 +63,7 @@ export async function requestRedeployAfterPush(input: {
 
   const { error } = await admin
     .from("clone_deployments")
-    .update(patch)
+    .update(asRow<TablesUpdate<"clone_deployments">>(patch))
     .eq("clone_id", input.cloneId);
 
   await admin.from("deployment_events").insert({

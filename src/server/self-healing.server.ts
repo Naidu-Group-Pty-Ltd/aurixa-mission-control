@@ -22,11 +22,23 @@
 //   rescan               — enqueue a codex security scan; findings then
 //                          flow the normal scan → remediation pipeline.
 
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assessSqlDestructiveness } from "@/lib/destructive-sql";
 import { decideRemediation } from "@/lib/remediation-policy";
-import { severityToPriority, priorityAtOrBelow } from "@/lib/ticket-classification";
+import {
+  severityToPriority,
+  priorityAtOrBelow,
+  type TicketPriority,
+} from "@/lib/ticket-classification";
+import { asJson, asRow } from "@/lib/json-cast";
+
+function secretsCleanFromVerification(verification: Json | null | undefined): boolean {
+  if (verification && typeof verification === "object" && !Array.isArray(verification)) {
+    return verification.secrets_clean !== false;
+  }
+  return true;
+}
 
 // Per-run caps. Ordered queries, so a backlog above these drains in order.
 const TICKET_ROLLUP_BATCH = 100;
@@ -38,7 +50,7 @@ const MONITOR_HEALTHY_WITHIN_MINUTES = 15;
 const AUTO_MERGE_SCAN_BATCH = 5;
 const INGEST_LEDGER_RETENTION_DAYS = 7;
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 // ── Planning ─────────────────────────────────────────────────────────────
 
@@ -69,7 +81,7 @@ export async function planTicketRemediation(ticketId: string): Promise<PlanResul
 
   type PlannedRun = Record<string, unknown> & {
     action_type: Database["public"]["Enums"]["remediation_action_type"];
-    priority?: string | null;
+    priority?: TicketPriority | null;
     _policyInput?: Record<string, unknown>;
   };
   const runs: PlannedRun[] = [];
@@ -127,12 +139,14 @@ export async function planTicketRemediation(ticketId: string): Promise<PlanResul
       ...(run._policyInput ?? {}),
     });
     const { _policyInput, ...row } = run;
-    const { error } = await admin.from("remediation_runs").insert({
-      ...row,
-      status: decision.autoExecute ? "planned" : "awaiting_validation",
-      requires_human: decision.requiresHuman,
-      policy: decision,
-    });
+    const { error } = await admin.from("remediation_runs").insert(
+      asRow<TablesInsert<"remediation_runs">>({
+        ...row,
+        status: decision.autoExecute ? "planned" : "awaiting_validation",
+        requires_human: decision.requiresHuman,
+        policy: asJson(decision),
+      }),
+    );
     if (error) {
       notes.push(`insert failed for ${row.action_type}: ${error.message}`);
       continue;
@@ -177,7 +191,7 @@ async function planVerifiedMergesForScope(
 
   type PlannedRun = Record<string, unknown> & {
     action_type: Database["public"]["Enums"]["remediation_action_type"];
-    priority?: string | null;
+    priority?: TicketPriority | null;
     _policyInput?: Record<string, unknown>;
   };
   const runs: PlannedRun[] = [];
@@ -196,7 +210,7 @@ async function planVerifiedMergesForScope(
       plan: { pr_number: rem.pr_number, repo_full_name: rem.repo_full_name },
       _policyInput: {
         verified: rem.verified === true,
-        secretsClean: rem.verification?.secrets_clean !== false,
+        secretsClean: secretsCleanFromVerification(rem.verification),
         filesChanged: rem.files_changed,
         linesChanged: rem.files_changed == null ? null : linesChanged,
       },
@@ -208,7 +222,10 @@ async function planVerifiedMergesForScope(
 // ── Execution ────────────────────────────────────────────────────────────
 
 async function markRun(runId: string, patch: Record<string, unknown>) {
-  await admin.from("remediation_runs").update(patch).eq("id", runId);
+  await admin
+    .from("remediation_runs")
+    .update(asRow<TablesUpdate<"remediation_runs">>(patch))
+    .eq("id", runId);
 }
 
 async function ticketEvent(ticketId: string | null, eventType: string, payload: unknown) {
@@ -216,7 +233,7 @@ async function ticketEvent(ticketId: string | null, eventType: string, payload: 
   await admin.from("support_ticket_events").insert({
     ticket_id: ticketId,
     event_type: eventType,
-    payload: payload ?? {},
+    payload: asJson(payload ?? {}),
   });
 }
 
@@ -365,7 +382,7 @@ async function executePrMerge(run: any, approvedByHuman: boolean): Promise<{ sta
       actionType: "pr_merge",
       priority: run.priority,
       verified: rem.verified === true,
-      secretsClean: rem.verification?.secrets_clean !== false,
+      secretsClean: secretsCleanFromVerification(rem.verification),
       filesChanged: rem.files_changed,
       linesChanged: rem.files_changed == null ? null : linesChanged,
     });
@@ -416,12 +433,19 @@ async function executePrMerge(run: any, approvedByHuman: boolean): Promise<{ sta
     .from("codex_findings")
     .update({ state: "fix_merged", resolved_at: new Date().toISOString() })
     .eq("id", rem.finding_id);
-  await admin.from("codex_scan_events").insert({
-    job_id: rem.scan_job_id,
-    event_type: approvedByHuman ? "remediation.merged" : "remediation.auto_merged",
-    actor: approvedByHuman ? (run.approved_by ?? "system") : "system",
-    payload: { remediation_id: rem.id, sha: merge.sha, pr_number: rem.pr_number, run_id: run.id },
-  });
+  if (rem.scan_job_id) {
+    await admin.from("codex_scan_events").insert({
+      job_id: rem.scan_job_id,
+      event_type: approvedByHuman ? "remediation.merged" : "remediation.auto_merged",
+      actor: approvedByHuman ? (run.approved_by ?? "system") : "system",
+      payload: asJson({
+        remediation_id: rem.id,
+        sha: merge.sha,
+        pr_number: rem.pr_number,
+        run_id: run.id,
+      }),
+    });
+  }
 
   // Deliberately NO automatic fleet cascade from an unattended merge — a
   // prime-scoped patch multiplying across every clone is exactly the blast
@@ -753,7 +777,7 @@ async function planScanAutoMerges(): Promise<number> {
       actionType: "pr_merge",
       priority,
       verified: rem.verified === true,
-      secretsClean: rem.verification?.secrets_clean !== false,
+      secretsClean: secretsCleanFromVerification(rem.verification),
       filesChanged: rem.files_changed,
       linesChanged: rem.files_changed == null ? null : linesChanged,
     });
@@ -819,7 +843,10 @@ async function rollUpTicketStatuses(): Promise<number> {
 
     const patch: Record<string, unknown> = { status: next };
     if (next === "remediated") patch.resolved_at = new Date().toISOString();
-    await admin.from("support_tickets").update(patch).eq("id", ticket.id);
+    await admin
+      .from("support_tickets")
+      .update(asRow<TablesUpdate<"support_tickets">>(patch))
+      .eq("id", ticket.id);
     await ticketEvent(ticket.id, "ticket.status_changed", { from: ticket.status, to: next });
     changed += 1;
 

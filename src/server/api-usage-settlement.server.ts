@@ -17,13 +17,21 @@
  * Splitting them means a Stripe outage cannot corrupt the billing record, and a
  * disputed charge can be waived after close without unwinding the meter.
  */
+import { asJson } from "@/lib/json-cast";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
 import { formatMicros } from "@/lib/api-usage-rating";
 
+/** jsonb column read back as `Json`; spread only when it is an object. */
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+
 // The metering tables are newer than the generated DB types.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /** Below this, a Stripe invoice item costs more in reconciliation than it
  *  collects. Sub-threshold periods close and stay closed at zero owed. */
@@ -160,7 +168,7 @@ export async function invoiceClosedCharge(chargeId: string): Promise<InvoiceResu
       .update({
         status: "invoiced",
         invoiced_at: new Date().toISOString(),
-        metadata: { ...(charge.metadata ?? {}), below_threshold: true },
+        metadata: asJson({ ...asObject(charge.metadata), below_threshold: true }),
       })
       .eq("id", chargeId);
     return { ok: true, skipped: true, reason: "below_threshold" };

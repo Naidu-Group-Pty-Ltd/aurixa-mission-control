@@ -18,6 +18,8 @@
 //   3. It preserves WHEN. `created_at` is taken from the Stripe session, not
 //      from now() — otherwise restored history all bunches up on the day of
 //      the repair and the ledger tells a story that never happened.
+import { asRow } from "@/lib/json-cast";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import type Stripe from "stripe";
 import { getStripe } from "@/server/stripe.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -28,8 +30,7 @@ import {
   type PurchaseStatus,
 } from "@/server/purchases.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /**
  * What a session's final state means for the ledger. Pure — unit tested.
@@ -103,14 +104,16 @@ export function isForeignKeyViolation(
  * survive. So a dangling handoff costs the link, not the record.
  */
 async function insertPurchaseRow(row: Record<string, unknown>) {
-  const first = await adminAny.from("purchases").insert(row);
+  const first = await adminAny.from("purchases").insert(asRow<TablesInsert<"purchases">>(row));
   if (!isForeignKeyViolation(first.error) || row.handoff_id == null) return first;
 
   console.warn(
     "[purchase-backfill] handoff no longer exists; inserting without the link",
     row.stripe_checkout_session_id,
   );
-  return await adminAny.from("purchases").insert({ ...row, handoff_id: null });
+  return await adminAny
+    .from("purchases")
+    .insert(asRow<TablesInsert<"purchases">>({ ...row, handoff_id: null }));
 }
 
 /** Which of these session ids already have a purchases row. */
@@ -125,7 +128,8 @@ async function existingSessionIds(ids: string[]): Promise<Set<string>> {
       .select("stripe_checkout_session_id")
       .in("stripe_checkout_session_id", chunk);
     if (error) throw new Error(`purchases_lookup_failed: ${error.message}`);
-    for (const row of data ?? []) found.add(row.stripe_checkout_session_id);
+    for (const row of data ?? [])
+      if (row.stripe_checkout_session_id) found.add(row.stripe_checkout_session_id);
   }
   return found;
 }

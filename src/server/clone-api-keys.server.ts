@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 
 export function hashApiKey(raw: string): string {
   return crypto.createHash("sha256").update(raw).digest("hex");
@@ -82,8 +84,7 @@ export async function ensureTenant(
   { ok: true; tenantId: string; billingUserId: string | null } | { ok: false; error: string }
 > {
   // Cast: the billing_* tracking columns are newer than the generated DB types.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dbAny = supabaseAdmin as any;
+  const dbAny = supabaseAdmin;
 
   // Operator-assigned billing/tracking identity lives on the clone; copy it
   // onto the clone's tenant so checkout can stamp it into Stripe metadata and
@@ -119,7 +120,7 @@ export async function ensureTenant(
       }
     }
     if (Object.keys(patch).length > 0) {
-      await dbAny.from("tenants").update(patch).eq("id", existing.data.id);
+      await dbAny.from("tenants").update(asRow<TablesUpdate<"tenants">>(patch)).eq("id", existing.data.id);
     }
     return {
       ok: true,

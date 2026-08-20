@@ -18,10 +18,10 @@ import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { asHostingSlug, getHostingProvider } from "@/server/hosting";
 import "@/server/hosting/index";
-import { reading, type DeploymentStatus } from "@/server/hosting/deploymentState.pure";
+import { reading, DEPLOYMENT_STATUSES, type DeploymentStatus } from "@/server/hosting/deploymentState.pure";
 import { cloneFqdn, resolveDnsTarget } from "@/server/hosting/dnsTarget.pure";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 async function loadConfig() {
   const { data } = await admin
@@ -230,11 +230,15 @@ export const getCloneDeployment = createServerFn({ method: "GET" })
 
     const slug = asHostingSlug(row?.provider_slug ?? config?.hosting_provider_slug);
     const target = row ? resolveDnsTarget(row, config) : null;
+    const statusValue: DeploymentStatus | null =
+      row?.status && (DEPLOYMENT_STATUSES as readonly string[]).includes(row.status)
+        ? (row.status as DeploymentStatus)
+        : null;
 
     return {
       deployment: row ?? null,
       events: events ?? [],
-      reading: reading(row?.status ?? null, { providerConfigured: providerConfigured(slug) }),
+      reading: reading(statusValue, { providerConfigured: providerConfigured(slug) }),
       // What DNS *should* say, rendered beside what it does — an operator
       // debugging a stuck domain should not have to open two dashboards to
       // compare two values.

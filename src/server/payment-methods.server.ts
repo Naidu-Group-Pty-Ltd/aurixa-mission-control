@@ -14,9 +14,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getStripe } from "@/server/stripe.server";
 import { attributionFromMetadata } from "@/server/purchases.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
-
 export const MAX_PAYMENT_METHODS = 3;
 
 export const PRIORITY_ROLES: Record<number, string> = {
@@ -47,12 +44,10 @@ export type PaymentMethodRow = {
 };
 
 const ROW_COLS =
-  "id, tenant_id, clone_id, stripe_customer_id, stripe_payment_method_id, brand, last4, " +
-  "exp_month, exp_year, funding, billing_name, billing_email, priority, status, " +
-  "origin_user_id, origin_username, origin_source, created_at";
+  "id, tenant_id, clone_id, stripe_customer_id, stripe_payment_method_id, brand, last4, exp_month, exp_year, funding, billing_name, billing_email, priority, status, origin_user_id, origin_username, origin_source, created_at";
 
 export async function listActivePaymentMethods(tenantId: string): Promise<PaymentMethodRow[]> {
-  const { data, error } = await adminAny
+  const { data, error } = await supabaseAdmin
     .from("payment_methods")
     .select(ROW_COLS)
     .eq("tenant_id", tenantId)
@@ -69,7 +64,7 @@ export async function countActivePaymentMethods(tenantId: string): Promise<numbe
   // the wallet tables didn't exist and every webhook write was failing. A row
   // fetch surfaces the real error (wallets hold at most 3 rows, so this is
   // just as cheap).
-  const { data, error } = await adminAny
+  const { data, error } = await supabaseAdmin
     .from("payment_methods")
     .select("id")
     .eq("tenant_id", tenantId)
@@ -129,7 +124,7 @@ export async function savePaymentMethodFromSetupSession(
   const fingerprint = card?.fingerprint ?? null;
 
   // Replay of the same session → return the existing row.
-  const { data: bySession } = await adminAny
+  const { data: bySession } = await supabaseAdmin
     .from("payment_methods")
     .select(ROW_COLS)
     .eq("stripe_checkout_session_id", session.id)
@@ -141,7 +136,7 @@ export async function savePaymentMethodFromSetupSession(
   // reference/expiry on the existing row (card was re-added, possibly after
   // reissue) and detach the newly-minted duplicate payment method at Stripe.
   if (fingerprint) {
-    const { data: dupe } = await adminAny
+    const { data: dupe } = await supabaseAdmin
       .from("payment_methods")
       .select(ROW_COLS)
       .eq("tenant_id", tenantId)
@@ -149,7 +144,7 @@ export async function savePaymentMethodFromSetupSession(
       .eq("card_fingerprint", fingerprint)
       .maybeSingle();
     if (dupe) {
-      await adminAny
+      await supabaseAdmin
         .from("payment_methods")
         .update({
           stripe_payment_method_id: pm.id,
@@ -179,7 +174,7 @@ export async function savePaymentMethodFromSetupSession(
   const taken = new Set(existing.map((r) => r.priority));
   const priority = [1, 2, 3].find((p) => !taken.has(p)) ?? MAX_PAYMENT_METHODS;
 
-  const { data: inserted, error } = await adminAny
+  const { data: inserted, error } = await supabaseAdmin
     .from("payment_methods")
     .insert({
       tenant_id: tenantId,
@@ -219,7 +214,7 @@ export async function reorderPaymentMethods(
   tenantId: string,
   orderedIds: string[],
 ): Promise<{ ok: true; error?: undefined } | { ok: false; error: string }> {
-  const { data, error } = await adminAny.rpc("reorder_payment_methods", {
+  const { data, error } = await supabaseAdmin.rpc("reorder_payment_methods", {
     _tenant_id: tenantId,
     _ordered_ids: orderedIds,
   });
@@ -239,7 +234,7 @@ export async function detachPaymentMethod(
   tenantId: string,
   rowId: string,
 ): Promise<{ ok: true; error?: undefined } | { ok: false; error: string }> {
-  const { data: row } = await adminAny
+  const { data: row } = await supabaseAdmin
     .from("payment_methods")
     .select(ROW_COLS)
     .eq("id", rowId)
@@ -256,7 +251,7 @@ export async function detachPaymentMethod(
     console.warn("[wallet] stripe detach warning:", (err as Error).message);
   }
 
-  const { error } = await adminAny
+  const { error } = await supabaseAdmin
     .from("payment_methods")
     .update({
       status: "detached",
@@ -278,14 +273,14 @@ export async function detachPaymentMethod(
 /** Marks a row detached when Stripe tells us the payment method went away
  * out-of-band (payment_method.detached webhook). */
 export async function markDetachedByStripeId(stripePaymentMethodId: string): Promise<void> {
-  const { data: row } = await adminAny
+  const { data: row } = await supabaseAdmin
     .from("payment_methods")
     .select("id, tenant_id")
     .eq("stripe_payment_method_id", stripePaymentMethodId)
     .eq("status", "active")
     .maybeSingle();
   if (!row) return;
-  await adminAny
+  await supabaseAdmin
     .from("payment_methods")
     .update({
       status: "detached",

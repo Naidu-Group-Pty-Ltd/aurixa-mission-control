@@ -19,7 +19,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { ensureTenant } from "@/server/clone-api-keys.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin;
 
 export type TenantCandidate = {

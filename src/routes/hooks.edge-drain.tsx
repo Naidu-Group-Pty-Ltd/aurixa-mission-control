@@ -10,13 +10,14 @@
 //    Cloudflare's 1200 req/5min token cap.
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asJson } from "@/lib/json-cast";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 import { getEdgeProvider } from "@/server/edge";
 import "@/server/edge/index"; // ensure providers register
 import { cloudflareApi } from "@/server/cloudflare/client";
 import type { EdgePosture, EdgeProviderSlug } from "@/server/edge";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 const MAX_JOBS_PER_RUN = 20;
 const CONCURRENCY = 6;
 
@@ -354,7 +355,7 @@ async function finalize(job: JobRow, outcome: { ok: boolean; result?: unknown; e
         status: "succeeded",
         attempts: nextAttempts,
         completed_at: nowIso,
-        result: outcome.result ?? {},
+        result: asJson(outcome.result ?? {}),
         error: null,
       })
       .eq("id", job.id);
@@ -385,7 +386,7 @@ async function finalize(job: JobRow, outcome: { ok: boolean; result?: unknown; e
     provider_slug: job.provider_slug,
     action: job.action,
     payload: job.payload,
-    result: outcome.result ?? {},
+    result: asJson(outcome.result ?? {}),
     success: outcome.ok,
     error_message: outcome.error ?? null,
   });

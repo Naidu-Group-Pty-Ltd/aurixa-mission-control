@@ -10,6 +10,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { verifyRemediationSignature } from "@/server/codex-remediation.server";
 import { shouldReopenOnRemediationFailure } from "@/lib/codex-finding-state";
 
@@ -106,7 +108,7 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
           return json({ error: "invalid payload", detail: (err as Error).message }, 400);
         }
 
-        const admin = supabaseAdmin as any;
+        const admin = supabaseAdmin;
         const { data: rem } = await admin
           .from("codex_remediations")
           .select("id, finding_id, scan_job_id, status")
@@ -148,7 +150,7 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
           patch.completed_at = nowIso;
         }
 
-        await admin.from("codex_remediations").update(patch).eq("id", rem.id);
+        await admin.from("codex_remediations").update(asRow<TablesUpdate<"codex_remediations">>(patch)).eq("id", rem.id);
 
         // Mirror finding state where applicable.
         const findingState = EVENT_FINDING_STATE[payload.event];
@@ -157,7 +159,7 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
           if (payload.pr_url) findingPatch.remediation_pr_url = payload.pr_url;
           if (payload.pr_state) findingPatch.remediation_pr_state = payload.pr_state;
           if (payload.event === "pr.merged") findingPatch.resolved_at = nowIso;
-          await admin.from("codex_findings").update(findingPatch).eq("id", rem.finding_id);
+          await admin.from("codex_findings").update(asRow<TablesUpdate<"codex_findings">>(findingPatch)).eq("id", rem.finding_id);
         }
 
         // A failed remediation must not leave the finding parked in a state
@@ -168,7 +170,7 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
             .select("id, state")
             .eq("id", rem.finding_id)
             .maybeSingle();
-          if (shouldReopenOnRemediationFailure(finding?.state)) {
+          if (finding && shouldReopenOnRemediationFailure(finding.state)) {
             await admin
               .from("codex_findings")
               .update({ state: "open", remediation_pr_state: "failed" })

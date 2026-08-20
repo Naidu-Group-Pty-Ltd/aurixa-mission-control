@@ -9,8 +9,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DEFAULT_STOREFRONT_PRICING_URL } from "@/lib/storefront";
 import type { BillingContact } from "@/server/billing-contact.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 export const HANDOFF_TTL_MINUTES = 30;
 
@@ -144,9 +143,7 @@ export async function loadHandoffById(handoffId: string): Promise<HandoffRow | n
   const { data, error } = await adminAny
     .from("billing_handoffs")
     .select(
-      "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at, " +
-        "contact_email, contact_first_name, contact_last_name, contact_phone, contact_company, " +
-        "contact_tax_id, contact_tax_id_type",
+      "id, clone_id, tenant_id, origin_user_id, origin_username, origin_source, intent, return_url, expires_at, consumed_at, contact_email, contact_first_name, contact_last_name, contact_phone, contact_company, contact_tax_id, contact_tax_id_type",
     )
     .eq("id", handoffId)
     .maybeSingle();

@@ -8,7 +8,6 @@ import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const adminAny = supabaseAdmin;
 
 export const listAccessGrants = createServerFn({ method: "GET" })

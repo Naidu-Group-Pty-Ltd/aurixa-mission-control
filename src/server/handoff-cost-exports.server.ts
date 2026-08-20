@@ -5,6 +5,7 @@
 // `ready` with aggregate totals so the /handoffs/$id UI can hand the
 // client a signed download URL. Falls back to `failed` with a captured
 // error string when a lookup or upload step throws.
+import { asJson } from "@/lib/json-cast";
 
 type FulfillResult =
   | {
@@ -31,7 +32,7 @@ function buildCsv(rows: Array<Record<string, unknown>>, columns: string[]): stri
 
 export async function fulfillCostExport(exportId: string): Promise<FulfillResult> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
 
   const { data: exp, error: expErr } = await admin
     .from("handoff_cost_exports")
@@ -217,13 +218,13 @@ export async function fulfillCostExport(exportId: string): Promise<FulfillResult
 
     await admin.from("handoff_events").insert({
       handoff_id: exp.handoff_id,
-      event_type: "cost_export_ready",
-      payload: {
+      kind: "cost_export_ready",
+      details: asJson({
         export_id: exportId,
         storage_path: storagePath,
         rows_included: rowsIncluded,
         total_tokens: totalTokens,
-      },
+      }),
     });
 
     return {
@@ -249,7 +250,7 @@ export async function signCostExportDownload(
   expiresInSeconds = 600,
 ): Promise<{ ok: true; url: string; expires_in: number } | { ok: false; error: string }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const admin = supabaseAdmin as any;
+  const admin = supabaseAdmin;
   const { data: exp } = await admin
     .from("handoff_cost_exports")
     .select("storage_path, status")

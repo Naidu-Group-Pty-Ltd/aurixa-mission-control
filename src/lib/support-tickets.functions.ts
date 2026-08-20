@@ -124,7 +124,7 @@ export const approveRemediationRun = createServerFn({ method: "POST" })
   .inputValidator((d) => RunDecisionInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as any;
+    const admin = supabaseAdmin;
 
     const { data: run } = await admin
       .from("remediation_runs")
@@ -177,7 +177,7 @@ export const rejectRemediationRun = createServerFn({ method: "POST" })
   .inputValidator((d) => RunDecisionInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as any;
+    const admin = supabaseAdmin;
 
     const { data: run } = await admin
       .from("remediation_runs")
@@ -222,7 +222,7 @@ export const overrideTicketPriority = createServerFn({ method: "POST" })
   .inputValidator((d) => OverrideInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as any;
+    const admin = supabaseAdmin;
 
     const { data: ticket } = await admin
       .from("support_tickets")
@@ -264,7 +264,7 @@ export const resolveSupportTicket = createServerFn({ method: "POST" })
   .inputValidator((d) => ResolveInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as any;
+    const admin = supabaseAdmin;
 
     const { data: ticket } = await admin
       .from("support_tickets")

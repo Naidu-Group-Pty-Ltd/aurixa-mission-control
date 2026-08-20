@@ -11,6 +11,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { TablesUpdate } from "@/integrations/supabase/types";
+import { asRow } from "@/lib/json-cast";
 import { verifyCodexSignature } from "@/server/codex-security-client.server";
 import { resolveScanWebhookSecret } from "@/server/codex-scheduling.server";
 import {
@@ -85,7 +87,7 @@ export const Route = createFileRoute("/api/public/hooks/codex-security")({
           return json({ error: "invalid payload", detail: (err as Error).message }, 400);
         }
 
-        const admin = supabaseAdmin as any;
+        const admin = supabaseAdmin;
         const { data: job } = await admin
           .from("codex_scan_jobs")
           .select("id, clone_id, target_kind, repo_full_name, kind, status")
@@ -120,7 +122,7 @@ export const Route = createFileRoute("/api/public/hooks/codex-security")({
             .update({ ...runPatch, status: "running", started_at: nowIso, last_error: null })
             .eq("id", job.id);
         } else if (Object.keys(runPatch).length) {
-          await admin.from("codex_scan_jobs").update(runPatch).eq("id", job.id);
+          await admin.from("codex_scan_jobs").update(asRow<TablesUpdate<"codex_scan_jobs">>(runPatch)).eq("id", job.id);
         }
 
         let regressions = 0;
@@ -144,6 +146,7 @@ export const Route = createFileRoute("/api/public/hooks/codex-security")({
           // wins, and "first seen" means first ever rather than first here.
           const priorByFingerprint = new Map<string, any>();
           for (const p of prior ?? []) {
+            if (!p.fingerprint) continue;
             const existing = priorByFingerprint.get(p.fingerprint);
             priorByFingerprint.set(p.fingerprint, {
               state: mostDecisiveState(existing?.state, p.state),

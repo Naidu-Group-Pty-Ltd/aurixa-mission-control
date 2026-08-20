@@ -5,6 +5,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import type Stripe from "stripe";
 import { getStripe, getStripeCryptoProvider } from "@/server/stripe.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { TablesUpdate, TablesInsert } from "@/integrations/supabase/types";
+import { asJson, asRow } from "@/lib/json-cast";
 import {
   attributionFromMetadata,
   finalizePurchaseFromSession,
@@ -47,8 +49,7 @@ function isPaidSession(session: Stripe.Checkout.Session): boolean {
   return session.payment_status === "paid" || session.payment_status === "no_payment_required";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adminAny = supabaseAdmin as any;
+const adminAny = supabaseAdmin;
 
 /**
  * Atomic idempotency claim using the unique constraint on
@@ -62,7 +63,7 @@ async function claimEvent(event: Stripe.Event): Promise<"claimed" | "duplicate" 
   const { error } = await adminAny.from("stripe_events").insert({
     stripe_event_id: event.id,
     type: event.type,
-    payload: event,
+    payload: asJson(event),
   });
   if (!error) return "claimed";
   // 23505 = unique_violation → already inserted by a prior delivery/worker.
@@ -86,7 +87,7 @@ async function markProcessed(eventId: string, error?: string) {
 }
 
 async function audit(action: string, metadata: Record<string, unknown>) {
-  await adminAny.from("audit_log").insert({ action, entity_type: "stripe", metadata });
+  await adminAny.from("audit_log").insert({ action, entity_type: "stripe", metadata: asJson(metadata) });
 }
 
 // Operator-facing signal that an attributed purchase landed. Best effort —
@@ -300,14 +301,15 @@ async function fulfillCheckout(session: Stripe.Checkout.Session) {
       updated_at: new Date().toISOString(),
     };
     if (existing) {
+      const typedPatch = asRow<TablesUpdate<"clone_seat_entitlements">>(patch);
       const updQ = cloneId
-        ? adminAny.from("clone_seat_entitlements").update(patch).eq("clone_id", cloneId)
-        : adminAny.from("clone_seat_entitlements").update(patch).is("clone_id", null);
+        ? adminAny.from("clone_seat_entitlements").update(typedPatch).eq("clone_id", cloneId)
+        : adminAny.from("clone_seat_entitlements").update(typedPatch).is("clone_id", null);
       await updQ;
     } else {
       await adminAny
         .from("clone_seat_entitlements")
-        .insert({ clone_id: cloneId, seats_used: 0, ...patch });
+        .insert(asRow<TablesInsert<"clone_seat_entitlements">>({ clone_id: cloneId, seats_used: 0, ...patch }));
     }
 
     // The tier's included credits. Until this, buying a plan wrote the
@@ -376,13 +378,13 @@ async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
   // Prefer subscription id mapping; fall back to clone_id from metadata.
   const bySub = await adminAny
     .from("clone_seat_entitlements")
-    .update(patch)
+    .update(asRow<TablesUpdate<"clone_seat_entitlements">>(patch))
     .eq("stripe_subscription_id", sub.id)
     .select("id");
   if ((bySub.data?.length ?? 0) === 0 && cloneId) {
     await adminAny
       .from("clone_seat_entitlements")
-      .update({ ...patch, stripe_subscription_id: sub.id })
+      .update(asRow<TablesUpdate<"clone_seat_entitlements">>({ ...patch, stripe_subscription_id: sub.id }))
       .eq("clone_id", cloneId);
   }
 
@@ -519,7 +521,7 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   };
   await adminAny
     .from("setup_purchases")
-    .update(updates)
+    .update(asRow<TablesUpdate<"setup_purchases">>(updates))
     .eq("stripe_payment_intent_id", charge.payment_intent as string);
 
   // Reflect the refund on the attribution ledger too.
@@ -537,7 +539,12 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     title: "Stripe refund processed",
     body: `Charge ${charge.id} refunded ${(refunded / 100).toFixed(2)} ${(charge.currency ?? "aud").toUpperCase()}.`,
     url: "/settings/billing",
-    metadata: { charge_id: charge.id, payment_intent_id: charge.payment_intent, refunded },
+    metadata: asJson({
+      charge_id: charge.id,
+      payment_intent_id:
+        typeof charge.payment_intent === "string" ? charge.payment_intent : (charge.payment_intent?.id ?? null),
+      refunded,
+    }),
   });
 }
 

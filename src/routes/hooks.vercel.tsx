@@ -15,9 +15,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import crypto from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { asRow } from "@/lib/json-cast";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { lifecyclePatchFor, readVercelWebhook } from "@/server/hosting/vercelWebhook.pure";
 
-const admin = supabaseAdmin as any;
+const admin = supabaseAdmin;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -100,7 +102,7 @@ export const Route = createFileRoute("/hooks/vercel")({
 
         const { error } = await admin
           .from("clone_deployments")
-          .update(patch)
+          .update(asRow<TablesUpdate<"clone_deployments">>(patch))
           .eq("clone_id", row.clone_id);
 
         await admin.from("deployment_events").insert({
