@@ -43,7 +43,7 @@ import {
 import { useServerAction } from "@/lib/use-server-action";
 import { formatDistanceToNow } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Gauge, Sparkles, RefreshCw } from "lucide-react";
+import { Gauge, Inbox, Sparkles, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/crm/fit")({
   component: () => (
