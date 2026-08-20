@@ -220,7 +220,17 @@ async function runBackendProvisioning(
         source_repo: snapshot.sourceRepo,
         source_ref: snapshot.sourceRef,
         source_sha: snapshot.sourceSha,
-        migrations_applied: result.migrationsApplied,
+        migrations_applied: result.introspection
+          ? [
+              {
+                strategy: "introspection",
+                ok: result.introspection.ok,
+                rowsOnClone: result.introspection.rowsOnClone,
+                stages: result.introspection.stages,
+              },
+            ]
+          : result.migrationsApplied,
+
         edge_functions: result.edgeFunctions,
         secret_shells: result.secretShells,
         error_message: null,
