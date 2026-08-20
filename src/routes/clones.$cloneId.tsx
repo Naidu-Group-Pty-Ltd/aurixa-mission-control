@@ -27,6 +27,7 @@ import { CloneAddonsCard } from "@/components/clone-addons-card";
 import { CloneDriftPolicyCard } from "@/components/clone-drift-policy-card";
 import { CloneDriftSuggestionsCard } from "@/components/clone-drift-suggestions-card";
 import { CloneEditDialog } from "@/components/clone-edit-dialog";
+import { CloneDeploymentCard } from "@/components/clone-deployment-card";
 import { CloneEdgeCard } from "@/components/clone-edge-card";
 import { CloneHealthCard } from "@/components/clone-health-card";
 import { CloneLibraryPinsCard } from "@/components/clone-library-pins";
@@ -342,6 +343,7 @@ function CloneDetail() {
       <CloneAddonsCard cloneId={cloneId} />
 
       <CloneBackendCard cloneId={cloneId} />
+      <CloneDeploymentCard cloneId={cloneId} />
       <ClonePurchasesCard cloneId={cloneId} />
       <GitHubSecretSyncCard target="clone" cloneId={cloneId} />
       <CloneSecurityAssessmentsCard cloneId={cloneId} />

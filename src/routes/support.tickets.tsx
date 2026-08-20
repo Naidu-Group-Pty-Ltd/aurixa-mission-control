@@ -508,7 +508,6 @@ function TicketDetailSheet({
                   ).map((r: string, i: number) => (
                     <li key={i}>{r}</li>
                   ))}
-
                 </ul>
                 <p className="mt-1 text-xs text-muted-foreground">
                   score {ticket.priority_score}
