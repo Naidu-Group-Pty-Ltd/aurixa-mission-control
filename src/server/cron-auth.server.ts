@@ -18,7 +18,14 @@ function jsonResponse(body: unknown, status: number): Response {
 
 // Constant-time string comparison; a length mismatch returns false up front
 // (timingSafeEqual requires equal-length buffers).
-function timingSafeEqualStr(a: string, b: string): boolean {
+/**
+ * Constant-time string comparison for shared secrets.
+ *
+ * Exported because `api.public.leads.capture.ts` carried a byte-identical
+ * private copy, and a comparison that has to be constant-time is exactly the
+ * kind of thing that should not exist twice.
+ */
+export function timingSafeEqualStr(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);
   if (ab.length !== bb.length) return false;

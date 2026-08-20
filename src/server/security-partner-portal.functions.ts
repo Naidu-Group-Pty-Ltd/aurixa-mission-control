@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { writeAuditLog } from "@/server/audit.server";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -32,7 +33,13 @@ const ReviewStatus = z.enum(SECURITY_REVIEW_STATUSES);
 const Cycle = z.enum(["quarterly", "bi_annual", "annual", "one_off"]);
 const MemberRole = z.enum(["partner_admin", "tester", "viewer"]);
 const Severity = z.enum(["critical", "high", "medium", "low", "info"]);
-const FindingStatus = z.enum(["open", "remediation_review", "resolved", "accepted_risk", "false_positive"]);
+const FindingStatus = z.enum([
+  "open",
+  "remediation_review",
+  "resolved",
+  "accepted_risk",
+  "false_positive",
+]);
 const RetestStatus = z.enum(["not_requested", "pending", "validated", "failed"]);
 const ReportType = z.enum(["draft", "final", "retest", "evidence"]);
 
@@ -75,22 +82,6 @@ async function writeSecurityEvent(input: {
   });
 }
 
-async function writeAudit(input: {
-  actorUserId?: string | null;
-  action: string;
-  entityType: string;
-  entityId?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  await admin.from("audit_log").insert({
-    action: input.action,
-    entity_type: input.entityType,
-    entity_id: input.entityId ?? null,
-    actor_user_id: input.actorUserId ?? null,
-    metadata: input.metadata ?? {},
-  });
-}
-
 async function claimPartnerInvites(userId: string, email?: string | null) {
   if (!email) return;
   const normalized = cleanEmail(email);
@@ -111,7 +102,9 @@ async function getActiveMemberships(userId: string, email?: string | null) {
   await claimPartnerInvites(userId, email);
   const { data, error } = await admin
     .from("security_partner_memberships")
-    .select("id, partner_id, role, status, email, display_name, security_partners(id, name, slug, status, primary_contact_email, primary_contact_name)")
+    .select(
+      "id, partner_id, role, status, email, display_name, security_partners(id, name, slug, status, primary_contact_email, primary_contact_name)",
+    )
     .eq("user_id", userId)
     .eq("status", "active")
     .order("created_at", { ascending: true });
@@ -131,11 +124,17 @@ async function userHasInternalRole(supabase: any, userId: string) {
   return roles.some((r) => r === "super_admin" || r === "admin" || r === "operator");
 }
 
-async function getAssessmentForPartnerAccess(assessmentId: string, userId: string, email?: string | null) {
+async function getAssessmentForPartnerAccess(
+  assessmentId: string,
+  userId: string,
+  email?: string | null,
+) {
   await claimPartnerInvites(userId, email);
   const { data: assessment, error } = await admin
     .from("security_assessments")
-    .select("id, partner_id, clone_id, status, aurixa_review_status, retest_required, client_release_approved, started_at")
+    .select(
+      "id, partner_id, clone_id, status, aurixa_review_status, retest_required, client_release_approved, started_at",
+    )
     .eq("id", assessmentId)
     .maybeSingle();
 
@@ -165,11 +164,15 @@ export const listSecurityPartnerAdminData = createServerFn({ method: "GET" })
         .order("created_at", { ascending: false }),
       admin
         .from("clones")
-        .select("id, name, slug, deploy_url, github_owner, github_repo, github_url, tags, sync_status, created_at")
+        .select(
+          "id, name, slug, deploy_url, github_owner, github_repo, github_url, tags, sync_status, created_at",
+        )
         .order("name", { ascending: true }),
       admin
         .from("security_assessments")
-        .select("*, clones(id, name, deploy_url, github_owner, github_repo, github_url), security_partners(id, name, slug), security_findings(id, title, severity, status, retest_status), security_reports(id, label, report_type, status, submitted_at), security_assessment_comments(id, visibility, created_at)")
+        .select(
+          "*, clones(id, name, deploy_url, github_owner, github_repo, github_url), security_partners(id, name, slug), security_findings(id, title, severity, status, retest_status), security_reports(id, label, report_type, status, submitted_at), security_assessment_comments(id, visibility, created_at)",
+        )
         .order("created_at", { ascending: false }),
     ]);
 
@@ -206,7 +209,9 @@ export const createSecurityPartner = createServerFn({ method: "POST" })
         name: data.name.trim(),
         slug,
         primary_contact_name: data.primaryContactName?.trim() || null,
-        primary_contact_email: data.primaryContactEmail ? cleanEmail(data.primaryContactEmail) : null,
+        primary_contact_email: data.primaryContactEmail
+          ? cleanEmail(data.primaryContactEmail)
+          : null,
         notes: data.notes?.trim() || null,
         created_by: context.userId,
       })
@@ -215,7 +220,7 @@ export const createSecurityPartner = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
-    await writeAudit({
+    await writeAuditLog({
       actorUserId: context.userId,
       action: "security.partner.created",
       entityType: "security_partner",
@@ -260,7 +265,7 @@ export const inviteSecurityPartnerMember = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
-    await writeAudit({
+    await writeAuditLog({
       actorUserId: context.userId,
       action: "security.partner_user.invited",
       entityType: "security_partner",
@@ -328,7 +333,8 @@ export const createSecurityAssessment = createServerFn({ method: "POST" })
       assignmentId = assignment.id;
     }
 
-    const title = data.title?.trim() || `${clone.name} ${data.cycle.replace("_", "-")} penetration test`;
+    const title =
+      data.title?.trim() || `${clone.name} ${data.cycle.replace("_", "-")} penetration test`;
     const { data: assessment, error } = await admin
       .from("security_assessments")
       .insert({
@@ -366,7 +372,7 @@ export const createSecurityAssessment = createServerFn({ method: "POST" })
       metadata: { cycle: data.cycle, assignment_id: assignmentId },
     });
 
-    await writeAudit({
+    await writeAuditLog({
       actorUserId: context.userId,
       action: "security.assessment.created",
       entityType: "security_assessment",
@@ -398,9 +404,11 @@ export const updateSecurityAssessmentAdmin = createServerFn({ method: "POST" })
     if (data.status === "closed") patch.completed_at = new Date().toISOString();
     if (data.status === "in_progress") patch.started_at = new Date().toISOString();
     if (data.aurixaReviewStatus) patch.aurixa_review_status = data.aurixaReviewStatus;
-    if (typeof data.clientReleaseApproved === "boolean") patch.client_release_approved = data.clientReleaseApproved;
+    if (typeof data.clientReleaseApproved === "boolean")
+      patch.client_release_approved = data.clientReleaseApproved;
     if (typeof data.retestRequired === "boolean") patch.retest_required = data.retestRequired;
-    if (data.remediationOwner !== undefined) patch.remediation_owner = data.remediationOwner.trim() || null;
+    if (data.remediationOwner !== undefined)
+      patch.remediation_owner = data.remediationOwner.trim() || null;
 
     const { data: row, error } = await admin
       .from("security_assessments")
@@ -430,9 +438,7 @@ export const getPartnerPortal = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const email = (context.claims as any)?.email as string | undefined;
     const memberships = await getActiveMemberships(context.userId, email);
-    const partnerIds = memberships
-      .map((m: any) => m.partner_id as string)
-      .filter(Boolean);
+    const partnerIds = memberships.map((m: any) => m.partner_id as string).filter(Boolean);
 
     if (partnerIds.length === 0) {
       return { ok: false, reason: "no_partner_membership", memberships: [] };
@@ -440,7 +446,9 @@ export const getPartnerPortal = createServerFn({ method: "GET" })
 
     const { data: assessments, error } = await admin
       .from("security_assessments")
-      .select("*, clones(id, name, deploy_url, tags), security_partners(id, name, slug), security_findings(*), security_reports(*), security_assessment_comments(*), security_assessment_events(*)")
+      .select(
+        "*, clones(id, name, deploy_url, tags), security_partners(id, name, slug), security_findings(*), security_reports(*), security_assessment_comments(*), security_assessment_events(*)",
+      )
       .in("partner_id", partnerIds)
       .order("created_at", { ascending: false });
 
@@ -456,12 +464,20 @@ export const getPartnerPortal = createServerFn({ method: "GET" })
     const stats = {
       assigned: visibleAssessments.length,
       active: visibleAssessments.filter((a: any) =>
-        ["pending", "scheduled", "in_progress", "reporting", "remediation_review", "retesting"].includes(a.status),
+        [
+          "pending",
+          "scheduled",
+          "in_progress",
+          "reporting",
+          "remediation_review",
+          "retesting",
+        ].includes(a.status),
       ).length,
       closed: visibleAssessments.filter((a: any) => a.status === "closed").length,
       criticalFindings: visibleAssessments.reduce(
         (sum: number, a: any) =>
-          sum + ((a.security_findings ?? []).filter((f: any) => f.severity === "critical").length ?? 0),
+          sum +
+          ((a.security_findings ?? []).filter((f: any) => f.severity === "critical").length ?? 0),
         0,
       ),
     };
@@ -496,23 +512,34 @@ export const updatePartnerAssessment = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const email = (context.claims as any)?.email as string | undefined;
-    const { assessment } = await getAssessmentForPartnerAccess(data.assessmentId, context.userId, email);
+    const { assessment } = await getAssessmentForPartnerAccess(
+      data.assessmentId,
+      context.userId,
+      email,
+    );
 
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (data.status) {
       patch.status = data.status;
-      if (data.status === "in_progress" && !assessment.started_at) patch.started_at = new Date().toISOString();
+      if (data.status === "in_progress" && !assessment.started_at)
+        patch.started_at = new Date().toISOString();
       if (data.status === "closed") patch.completed_at = new Date().toISOString();
-      if (["reporting", "remediation_review"].includes(data.status)) patch.aurixa_review_status = "submitted";
+      if (["reporting", "remediation_review"].includes(data.status))
+        patch.aurixa_review_status = "submitted";
     }
     if (data.scopeSummary !== undefined) patch.scope_summary = data.scopeSummary.trim() || null;
-    if (data.rulesOfEngagement !== undefined) patch.rules_of_engagement = data.rulesOfEngagement.trim() || null;
+    if (data.rulesOfEngagement !== undefined)
+      patch.rules_of_engagement = data.rulesOfEngagement.trim() || null;
     if (data.exclusions !== undefined) patch.exclusions = data.exclusions.trim() || null;
     if (data.targetUrls !== undefined) patch.target_urls = cleanTextList(data.targetUrls);
-    if (data.testingWindowStart !== undefined) patch.testing_window_start = data.testingWindowStart || null;
-    if (data.testingWindowEnd !== undefined) patch.testing_window_end = data.testingWindowEnd || null;
-    if (data.emergencyStopContact !== undefined) patch.emergency_stop_contact = data.emergencyStopContact.trim() || null;
-    if (data.escalationContacts !== undefined) patch.escalation_contacts = cleanTextList(data.escalationContacts);
+    if (data.testingWindowStart !== undefined)
+      patch.testing_window_start = data.testingWindowStart || null;
+    if (data.testingWindowEnd !== undefined)
+      patch.testing_window_end = data.testingWindowEnd || null;
+    if (data.emergencyStopContact !== undefined)
+      patch.emergency_stop_contact = data.emergencyStopContact.trim() || null;
+    if (data.escalationContacts !== undefined)
+      patch.escalation_contacts = cleanTextList(data.escalationContacts);
 
     const { data: row, error } = await admin
       .from("security_assessments")
@@ -568,7 +595,8 @@ export const createSecurityFinding = createServerFn({ method: "POST" })
       if (!res.data) throw new Error("assessment_not_found");
       assessment = res.data;
     } else {
-      assessment = (await getAssessmentForPartnerAccess(data.assessmentId, context.userId, email)).assessment;
+      assessment = (await getAssessmentForPartnerAccess(data.assessmentId, context.userId, email))
+        .assessment;
     }
 
     const { data: row, error } = await admin
@@ -642,7 +670,8 @@ export const updateSecurityFinding = createServerFn({ method: "POST" })
       }
     }
     if (data.retestStatus) patch.retest_status = data.retestStatus;
-    if (data.recommendation !== undefined) patch.recommendation = data.recommendation.trim() || null;
+    if (data.recommendation !== undefined)
+      patch.recommendation = data.recommendation.trim() || null;
 
     const { data: row, error } = await admin
       .from("security_findings")
@@ -695,7 +724,8 @@ export const createSecurityReport = createServerFn({ method: "POST" })
       if (!res.data) throw new Error("assessment_not_found");
       assessment = res.data;
     } else {
-      assessment = (await getAssessmentForPartnerAccess(data.assessmentId, context.userId, email)).assessment;
+      assessment = (await getAssessmentForPartnerAccess(data.assessmentId, context.userId, email))
+        .assessment;
     }
 
     const { data: row, error } = await admin
@@ -764,7 +794,8 @@ export const addSecurityAssessmentComment = createServerFn({ method: "POST" })
       if (!res.data) throw new Error("assessment_not_found");
       assessment = res.data;
     } else {
-      assessment = (await getAssessmentForPartnerAccess(data.assessmentId, context.userId, email)).assessment;
+      assessment = (await getAssessmentForPartnerAccess(data.assessmentId, context.userId, email))
+        .assessment;
     }
 
     const visibility = isInternal ? data.visibility : "partner_thread";

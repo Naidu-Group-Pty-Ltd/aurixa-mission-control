@@ -19,6 +19,7 @@
 // Supabase errors are now surfaced rather than dropped, history is written
 // with the service-role client, and every handler returns one explicit shape.
 import { createServerFn } from "@tanstack/react-start";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
@@ -200,24 +201,6 @@ export const syncCloneActionsSecrets = createServerFn({ method: "POST" })
       error: result.ok ? undefined : summarize(target, result),
     };
   });
-
-/** Run `worker` over `items` with a bounded number of in-flight promises. */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++;
-      results[index] = await worker(items[index]);
-    }
-  });
-  await Promise.all(runners);
-  return results;
-}
 
 /** Fan out to every clone that has a GitHub repo. Admin only. */
 export const syncAllCloneActionsSecrets = createServerFn({ method: "POST" })
