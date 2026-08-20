@@ -7,6 +7,10 @@ import crypto from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 
+// How many edge configs one run checks. Reported back as `truncated` when the
+// batch comes back full, so a fleet that has outgrown it says so.
+const EDGE_DRIFT_BATCH = 500;
+
 const admin = supabaseAdmin;
 
 export const Route = createFileRoute("/hooks/edge-drift")({
@@ -20,7 +24,11 @@ export const Route = createFileRoute("/hooks/edge-drift")({
             .from("clone_edge_config")
             .select("clone_id, provider_slug, status")
             .in("status", ["active", "drifted"])
-            .limit(500);
+            // Ordered, because the cap is real: an unordered LIMIT returns an
+            // arbitrary subset, so above 500 configs the same ones can be
+            // checked every run while the rest are never checked at all.
+            .order("updated_at", { ascending: true })
+            .limit(EDGE_DRIFT_BATCH);
           const rows = (configs ?? []) as Array<{
             clone_id: string;
             provider_slug: string;
@@ -45,9 +53,18 @@ export const Route = createFileRoute("/hooks/edge-drift")({
               { onConflict: "clone_id,provider_slug,action,payload_hash" },
             );
           }
-          return new Response(JSON.stringify({ success: true, scheduled: rows.length }), {
-            headers: { "Content-Type": "application/json" },
-          });
+          // `truncated` rather than silence: a fleet that has outgrown the batch
+          // looks identical to one that fits, and only this says which.
+          return new Response(
+            JSON.stringify({
+              success: true,
+              scheduled: rows.length,
+              truncated: rows.length >= EDGE_DRIFT_BATCH,
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+            },
+          );
         } catch (e) {
           const msg = e instanceof Error ? e.message : "drift_failed";
           console.error("edge-drift failed:", msg);
