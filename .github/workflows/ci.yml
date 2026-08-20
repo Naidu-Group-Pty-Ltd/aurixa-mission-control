@@ -67,6 +67,17 @@ jobs:
       - name: Hosting env policy and deployment state parity
         run: npm run check:hosting
 
+      # Postgres indexes the referenced side of a foreign key and never the
+      # referencing side, so an unindexed FK is a sequential scan on every join
+      # and every cascade check — invisible while a table is small.
+      - name: Foreign key indexes
+        run: npm run check:fk-indexes
+
+      # A Supabase write does not throw; it resolves to { data, error }. A
+      # discarded error means the row is silently absent later. Budget shrinks only.
+      - name: Discarded Supabase errors
+        run: npm run check:discarded-errors
+
       - name: Typecheck
         run: npm run typecheck
 

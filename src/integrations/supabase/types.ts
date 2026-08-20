@@ -1602,6 +1602,7 @@ export type Database = {
       clone_deployments: {
         Row: {
           attempts: number
+          build_checked_at: string | null
           clone_id: string
           created_at: string
           dns_target_type: string | null
@@ -1612,12 +1613,11 @@ export type Database = {
           env_digest: string | null
           env_synced_at: string | null
           error_message: string | null
-          last_deployed_at: string | null
-          build_checked_at: string | null
           last_build_at: string | null
           last_build_deployment_id: string | null
           last_build_error: string | null
           last_build_state: string | null
+          last_deployed_at: string | null
           latest_deployment_id: string | null
           max_attempts: number
           next_attempt_at: string
@@ -1635,6 +1635,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          build_checked_at?: string | null
           clone_id: string
           created_at?: string
           dns_target_type?: string | null
@@ -1645,12 +1646,11 @@ export type Database = {
           env_digest?: string | null
           env_synced_at?: string | null
           error_message?: string | null
-          last_deployed_at?: string | null
-          build_checked_at?: string | null
           last_build_at?: string | null
           last_build_deployment_id?: string | null
           last_build_error?: string | null
           last_build_state?: string | null
+          last_deployed_at?: string | null
           latest_deployment_id?: string | null
           max_attempts?: number
           next_attempt_at?: string
@@ -1668,6 +1668,7 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          build_checked_at?: string | null
           clone_id?: string
           created_at?: string
           dns_target_type?: string | null
@@ -1678,12 +1679,11 @@ export type Database = {
           env_digest?: string | null
           env_synced_at?: string | null
           error_message?: string | null
-          last_deployed_at?: string | null
-          build_checked_at?: string | null
           last_build_at?: string | null
           last_build_deployment_id?: string | null
           last_build_error?: string | null
           last_build_state?: string | null
+          last_deployed_at?: string | null
           latest_deployment_id?: string | null
           max_attempts?: number
           next_attempt_at?: string
@@ -1706,6 +1706,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "clones"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_deployments_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: true
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
           },
           {
             foreignKeyName: "clone_deployments_provider_slug_fkey"
@@ -4544,6 +4551,13 @@ export type Database = {
             referencedRelation: "clones"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "deployment_events_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
         ]
       }
       edge_audit: {
@@ -5935,15 +5949,7 @@ export type Database = {
           worker_started_at?: string | null
           zone_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "hosting_teardowns_requested_by_fkey"
-            columns: ["requested_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       invoices: {
         Row: {
@@ -6990,7 +6996,15 @@ export type Database = {
           vercel_project_prefix?: string
           vercel_team_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "platform_hosting_config_hosting_provider_fk"
+            columns: ["hosting_provider_slug"]
+            isOneToOne: false
+            referencedRelation: "hosting_providers"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       pricing_module_map: {
         Row: {
@@ -9898,6 +9912,8 @@ export type Database = {
       }
       prune_repo_blob_analysis: { Args: never; Returns: number }
       purge_api_usage_events: { Args: never; Returns: Json }
+      purge_deployment_events: { Args: never; Returns: number }
+      purge_hosting_teardowns: { Args: never; Returns: number }
       purge_log_tables: {
         Args: never
         Returns: {
@@ -10226,7 +10242,6 @@ export type Database = {
       module_status: "proposed" | "approved" | "archived" | "rejected"
       notification_kind:
         | "cascade_completed"
-        | "deployment_build_failed"
         | "cascade_failed"
         | "cascade_partial"
         | "cascade_started"
@@ -10267,14 +10282,15 @@ export type Database = {
         | "handoff_consent_received"
         | "github_app_access_drift"
         | "api_usage_settlement_failed"
-        | "deployment_live"
-        | "deployment_failed"
-        | "deployment_domain_pending"
         | "security_assessment_created"
         | "security_report_submitted"
         | "security_finding_created"
         | "security_retest_requested"
         | "security_assessment_closed"
+        | "deployment_live"
+        | "deployment_failed"
+        | "deployment_domain_pending"
+        | "deployment_build_failed"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -10657,7 +10673,6 @@ export const Constants = {
       module_status: ["proposed", "approved", "archived", "rejected"],
       notification_kind: [
         "cascade_completed",
-        "deployment_build_failed",
         "cascade_failed",
         "cascade_partial",
         "cascade_started",
@@ -10698,14 +10713,15 @@ export const Constants = {
         "handoff_consent_received",
         "github_app_access_drift",
         "api_usage_settlement_failed",
-        "deployment_live",
-        "deployment_failed",
-        "deployment_domain_pending",
         "security_assessment_created",
         "security_report_submitted",
         "security_finding_created",
         "security_retest_requested",
         "security_assessment_closed",
+        "deployment_live",
+        "deployment_failed",
+        "deployment_domain_pending",
+        "deployment_build_failed",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
