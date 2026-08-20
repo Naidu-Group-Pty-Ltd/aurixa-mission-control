@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Client Fit Analysis engine.
 //
 // Cross-examines a lead / account against what Aurixa Systems actually sells
@@ -327,7 +325,7 @@ export function buildPrompt(args: {
     error?: string;
   };
   corpus: Awaited<ReturnType<typeof buildCapabilityCorpus>>;
-  rubric: { dimension: string; label: string; description: string | null; weight: number }[];
+  rubric: RubricRow[];
   knowledge?: KnowledgeEntry[];
 }) {
   const dims = args.rubric
@@ -523,6 +521,7 @@ export function reconcileSamples(samples: AiDimension[][]): Map<
 export type RubricRow = {
   dimension: string;
   label: string;
+  description?: string | null;
   weight: number;
   sort_order?: number;
   is_veto?: boolean | null;

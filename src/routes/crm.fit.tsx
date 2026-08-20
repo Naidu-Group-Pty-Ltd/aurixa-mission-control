@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Client fit analysis queue — leads awaiting a fit check, plus every report
 // the AI engine has produced.
 import { createFileRoute } from "@tanstack/react-router";
@@ -45,7 +43,7 @@ import {
 import { useServerAction } from "@/lib/use-server-action";
 import { formatDistanceToNow } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Gauge, Sparkles, RefreshCw } from "lucide-react";
+import { Gauge, Inbox, Sparkles, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/crm/fit")({
   component: () => (
@@ -258,7 +256,11 @@ function FitPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {(leads.data ?? []).length === 0 ? (
-                <EmptyState title="No leads" description="Inbound leads will appear here." />
+                <EmptyState
+                  icon={<Inbox className="h-6 w-6" />}
+                  title="No leads"
+                  description="Inbound leads will appear here."
+                />
               ) : (
                 (leads.data ?? []).map((lead: any) => (
                   <div
@@ -297,6 +299,7 @@ function FitPage() {
             <CardContent className="space-y-2 pt-6">
               {(analyses.data ?? []).length === 0 ? (
                 <EmptyState
+                  icon={<Inbox className="h-6 w-6" />}
                   title="No analyses yet"
                   description="Run your first fit analysis from the queue."
                 />

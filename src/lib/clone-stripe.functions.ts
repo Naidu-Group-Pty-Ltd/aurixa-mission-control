@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G7 — per-clone Stripe routing.
 
 //
@@ -13,7 +11,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 
 type CloneStripeRow = {
   clone_id: string;
@@ -24,7 +22,7 @@ type CloneStripeRow = {
   status: "pending" | "active" | "rotated" | "revoked";
   activated_at: string | null;
   rotated_at: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Json;
   created_at: string;
   updated_at: string;
 };
@@ -90,7 +88,7 @@ export const upsertCloneStripeConfig = createServerFn({ method: "POST" })
       mode: data.mode,
       stripe_account_id: data.stripe_account_id ?? null,
       forward_url: data.forward_url ?? null,
-      metadata: data.metadata ?? {},
+      metadata: (data.metadata ?? {}) as Json,
       created_by: context.userId,
     };
 

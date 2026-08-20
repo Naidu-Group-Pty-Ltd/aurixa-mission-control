@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";

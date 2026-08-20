@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Piggybacked API-key usage: what the fleet spends on the prime's vendor keys,
 // who is spending it, and what has been billed back.
 //
@@ -127,8 +125,9 @@ function ApiUsagePage() {
       ? (envelope.error ??
         "The usage query was rejected without a reason. This is usually an expired session or a missing operator role.")
       : settled && !envelope
-        ? typeof overview.data === "string" && overview.data.length > 0
-          ? `${overview.data.slice(0, 300)} — usually an expired session or a missing operator role.`
+        ? typeof (overview.data as unknown) === "string" &&
+          (overview.data as unknown as string).length > 0
+          ? `${(overview.data as unknown as string).slice(0, 300)} — usually an expired session or a missing operator role.`
           : "The usage query returned no response. Sign in again, and check your role if it persists."
         : null;
 

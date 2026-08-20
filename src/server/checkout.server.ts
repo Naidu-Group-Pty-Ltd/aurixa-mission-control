@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Shared Stripe checkout engine (user-attributed pricing workflow).
 //
@@ -7,6 +6,7 @@
 // customer-facing pricing page on the Aurixa Systems website. Mission Control
 // is the headless billing engine — the customer never needs its UI.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type Stripe from "stripe";
 import { getStripe } from "@/server/stripe.server";
 import { resolveCloneBillingTenant } from "@/server/billing-tenant.server";
 import {
@@ -242,7 +242,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   // person who actually paid would otherwise never receive their own receipt.
   const receiptEmail = contact.email ?? undefined;
 
-  const sessionParams = {
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: args.mode === "seat_plan" ? "subscription" : "payment",
     customer: customerId,
     line_items: [{ price: priceId, quantity: args.quantity }],
@@ -352,7 +352,7 @@ export async function startCheckoutCore(args: CheckoutCoreArgs) {
   ];
 
   let session;
-  let params = sessionParams;
+  let params: typeof sessionParams = sessionParams;
   const dropped = new Set<string>();
   for (let attempt = 0; ; attempt++) {
     try {

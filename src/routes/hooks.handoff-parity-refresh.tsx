@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G19 — Handoff parity refresh worker.
 //
 // Cron-invoked endpoint that keeps `handoff_parity_reports` fresh for every
@@ -16,6 +14,7 @@
 // scheduler is expected to run this every 15 minutes.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { asJson } from "@/lib/json-cast";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyCronAuth } from "@/server/cron-auth.server";
 
@@ -116,15 +115,15 @@ export const Route = createFileRoute("/hooks/handoff-parity-refresh")({
                 prime_ref: parity.prime_ref,
                 target_ref: parity.target_ref,
                 risk_level: parity.risk_level,
-                tables_diff: parity.tables_diff,
-                policies_diff: parity.policies_diff,
-                functions_diff: parity.functions_diff,
-                buckets_diff: parity.buckets_diff,
-                cron_diff: parity.cron_diff,
-                edge_functions_diff: parity.edge_functions_diff,
-                secrets_diff: parity.secrets_diff,
-                auth_diff: parity.auth_config_diff,
-                extensions_diff: parity.extensions_diff,
+                tables_diff: asJson(parity.tables_diff),
+                policies_diff: asJson(parity.policies_diff),
+                functions_diff: asJson(parity.functions_diff),
+                buckets_diff: asJson(parity.buckets_diff),
+                cron_diff: asJson(parity.cron_diff),
+                edge_functions_diff: asJson(parity.edge_functions_diff),
+                secrets_diff: asJson(parity.secrets_diff),
+                auth_diff: asJson(parity.auth_config_diff),
+                extensions_diff: asJson(parity.extensions_diff),
                 blocking_issues: parity.blocking_issues,
                 summary: parity.summary,
               })

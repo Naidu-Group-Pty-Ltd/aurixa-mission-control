@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Server-only orchestration for Codex Security scans without a user context
 // (pg_cron nightly job, the GitHub webhook receiver, and the sweeper).
 //
@@ -13,6 +11,7 @@
 // on Cloudflare Workers the isolate can be reclaimed as soon as the response
 // is written, so jobs were routinely left stranded at `queued` with no event
 // row at all — a large part of why the pipeline looked dead.
+import type { Json } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import {
@@ -100,7 +99,7 @@ export async function resolveRemediationWebhookSecret(): Promise<string> {
 async function recordEvent(
   jobId: string,
   eventType: string,
-  payload: Record<string, unknown> = {},
+  payload: Json = {},
 ) {
   try {
     await admin.from("codex_scan_events").insert({ job_id: jobId, event_type: eventType, payload });
@@ -209,7 +208,7 @@ async function dispatchJob(job: {
   ref: string | null;
   path_globs: string[] | null;
   failure_count?: number | null;
-  request_payload?: Record<string, unknown> | null;
+  request_payload?: Json | null;
 }): Promise<{ ok: true } | { ok: false; error: string; terminal: boolean }> {
   const attempt = (job.failure_count ?? 0) + 1;
   const payload = (job.request_payload ?? {}) as Record<string, unknown>;
@@ -316,7 +315,7 @@ export async function enqueueScanNoAuth(opts: EnqueueOpts): Promise<EnqueueResul
   if (error) throw error;
 
   // Awaited on purpose — see the module header.
-  const result = await dispatchJob(job);
+  const result = await dispatchJob({ ...job, target_kind: job.target_kind as "prime" | "clone" });
   if (!result.ok && result.terminal) {
     return { skipped: true, reason: result.error };
   }
@@ -477,7 +476,7 @@ export async function sweepStalledScans(options?: {
     }
 
     await recordEvent(job.id, "sweep_retry", { failureCount: job.failure_count ?? 0 });
-    const r = await dispatchJob(job);
+    const r = await dispatchJob({ ...job, target_kind: job.target_kind as "prime" | "clone" });
     if (r.ok) retried.push(job.id);
     else if (r.terminal) failed.push({ jobId: job.id, reason: r.error });
   }

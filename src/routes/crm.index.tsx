@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // CRM overview — the client-lifecycle control tower.
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -41,14 +39,14 @@ const money = (cents: number) =>
     (cents ?? 0) / 100,
   );
 
-const STAGE_LABELS: Record<string, string> = {
+const STAGE_LABELS = {
   lead: "Leads",
   opportunity: "Opportunities",
   onboarding: "Onboarding",
   active: "Active",
   at_risk: "At risk",
   churned: "Churned",
-};
+} as const;
 
 function Stat({
   label,
@@ -153,7 +151,7 @@ function CrmOverview() {
             <CardDescription>Where the whole book of business sits right now.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {Object.keys(STAGE_LABELS).map((stage) => (
+            {(Object.keys(STAGE_LABELS) as Array<keyof typeof STAGE_LABELS>).map((stage) => (
               <Link
                 key={stage}
                 to="/crm/accounts"

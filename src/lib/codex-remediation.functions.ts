@@ -1,5 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
-// Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
@@ -83,6 +81,7 @@ export const draftRemediationPR = createServerFn({ method: "POST" })
       .maybeSingle();
     if (fErr) throw fErr;
     if (!finding) throw new Error("finding not found");
+    if (!finding.scan_job_id) throw new Error("finding has no scan job");
 
     const { data: job } = await supabase
       .from("codex_scan_jobs")

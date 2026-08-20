@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // CRM deal pipeline — opportunities, line items priced from the live catalog,
 // and the won → contract + onboarding transition.
@@ -92,7 +91,7 @@ export const setDealStage = createServerFn({ method: "POST" })
           : Infinity;
         if (!latest) throw new Error("fit_gate_no_analysis");
         if (ageDays > FIT_STALE_DAYS) throw new Error("fit_gate_stale_analysis");
-        if (!FIT_PASSING_VERDICTS.includes(effective)) throw new Error("fit_gate_failed_verdict");
+        if (!effective || !FIT_PASSING_VERDICTS.includes(effective)) throw new Error("fit_gate_failed_verdict");
       }
     }
 

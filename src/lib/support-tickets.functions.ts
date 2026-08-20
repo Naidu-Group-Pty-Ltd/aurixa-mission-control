@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Server functions for the Support Ops surface: ticket queue, ticket
 // detail, the human-validation gate on parked remediation runs, priority
@@ -13,8 +12,19 @@ import {
   TICKET_PRIORITIES,
 } from "@/lib/ticket-classification";
 
+const TICKET_STATUSES = [
+  "new",
+  "triaged",
+  "remediating",
+  "awaiting_validation",
+  "remediated",
+  "resolved",
+  "closed",
+  "failed",
+] as const;
+
 const ListInput = z.object({
-  status: z.string().max(40).optional(),
+  status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   search: z.string().max(200).optional(),
   limit: z.number().int().min(1).max(200).default(100),

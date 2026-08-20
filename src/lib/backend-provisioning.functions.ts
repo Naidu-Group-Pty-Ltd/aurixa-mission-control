@@ -1,4 +1,3 @@
-// @ts-nocheck — tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -777,7 +776,7 @@ export const addModulesToBackend = createServerFn({ method: "POST" })
         succeededRequested.map((r) => ({
           clone_id: data.cloneId,
           module_id: r.id,
-          enabled_by: userId,
+          installed_by: userId,
         })),
         { onConflict: "clone_id,module_id" },
       );
