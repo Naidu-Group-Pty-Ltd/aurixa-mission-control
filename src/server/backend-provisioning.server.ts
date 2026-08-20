@@ -2261,6 +2261,21 @@ export type ProvisionBackendInput = {
    * sign-ins from the clone's own hosts, not the prime's (G8).
    */
   cloneOrigins?: CloneOrigins;
+  /**
+   * How the clone's schema gets built. Default `introspection` reads the
+   * prime's live catalog; `migration-replay` forces the legacy path.
+   */
+  schemaStrategy?: SchemaStrategy;
+};
+
+export type SchemaStrategy = "introspection" | "migration-replay";
+
+export type IntrospectionSummary = {
+  ok: boolean;
+  stages: StageResult[];
+  shortStages: StageName[];
+  rowsOnClone: number | null;
+  nonEmptyTables: string[];
 };
 
 export type ProvisionBackendResult = {
@@ -2273,6 +2288,8 @@ export type ProvisionBackendResult = {
   adminUserId: string | null;
   migrationsApplied: PrimeMigrationResult[];
   latestMigration: string | null;
+  /** Present when the schema was built by catalog introspection. */
+  introspection?: IntrospectionSummary | null;
   edgeFunctions: EdgeFunctionDeployResult[];
   secretShells: SecretShellResult[];
   storageBuckets: BucketReplicationResult[];
@@ -2281,6 +2298,7 @@ export type ProvisionBackendResult = {
   requiredExtensions: RequiredExtensionResult[];
   realtimePublication: RealtimeReplicationResult;
 };
+
 
 /**
  * Full pipeline: create project → wait ready → get keys → replay the prime's
