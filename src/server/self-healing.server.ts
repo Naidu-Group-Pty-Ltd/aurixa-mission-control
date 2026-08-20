@@ -1,4 +1,3 @@
-// @ts-nocheck — 2 unresolved type errors (assignability ×1, argument types ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // The self-healing engine: plans and executes remediation runs for support
 // tickets and verified security-scan remediations.

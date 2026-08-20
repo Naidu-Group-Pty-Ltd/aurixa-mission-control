@@ -1,4 +1,3 @@
-// @ts-nocheck — 4 unresolved type errors (excess property ×3, argument types ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G23 — Audit log continuity / outbound audit shipper.
 //

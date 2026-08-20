@@ -1,4 +1,3 @@
-// @ts-nocheck — 3 unresolved type errors (unknown ×3).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";

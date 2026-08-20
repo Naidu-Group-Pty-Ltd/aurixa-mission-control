@@ -1,4 +1,3 @@
-// @ts-nocheck — 3 unresolved type errors (assignability ×3).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 /**
  * G9 — GitHub App access verification for clone repositories.
@@ -17,6 +16,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { checkGithubAppPreflight, type GithubPreflightResult } from "./github-preflight.functions";
+import { asJson } from "@/lib/json-cast";
 
 const OneInput = z.object({ cloneId: z.string().uuid() });
 
@@ -76,17 +76,17 @@ export const verifyCloneRepoGithubAccess = createServerFn({ method: "POST" })
     // Persist a lightweight audit trace for the fleet ops log.
     try {
       await context.supabase.from("audit_log").insert({
-        actor_id: context.userId,
+        actor_user_id: context.userId,
         action: "github_app_access_check",
         entity_type: "clone",
         entity_id: clone.id,
-        details: {
+        metadata: asJson({
           ok: row.ok,
           repo_accessible: row.repo_accessible,
           repository_selection: row.repository_selection,
           contents_write: row.contents_write,
           message: row.message,
-        },
+        }),
       });
     } catch {
       /* best-effort */
@@ -144,7 +144,6 @@ export const auditFleetGithubAccess = createServerFn({ method: "POST" })
     if (failing.length > 0) {
       try {
         await context.supabase.from("notifications").insert({
-          user_id: context.userId,
           kind: "github_app_access_drift",
           title: `GitHub App access drift on ${failing.length} clone(s)`,
           body: failing

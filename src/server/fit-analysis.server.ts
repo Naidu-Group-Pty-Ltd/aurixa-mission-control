@@ -1,4 +1,3 @@
-// @ts-nocheck — 2 unresolved type errors (unknown property ×1, assignability ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Client Fit Analysis engine.
 //

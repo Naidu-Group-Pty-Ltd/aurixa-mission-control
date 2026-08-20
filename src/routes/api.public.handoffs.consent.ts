@@ -1,4 +1,3 @@
-// @ts-nocheck — 1 unresolved type error (argument types ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // G11 — public client onboarding endpoint.
 // GET  /api/public/handoffs/consent?token=hoi_... → invite preview

@@ -1236,10 +1236,13 @@ export type Database = {
           id: string
           migration_version: string | null
           migrations_applied: Json
+          parity_checked_at: string | null
+          parity_report: Json | null
           queued_admin_password_enc: string | null
           queued_at: string | null
           queued_module_ids: string[] | null
           region: string
+          repo_retarget: Json | null
           secret_shells: Json
           service_role_key: string | null
           source_ref: string | null
@@ -1266,10 +1269,13 @@ export type Database = {
           id?: string
           migration_version?: string | null
           migrations_applied?: Json
+          parity_checked_at?: string | null
+          parity_report?: Json | null
           queued_admin_password_enc?: string | null
           queued_at?: string | null
           queued_module_ids?: string[] | null
           region?: string
+          repo_retarget?: Json | null
           secret_shells?: Json
           service_role_key?: string | null
           source_ref?: string | null
@@ -1296,10 +1302,13 @@ export type Database = {
           id?: string
           migration_version?: string | null
           migrations_applied?: Json
+          parity_checked_at?: string | null
+          parity_report?: Json | null
           queued_admin_password_enc?: string | null
           queued_at?: string | null
           queued_module_ids?: string[] | null
           region?: string
+          repo_retarget?: Json | null
           secret_shells?: Json
           service_role_key?: string | null
           source_ref?: string | null
@@ -9055,6 +9064,57 @@ export type Database = {
         }
         Relationships: []
       }
+      user_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user_id: string | null
+          created_at: string
+          email: string | null
+          expires_at: string
+          id: string
+          invited_by: string
+          note: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          token_hash: string
+          token_prefix: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          expires_at: string
+          id?: string
+          invited_by: string
+          note?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          token_hash: string
+          token_prefix: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          note?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          token_hash?: string
+          token_prefix?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           created_at: string
@@ -9461,6 +9521,20 @@ export type Database = {
       crm_recompute_health: { Args: { _account_id: string }; Returns: number }
       crm_seed_onboarding: { Args: { _account_id: string }; Returns: Json }
       crm_sweep: { Args: never; Returns: Json }
+      cron_delivery_health: {
+        Args: { _since_hours?: number }
+        Returns: {
+          active: boolean
+          delivered: boolean
+          jobname: string
+          last_http_error: string
+          last_http_status: number
+          last_run_at: string
+          last_run_status: string
+          runs: number
+          schedule: string
+        }[]
+      }
       entitlement_for_subscription: {
         Args: { _sub_id: string }
         Returns: {
@@ -9499,11 +9573,13 @@ export type Database = {
       heartbeat_device: { Args: { _device_id: string }; Returns: Json }
       highest_role_level: { Args: { _user_id: string }; Returns: number }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_high_king: { Args: { _user_id: string }; Returns: boolean }
       is_operator: { Args: { _user_id: string }; Returns: boolean }
       is_security_partner_member: {
         Args: { _partner_id: string }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       issue_due_plan_allowances: { Args: never; Returns: Json }
       issue_plan_allowance: {
         Args: { _period_start?: string; _tenant_id: string }
@@ -9880,6 +9956,9 @@ export type Database = {
         | "remediation_awaiting_validation"
         | "remediation_auto_completed"
         | "remediation_failed"
+        | "handoff_consent_received"
+        | "github_app_access_drift"
+        | "api_usage_settlement_failed"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -10299,6 +10378,9 @@ export const Constants = {
         "remediation_awaiting_validation",
         "remediation_auto_completed",
         "remediation_failed",
+        "handoff_consent_received",
+        "github_app_access_drift",
+        "api_usage_settlement_failed",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],

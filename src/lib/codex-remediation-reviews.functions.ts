@@ -1,4 +1,3 @@
-// @ts-nocheck — 1 unresolved type error (argument types ×1).
 // Tracked in scripts/ts-nocheck-budget.txt; the budget only goes down.
 // Two-key merge gate for Codex remediation PRs. Admins record approve /
 // reject / changes-requested decisions; merging a PR requires N distinct
