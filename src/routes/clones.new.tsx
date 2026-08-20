@@ -376,10 +376,8 @@ function NewClone() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-          provisioning
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">New clone</h1>
+        <p className="label-mono">provisioning</p>
+        <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">New clone</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Spin up a child instance of the prime codebase.
         </p>
@@ -592,7 +590,7 @@ function NewClone() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border/70 bg-muted/30 p-3">
+          <label className="flex cursor-pointer items-start gap-3 border border-border/70 bg-muted/30 p-3">
             <Checkbox
               checked={isolatedTenant}
               onCheckedChange={(v) => setIsolatedTenant(!!v)}
@@ -628,7 +626,7 @@ function NewClone() {
             </span>
           </label>
           {dedicatedBackend && (
-            <div className="grid gap-4 md:grid-cols-2 rounded-md border border-border p-4">
+            <div className="grid gap-4 md:grid-cols-2 border border-border p-4">
               <div className="space-y-2">
                 <Label>Admin email</Label>
                 <Input
@@ -650,7 +648,7 @@ function NewClone() {
               <div className="space-y-2 md:col-span-2">
                 <Label>Region</Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-10 w-full border border-input bg-background px-3 py-2 text-sm"
                   value={backendRegion}
                   onChange={(e) => setBackendRegion(e.target.value)}
                 >
@@ -685,11 +683,11 @@ function NewClone() {
             <span className="text-sm">Attach an edge provider to this clone</span>
           </label>
           {cloudflare && (
-            <div className="grid gap-3 rounded-md border border-border p-4 md:grid-cols-3">
+            <div className="grid gap-3 border border-border p-4 md:grid-cols-3">
               <div className="space-y-1">
                 <Label className="text-xs">Provider</Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-10 w-full border border-input bg-background px-3 py-2 text-sm"
                   value={edgeProvider}
                   onChange={(e) =>
                     setEdgeProvider(e.target.value as "cloudflare" | "aws" | "azure")
@@ -713,7 +711,7 @@ function NewClone() {
               <div className="space-y-1">
                 <Label className="text-xs">Posture preset</Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-10 w-full border border-input bg-background px-3 py-2 text-sm"
                   value={edgePreset}
                   onChange={(e) => setEdgePreset(e.target.value)}
                 >
@@ -735,7 +733,7 @@ function NewClone() {
           </CardTitle>
           <CardDescription>
             Every clone gets an{" "}
-            <code className="rounded bg-muted px-1 text-xs">&lt;slug&gt;.aurixasystems.com.au</code>{" "}
+            <code className="bg-muted px-1 text-xs">&lt;slug&gt;.aurixasystems.com.au</code>{" "}
             subdomain via Cloudflare DNS. Dormant if Cloudflare isn't configured yet — the record
             fans out automatically once{" "}
             <a href="/settings/domains" className="underline">
@@ -753,7 +751,7 @@ function NewClone() {
             <span className="text-sm">Reserve a subdomain for this clone</span>
           </label>
           {subdomainEnabled && (
-            <div className="grid gap-3 rounded-md border border-border p-4 md:grid-cols-2">
+            <div className="grid gap-3 border border-border p-4 md:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Subdomain (leave blank to use the clone slug)</Label>
                 <div className="flex items-center gap-2">

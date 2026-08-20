@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { bulkSyncModuleFn } from "@/server/module-sync.functions";
 import { ModuleBackendCard } from "@/components/module-backend-card";
+import { MetricCell } from "@/components/metric-bar";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -36,24 +37,7 @@ function StatTile({
   value: number;
   tone?: "success" | "warning" | "destructive";
 }) {
-  const toneCls =
-    tone === "success"
-      ? "text-success"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "destructive"
-          ? "text-destructive"
-          : "text-foreground";
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </div>
-        <div className={`mt-1 text-2xl font-semibold ${toneCls}`}>{value}</div>
-      </CardContent>
-    </Card>
-  );
+  return <MetricCell label={label} value={value} tone={tone} alarm={Boolean(tone)} />;
 }
 
 function FilterChip({
@@ -200,10 +184,8 @@ function ModuleDetail() {
 
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            module health
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{module.name}</h1>
+          <p className="label-mono">module health</p>
+          <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">{module.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Badge variant="outline" className="font-mono text-[10px] uppercase">
               {module.status}
@@ -230,7 +212,7 @@ function ModuleDetail() {
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="glass grid overflow-hidden md:grid-cols-4">
         <StatTile label="installed on" value={clones.length} />
         <StatTile label="in sync" value={inSync} tone="success" />
         <StatTile label="behind" value={behind} tone="warning" />
@@ -276,7 +258,7 @@ function ModuleDetail() {
         </CardHeader>
         <CardContent>
           {clones.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               <Boxes className="mx-auto mb-2 h-5 w-5" />
               No clones have this module installed yet.
             </div>
@@ -287,7 +269,7 @@ function ModuleDetail() {
                 : clones;
               if (filtered.length === 0) {
                 return (
-                  <div className="flex flex-col items-center gap-2 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2 border border-dashed p-6 text-center text-sm text-muted-foreground">
                     <Boxes className="h-5 w-5" />
                     No clones match the {statusFilter?.replace("_", " ")} filter.
                     <button
@@ -309,7 +291,7 @@ function ModuleDetail() {
                       params={{ cloneId: c.id }}
                       className="block"
                     >
-                      <Card className="border-border/80 transition-colors hover:border-primary/40">
+                      <Card className="transition-colors hover:border-primary/40">
                         <CardContent className="flex items-center justify-between p-4">
                           <div className="min-w-0">
                             <div className="font-mono text-sm font-medium">{c.name}</div>
@@ -345,7 +327,7 @@ function ModuleDetail() {
         <CardContent>
           <div className="flex flex-wrap gap-1.5">
             {(module.file_globs ?? []).map((g) => (
-              <code key={g} className="rounded bg-muted px-2 py-1 font-mono text-[11px]">
+              <code key={g} className="bg-muted px-2 py-1 font-mono text-[11px]">
                 {g}
               </code>
             ))}

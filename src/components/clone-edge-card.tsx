@@ -215,7 +215,7 @@ export function CloneEdgeCard({ cloneId }: { cloneId: string }) {
         ) : (
           <>
             {configs.length === 0 && (
-              <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+              <div className="border border-dashed p-4 text-center text-xs text-muted-foreground">
                 No edge provider attached.
               </div>
             )}
@@ -231,10 +231,7 @@ export function CloneEdgeCard({ cloneId }: { cloneId: string }) {
                       ? "text-warning"
                       : "text-muted-foreground";
               return (
-                <div
-                  key={c.provider_slug}
-                  className="rounded-md border border-border bg-surface p-3"
-                >
+                <div key={c.provider_slug} className="border border-border bg-surface p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -310,7 +307,7 @@ export function CloneEdgeCard({ cloneId }: { cloneId: string }) {
             })}
 
             {isAdmin && availableProviders.length > 0 && (
-              <div className="grid gap-3 rounded-md border border-dashed border-border p-3 md:grid-cols-4">
+              <div className="grid gap-3 border border-dashed border-border p-3 md:grid-cols-4">
                 <div className="space-y-1 md:col-span-1">
                   <Label className="text-[11px]">Provider</Label>
                   <Select value={newProvider} onValueChange={setNewProvider}>
@@ -384,7 +381,7 @@ export function CloneEdgeCard({ cloneId }: { cloneId: string }) {
                     return (
                       <div
                         key={j.id}
-                        className="flex items-center justify-between rounded border border-border/50 bg-card px-2 py-1 font-mono text-[11px]"
+                        className="flex items-center justify-between border px-2 py-1 font-mono text-[11px]"
                       >
                         <span>
                           {j.provider_slug} · {j.action}

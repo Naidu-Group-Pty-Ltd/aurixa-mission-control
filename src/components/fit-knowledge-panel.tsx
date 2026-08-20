@@ -311,7 +311,7 @@ export function FitKnowledgePanel() {
           </div>
 
           {missing.length > 0 && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+            <div className="flex items-start gap-2 border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               <div>
                 <p className="font-medium">
@@ -355,7 +355,7 @@ export function FitKnowledgePanel() {
               description="Add your ideal customer profile and your disqualification policy first — they apply to every prospect, and they are the two the engine leans on hardest."
             />
           ) : (
-            <ul className="divide-y divide-border/60 rounded-lg border">
+            <ul className="divide-y divide-border/60 border">
               {rows.map((row: any) => (
                 <li key={row.id} className="flex flex-wrap items-center gap-3 p-3">
                   <div className="min-w-0 flex-1">
@@ -598,7 +598,7 @@ function Stat({
   warn?: boolean;
 }) {
   return (
-    <div className="rounded-lg border p-3">
+    <div className="border p-3">
       <div
         className={cn(
           "text-2xl font-semibold tabular-nums tracking-tight",

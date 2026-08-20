@@ -6,8 +6,9 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MetricCell } from "@/components/metric-bar";
 import { pipelineSummary, listOpenTasks } from "@/lib/crm.functions";
-import { Users, Target, LifeBuoy, Scale, HeartPulse, UserPlus, ArrowRight } from "lucide-react";
+import { Users, Scale, UserPlus, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/crm/")({
   component: () => (
@@ -35,9 +36,11 @@ export const Route = createFileRoute("/crm/")({
 });
 
 const money = (cents: number) =>
-  new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(
-    (cents ?? 0) / 100,
-  );
+  new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: 0,
+  }).format((cents ?? 0) / 100);
 
 const STAGE_LABELS = {
   lead: "Leads",
@@ -52,37 +55,22 @@ function Stat({
   label,
   value,
   hint,
-  icon: Icon,
   tone,
 }: {
   label: string;
-  value: string | number;
+  value: string;
   hint?: string;
-  icon: any;
-  tone?: "danger" | "warn";
+  tone?: "success" | "warning" | "destructive" | "primary";
 }) {
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-              {label}
-            </p>
-            <p
-              className={
-                "mt-2 text-3xl font-semibold tracking-tight " +
-                (tone === "danger" ? "text-destructive" : "")
-              }
-            >
-              {value}
-            </p>
-            {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-          </div>
-          <Icon className="h-5 w-5 text-muted-foreground" />
-        </div>
-      </CardContent>
-    </Card>
+    <MetricCell
+      label={label}
+      value={value}
+      note={hint}
+      size="sm"
+      tone={tone}
+      alarm={Boolean(tone)}
+    />
   );
 }
 
@@ -115,31 +103,27 @@ function CrmOverview() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="glass grid overflow-hidden sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Recurring revenue"
           value={money(Number(s.mrr_cents ?? 0))}
           hint={`${money(Number(s.mrr_cents ?? 0) * 12)} annualised`}
-          icon={Target}
         />
         <Stat
           label="Weighted forecast"
           value={money(Number(s.weighted_forecast_cents ?? 0))}
           hint="Open pipeline × probability"
-          icon={Target}
         />
         <Stat
           label="Open tickets"
           value={Number(s.open_tickets ?? 0)}
           hint={`${Number(s.sla_breached ?? 0)} past SLA`}
-          icon={LifeBuoy}
           tone={Number(s.sla_breached ?? 0) > 0 ? "danger" : undefined}
         />
         <Stat
           label="At risk"
           value={Number(s.at_risk ?? 0)}
           hint={`${Number(s.open_disputes ?? 0)} open disputes`}
-          icon={HeartPulse}
           tone={Number(s.at_risk ?? 0) > 0 ? "danger" : undefined}
         />
       </div>
@@ -156,7 +140,7 @@ function CrmOverview() {
                 key={stage}
                 to="/crm/accounts"
                 search={{ stage }}
-                className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50"
+                className="flex items-center justify-between border px-3 py-2 text-sm hover:bg-muted/50"
               >
                 <span>{STAGE_LABELS[stage]}</span>
                 <Badge variant={stage === "at_risk" ? "destructive" : "secondary"}>
@@ -164,7 +148,7 @@ function CrmOverview() {
                 </Badge>
               </Link>
             ))}
-            <div className="flex items-center justify-between rounded-md border border-dashed px-3 py-2 text-sm">
+            <div className="flex items-center justify-between border border-dashed px-3 py-2 text-sm">
               <span className="text-muted-foreground">Unconverted waitlist leads</span>
               <Link to="/leads" className="font-mono text-sm underline-offset-4 hover:underline">
                 {Number(s.unconverted_leads ?? 0)} <ArrowRight className="inline h-3 w-3" />
@@ -180,7 +164,10 @@ function CrmOverview() {
           </CardHeader>
           <CardContent className="space-y-2">
             {["discovery", "demo", "proposal", "contract", "won", "lost"].map((stage) => (
-              <div key={stage} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+              <div
+                key={stage}
+                className="flex items-center justify-between border px-3 py-2 text-sm"
+              >
                 <span className="capitalize">{stage}</span>
                 <span className="font-mono text-xs text-muted-foreground">
                   {dealStages[stage]?.count ?? 0} · {money(dealStages[stage]?.value ?? 0)}
@@ -200,8 +187,8 @@ function CrmOverview() {
             <div>
               <CardTitle className="text-base">Follow-ups</CardTitle>
               <CardDescription>
-                {Number(s.overdue_tasks ?? 0)} overdue · {Number(s.churned_90d ?? 0)} churn events in
-                the last 90 days
+                {Number(s.overdue_tasks ?? 0)} overdue · {Number(s.churned_90d ?? 0)} churn events
+                in the last 90 days
               </CardDescription>
             </div>
             <Button asChild variant="outline" size="sm">
@@ -220,7 +207,7 @@ function CrmOverview() {
             return (
               <div
                 key={t.id}
-                className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                className="flex items-center justify-between border px-3 py-2 text-sm"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium">{t.title}</p>

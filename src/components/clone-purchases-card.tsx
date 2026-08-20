@@ -65,7 +65,7 @@ export function ClonePurchasesCard({ cloneId }: { cloneId: string }) {
         </div>
 
         {summary && summary.recent.length === 0 && (
-          <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+          <div className="border border-dashed p-4 text-center text-sm text-muted-foreground">
             No purchases recorded for this clone yet.
           </div>
         )}
@@ -75,7 +75,7 @@ export function ClonePurchasesCard({ cloneId }: { cloneId: string }) {
             {summary.recent.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2"
+                className="flex items-center justify-between gap-2 border border-border bg-surface px-3 py-2"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ export function ClonePurchasesCard({ cloneId }: { cloneId: string }) {
 
 function MiniStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-md border border-border bg-surface px-3 py-2">
+    <div className="border border-border bg-surface px-3 py-2">
       <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         {label}
       </div>

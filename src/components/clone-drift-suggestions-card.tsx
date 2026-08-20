@@ -142,7 +142,7 @@ export function CloneDriftSuggestionsCard({
       </CardHeader>
       <CardContent className="space-y-2">
         {open.length === 0 && closed.length === 0 && (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
             No suggestions yet. Click <span className="font-mono">Analyze drift</span> to ask the AI
             for fix proposals.
           </div>
@@ -161,7 +161,7 @@ export function CloneDriftSuggestionsCard({
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="mt-2 flex w-full items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
+                className="mt-2 flex w-full items-center gap-2 border bg-muted/30 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-muted-foreground hover:bg-muted/50"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
                 History · {closed.length} resolved
@@ -318,14 +318,14 @@ function SuggestionRow({
           <Link
             to="/cascades/$eventId"
             params={{ eventId: suggestion.applied_event_id }}
-            className="inline-flex items-center gap-1 self-start rounded-md border border-success/40 bg-success/10 px-2 py-1 font-mono text-[11px] text-success hover:bg-success/20"
+            className="inline-flex items-center gap-1 self-start border border-success/40 bg-success/10 px-2 py-1 font-mono text-[11px] text-success hover:bg-success/20"
           >
             View cascade <ExternalLink className="h-3 w-3" />
           </Link>
         )}
       </div>
       {open && (
-        <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
+        <div className="mt-3 space-y-2 border-t pt-3">
           <p className="text-sm text-muted-foreground">{suggestion.rationale}</p>
           <div className="font-mono text-[11px] text-muted-foreground">
             <div className="mb-1 uppercase tracking-wider">Files ({suggestion.files.length})</div>

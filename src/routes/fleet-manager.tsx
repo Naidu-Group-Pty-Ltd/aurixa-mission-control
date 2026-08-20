@@ -291,14 +291,12 @@ function FleetManager() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
           <Bot className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            ai
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Fleet Manager</h1>
+          <p className="label-mono">ai</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Fleet Manager</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Badge variant="outline" className="border-success/40 text-success">
@@ -348,7 +346,7 @@ function FleetManager() {
               </CardDescription>
             </div>
             {drift.length > 0 && (
-              <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 border border-border bg-surface px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">
                 <Checkbox
                   checked={allSelected ? true : someSelected ? "indeterminate" : false}
                   onCheckedChange={toggleAll}
@@ -396,7 +394,7 @@ function FleetManager() {
       </Card>
 
       {selected.size > 0 && (
-        <div className="sticky bottom-4 z-30 mx-auto flex w-full max-w-3xl items-center gap-3 rounded-lg border border-primary/40 bg-background/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="sticky bottom-4 z-30 mx-auto flex w-full max-w-3xl items-center gap-3 border border-primary/40 bg-background/95 p-3 shadow-lg supports-[backdrop-filter]:bg-background/80">
           <Badge variant="outline" className="border-primary/40 text-primary">
             {selected.size} selected
           </Badge>
@@ -485,7 +483,7 @@ function DriftCloneRow({
         </Badge>
       </div>
       {sugg.length > 0 && (
-        <ul className="mt-3 space-y-1.5 border-t border-border/60 pt-2">
+        <ul className="mt-3 space-y-1.5 border-t pt-2">
           {sugg.map((s, i) => (
             <li key={i} className="flex items-start gap-2 text-xs">
               <Badge

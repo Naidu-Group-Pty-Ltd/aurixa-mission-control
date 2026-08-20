@@ -119,7 +119,7 @@ export function KeysTab() {
                   <p className="text-sm text-muted-foreground">
                     Copy this key now — it will not be shown again.
                   </p>
-                  <div className="flex items-center gap-2 rounded border border-border bg-muted/30 p-2 font-mono text-xs">
+                  <div className="flex items-center gap-2 border border-border bg-muted/30 p-2 font-mono text-xs">
                     <span className="flex-1 break-all">{issuedKey}</span>
                     <Button
                       size="sm"
@@ -153,7 +153,7 @@ export function KeysTab() {
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
                   />
-                  <div className="rounded border border-border p-3">
+                  <div className="border border-border p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                         Scopes
@@ -192,7 +192,7 @@ export function KeysTab() {
                       {CLONE_API_SCOPES.map((s) => (
                         <label
                           key={s.value}
-                          className="flex items-start gap-2 cursor-pointer rounded border border-transparent p-2 hover:border-border"
+                          className="flex items-start gap-2 cursor-pointer border border-transparent p-2 hover:border-border"
                         >
                           <Checkbox
                             checked={selectedScopes.includes(s.value)}
@@ -349,14 +349,14 @@ export function KeysTab() {
           </DialogHeader>
           {rotateResult ? (
             <div className="space-y-3 text-sm">
-              <div className="rounded border border-warning/40 bg-warning/10 p-3 text-xs">
+              <div className="border border-warning/40 bg-warning/10 p-3 text-xs">
                 <p className="font-semibold text-warning-foreground">Shown only once.</p>
                 <p className="mt-1 text-muted-foreground">
                   Cascade this secret into your clone now. Mission Control stores only its hash —
                   closing this dialog discards it.
                 </p>
               </div>
-              <div className="flex items-center gap-2 rounded border border-border bg-muted/30 p-2 font-mono text-xs">
+              <div className="flex items-center gap-2 border border-border bg-muted/30 p-2 font-mono text-xs">
                 <span className="flex-1 break-all">{rotateResult.key}</span>
                 <Button
                   size="sm"
@@ -369,7 +369,7 @@ export function KeysTab() {
                   <Copy className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="rounded border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+              <div className="border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
                 <p>
                   <span className="font-mono text-foreground">{rotateResult.prefix}…</span> is live
                   immediately. The previous key keeps working until{" "}
@@ -382,7 +382,7 @@ export function KeysTab() {
             </div>
           ) : rotateTarget ? (
             <div className="space-y-3 text-sm">
-              <div className="rounded border border-border bg-muted/20 p-3 text-xs">
+              <div className="border border-border bg-muted/20 p-3 text-xs">
                 <p className="text-muted-foreground">Target</p>
                 <p className="mt-0.5 font-medium">
                   {rotateTarget.clones?.name ?? "Prime repo"} ·{" "}

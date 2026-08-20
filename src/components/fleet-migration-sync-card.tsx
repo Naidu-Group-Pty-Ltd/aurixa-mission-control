@@ -91,17 +91,17 @@ export function FleetMigrationSyncCard() {
         {registry && (
           <>
             <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-md border p-3 text-center">
+              <div className="border p-3 text-center">
                 <div className="text-2xl font-semibold">{registry.totalMigrations}</div>
                 <div className="text-[11px] text-muted-foreground">Total migrations</div>
               </div>
-              <div className="rounded-md border p-3 text-center">
+              <div className="border p-3 text-center">
                 <div className="text-2xl font-semibold text-primary">
                   {registry.cloneApplicable}
                 </div>
                 <div className="text-[11px] text-muted-foreground">Clone-applicable</div>
               </div>
-              <div className="rounded-md border p-3 text-center">
+              <div className="border p-3 text-center">
                 <div className="font-mono text-sm font-semibold truncate">
                   {registry.latestCloneVersion}
                 </div>
@@ -116,10 +116,7 @@ export function FleetMigrationSyncCard() {
               </summary>
               <div className="mt-2 max-h-60 overflow-y-auto space-y-1">
                 {registry.migrations.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-start gap-2 rounded border border-border/50 p-2 text-xs"
-                  >
+                  <div key={m.id} className="flex items-start gap-2 border p-2 text-xs">
                     {m.cloneApplicable ? (
                       <ArrowUpCircle className="mt-0.5 h-3 w-3 text-primary shrink-0" />
                     ) : (
@@ -162,10 +159,7 @@ export function FleetMigrationSyncCard() {
               Last sync results
             </span>
             {lastResult.map((r) => (
-              <div
-                key={r.cloneId}
-                className="flex items-center justify-between rounded border border-border/50 p-2 text-xs"
-              >
+              <div key={r.cloneId} className="flex items-center justify-between border p-2 text-xs">
                 <span className="font-mono">{r.cloneName}</span>
                 <div className="flex items-center gap-2">
                   {r.applied > 0 && (

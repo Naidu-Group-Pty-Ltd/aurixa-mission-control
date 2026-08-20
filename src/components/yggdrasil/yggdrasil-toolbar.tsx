@@ -172,7 +172,7 @@ export function YggdrasilToolbar({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 4, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute left-1/2 top-full z-50 mt-2 w-56 -translate-x-1/2 rounded-lg border border-border/60 bg-popover p-3 shadow-xl"
+                    className="absolute left-1/2 top-full z-50 mt-2 w-56 -translate-x-1/2 border bg-popover p-3 shadow-xl"
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <span
@@ -191,7 +191,7 @@ export function YggdrasilToolbar({
                         {descendantCounts[opt.value] ?? 0} in {selectedNode.name}'s subtree
                       </p>
                     )}
-                    <div className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t border-border/60 bg-popover" />
+                    <div className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t bg-popover" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -210,7 +210,7 @@ export function YggdrasilToolbar({
 
       {/* Descendant filter toggle */}
       {showDescendantToggle && (
-        <div className="flex items-center gap-2 rounded-full border border-border/60 px-3 py-1">
+        <div className="flex items-center gap-2 rounded-full border px-3 py-1">
           <GitFork className="h-3 w-3 text-muted-foreground" />
           <span className="font-mono text-[10px] text-muted-foreground">
             {selectedNode.name} subtree
@@ -286,7 +286,7 @@ export function YggdrasilToolbar({
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              className="absolute left-0 top-full z-50 mt-1 max-h-48 w-64 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg"
+              className="absolute left-0 top-full z-50 mt-1 max-h-48 w-64 overflow-y-auto border border-border bg-popover p-1 shadow-lg"
             >
               {searchResults.map((r) => (
                 <button
@@ -295,7 +295,7 @@ export function YggdrasilToolbar({
                     onSearchSelect(r.id);
                     setSearchOpen(false);
                   }}
-                  className="flex w-full flex-col rounded-sm px-2 py-1.5 text-left hover:bg-accent"
+                  className="flex w-full flex-col px-2 py-1.5 text-left hover:bg-accent"
                 >
                   <span className="font-mono text-xs font-medium">{r.name}</span>
                   <span className="font-mono text-[10px] text-muted-foreground">{r.repo}</span>
@@ -309,7 +309,7 @@ export function YggdrasilToolbar({
       <div className="flex-1" />
 
       {/* Zoom controls */}
-      <div className="flex items-center gap-1 rounded-md border border-border/60 px-1">
+      <div className="flex items-center gap-1 border px-1">
         <Button
           variant="ghost"
           size="icon"

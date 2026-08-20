@@ -57,13 +57,13 @@ export function CascadeDryRunCard({ cloneIds }: { cloneIds?: string[] }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {!result && (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
             No dry-run yet. Click <span className="font-mono">Run dry-run</span> to preview the
             blast.
           </div>
         )}
         {result?.ok === false && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <div className="border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
             {result.error}
           </div>
         )}
@@ -75,7 +75,7 @@ export function CascadeDryRunCard({ cloneIds }: { cloneIds?: string[] }) {
               <Tally label="Red" count={result.totals.red} tone="destructive" />
             </div>
             {result.aiSummary && (
-              <div className="rounded-md border border-accent/30 bg-accent/5 p-3">
+              <div className="border border-accent/30 bg-accent/5 p-3">
                 <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-accent">
                   <Sparkles className="h-3 w-3" /> AI summary
                 </div>

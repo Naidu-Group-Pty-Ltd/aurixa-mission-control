@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Shield, RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { MetricCell } from "@/components/metric-bar";
 import { toast } from "sonner";
 import { useUserRoles } from "@/lib/use-user-roles";
 import {
@@ -328,7 +329,7 @@ function FleetEdge() {
         }
       />
 
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="glass grid overflow-hidden md:grid-cols-5">
         <StatTile label="Clones" value={stats.uniqueClones} />
         <StatTile label="Active" value={stats.attached} tone="text-success" />
         <StatTile label="Errors" value={stats.errors} tone="text-destructive" />
@@ -367,7 +368,7 @@ function FleetEdge() {
           </div>
 
           {isAdmin && selected.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 border border-primary/40 bg-primary/5 px-3 py-2">
               <Badge variant="outline" className="border-primary/40 text-primary">
                 {selected.size} selected
               </Badge>
@@ -396,7 +397,7 @@ function FleetEdge() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-md border border-border">
+          <div className="overflow-x-auto border border-border">
             <table className="w-full text-sm">
               <thead className="bg-surface font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
@@ -458,7 +459,7 @@ function FleetEdge() {
                     return (
                       <tr
                         key={`${r.clone_id}-${r.provider_slug ?? "none"}-${i}`}
-                        className="border-t border-border/50"
+                        className="border-t"
                       >
                         {isAdmin && (
                           <td className="px-3 py-2">
@@ -550,7 +551,7 @@ function FleetEdge() {
                             <Link
                               to="/clones/$cloneId"
                               params={{ cloneId: r.clone_id }}
-                              className="inline-flex h-7 items-center rounded-md px-2 text-muted-foreground hover:text-foreground"
+                              className="inline-flex h-7 items-center px-2 text-muted-foreground hover:text-foreground"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
                             </Link>
@@ -568,15 +569,14 @@ function FleetEdge() {
   );
 }
 
+const TONE_CLASS_TO_TONE = {
+  "text-success": "success",
+  "text-destructive": "destructive",
+  "text-warning": "warning",
+  "text-info": "primary",
+} as const;
+
 function StatTile({ label, value, tone }: { label: string; value: number; tone?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </div>
-        <div className={`mt-1 text-2xl font-semibold ${tone ?? ""}`}>{value}</div>
-      </CardContent>
-    </Card>
-  );
+  const mapped = tone ? TONE_CLASS_TO_TONE[tone as keyof typeof TONE_CLASS_TO_TONE] : undefined;
+  return <MetricCell label={label} value={value} tone={mapped} alarm={Boolean(mapped)} />;
 }

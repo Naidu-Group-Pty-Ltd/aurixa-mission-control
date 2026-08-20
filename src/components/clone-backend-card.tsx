@@ -176,7 +176,7 @@ export function CloneBackendCard({ cloneId }: { cloneId: string }) {
 
         {/* Error message */}
         {backend.error_message && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+          <div className="border border-destructive/30 bg-destructive/5 p-3">
             <p className="text-xs text-destructive">{backend.error_message}</p>
           </div>
         )}
@@ -221,7 +221,7 @@ export function CloneBackendCard({ cloneId }: { cloneId: string }) {
               return (
                 <>
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-md border p-2 text-center">
+                    <div className="border p-2 text-center">
                       <div className="text-lg font-semibold">
                         {migrations.filter((m) => m.success).length}
                       </div>
@@ -264,7 +264,7 @@ export function CloneBackendCard({ cloneId }: { cloneId: string }) {
                       {failedFns.map((f) => (
                         <div
                           key={f.slug}
-                          className="rounded border border-warning/40 bg-warning/5 p-2 text-xs"
+                          className="border border-warning/40 bg-warning/5 p-2 text-xs"
                         >
                           <span className="font-mono font-medium">{f.slug}</span>
                           <span className="text-muted-foreground">
@@ -347,10 +347,7 @@ export function CloneBackendCard({ cloneId }: { cloneId: string }) {
             {hasPending && migration.pendingMigrations.length > 0 && (
               <div className="space-y-1">
                 {migration.pendingMigrations.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-start gap-2 rounded border border-border/50 p-2 text-xs"
-                  >
+                  <div key={m.id} className="flex items-start gap-2 border p-2 text-xs">
                     <ArrowUpCircle className="mt-0.5 h-3 w-3 text-warning shrink-0" />
                     <div>
                       <span className="font-mono text-[10px] text-muted-foreground">{m.id}</span>

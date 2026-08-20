@@ -149,10 +149,8 @@ function RouteErrorsPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            telemetry
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Route errors</h1>
+          <p className="label-mono">telemetry</p>
+          <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Route errors</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Routes that crashed in production, grouped by path. Reported automatically by the in-app
             error boundary.
@@ -236,11 +234,11 @@ function RouteErrorsPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {loading ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               Loading telemetry…
             </div>
           ) : grouped.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               No route errors recorded for this window. 🎉
             </div>
           ) : (
@@ -283,7 +281,7 @@ function RouteErrorsPage() {
                     </Link>
                   </button>
                   {open && (
-                    <div className="space-y-2 border-t border-border/60 px-3 pb-3 pt-2">
+                    <div className="space-y-2 border-t px-3 pb-3 pt-2">
                       {g.lastStack && (
                         <div>
                           <div className="mb-1 flex items-center justify-between">
@@ -292,7 +290,7 @@ function RouteErrorsPage() {
                             </span>
                             <CopyButton value={g.lastStack} label="stack" size="xs" />
                           </div>
-                          <pre className="max-h-60 overflow-auto rounded bg-muted/40 p-2 font-mono text-[10px] text-destructive">
+                          <pre className="max-h-60 overflow-auto bg-muted/40 p-2 font-mono text-[10px] text-destructive">
                             {g.lastStack}
                           </pre>
                         </div>
@@ -305,7 +303,7 @@ function RouteErrorsPage() {
                           {g.samples.map((s) => (
                             <li
                               key={s.id}
-                              className="flex items-center gap-2 rounded border border-border/60 px-2 py-1 font-mono text-[10px]"
+                              className="flex items-center gap-2 border px-2 py-1 font-mono text-[10px]"
                             >
                               <span className="text-muted-foreground">
                                 {formatDistanceToNow(s.created_at)}

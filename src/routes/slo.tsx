@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MetricCell } from "@/components/metric-bar";
 import { Activity, RefreshCw, Target } from "lucide-react";
 import { computeFleetSlo } from "@/server/reliability.functions";
 import { brandDriftTimeseries } from "@/server/reliability.functions";
@@ -41,14 +42,12 @@ function SloPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-success/15 ring-1 ring-success/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-success/15 ring-1 ring-success/40">
           <Target className="h-5 w-5 text-success" />
         </div>
         <div className="flex-1">
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            reliability
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Fleet SLO</h1>
+          <p className="label-mono">reliability</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Fleet SLO</h1>
           <p className="text-sm text-muted-foreground">
             Uptime over the last {days} days from health snapshots.
           </p>
@@ -77,7 +76,7 @@ function SloPage() {
         </div>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="glass grid overflow-hidden md:grid-cols-3">
         <StatCard
           label="Fleet uptime"
           value={
@@ -108,7 +107,7 @@ function SloPage() {
         </CardHeader>
         <CardContent>
           {!fleet || fleet.clones.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               No health snapshots in the window.
             </div>
           ) : (
@@ -116,7 +115,7 @@ function SloPage() {
               {fleet.clones.map((c) => (
                 <div
                   key={c.clone_id}
-                  className="flex items-center gap-3 rounded-md border border-border bg-surface p-3"
+                  className="flex items-center gap-3 border border-border bg-surface p-3"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-mono text-sm font-semibold truncate">{c.name}</div>
@@ -153,7 +152,7 @@ function SloPage() {
         </CardHeader>
         <CardContent>
           {series.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               No drift data in window.
             </div>
           ) : (
@@ -182,23 +181,14 @@ function StatCard({
   value: string;
   tone?: "success" | "warning" | "destructive" | "muted";
 }) {
-  const cls =
-    tone === "success"
-      ? "text-success"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "destructive"
-          ? "text-destructive"
-          : "";
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </div>
-        <div className={`mt-1 text-2xl font-semibold ${cls}`}>{value}</div>
-      </CardContent>
-    </Card>
+    <MetricCell
+      label={label}
+      value={value}
+      size="sm"
+      tone={tone === "muted" ? "neutral" : tone}
+      alarm={tone !== "muted"}
+    />
   );
 }
 

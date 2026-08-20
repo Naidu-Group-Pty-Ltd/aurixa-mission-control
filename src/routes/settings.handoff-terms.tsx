@@ -73,7 +73,7 @@ function HandoffTermsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Handoff terms versions</h1>
+        <h1 className="font-display text-[1.75rem] leading-[1.1]">Handoff terms versions</h1>
         <p className="text-sm text-muted-foreground">
           Canonical DPA text that clients sign during handoff onboarding. Each version's body is
           SHA-256 hashed; the active version is served to new invites.
@@ -150,7 +150,7 @@ function HandoffTermsPage() {
               {versions.map((v: any) => (
                 <div
                   key={v.id}
-                  className="flex flex-col md:flex-row md:items-center justify-between gap-2 rounded border p-3"
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-2 border p-3"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">

@@ -64,7 +64,7 @@ export function TreeStats({ clones }: Props) {
       {stats.map((s, i) => (
         <motion.div
           key={s.label}
-          className="relative overflow-hidden rounded-lg border border-border/40 bg-card/80 p-4 backdrop-blur"
+          className="relative overflow-hidden border border-border/40 /80 p-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 + i * 0.08, duration: 0.5 }}

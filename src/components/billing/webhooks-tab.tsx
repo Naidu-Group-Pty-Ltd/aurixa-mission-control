@@ -227,7 +227,7 @@ export function WebhooksTab() {
                 Save this signing secret — it will not be shown again. Verify HMAC-SHA256 on the{" "}
                 <span className="font-mono">x-mc-signature</span> header.
               </p>
-              <div className="flex items-center gap-2 rounded border border-border bg-muted/30 p-2 font-mono text-xs">
+              <div className="flex items-center gap-2 border border-border bg-muted/30 p-2 font-mono text-xs">
                 <span className="flex-1 break-all">{issuedSecret}</span>
                 <Button
                   size="sm"

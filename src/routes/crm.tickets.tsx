@@ -7,7 +7,14 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RecordRow } from "@/components/record-row";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   listTickets,
   listDisputes,
@@ -30,8 +37,7 @@ export const Route = createFileRoute("/crm/tickets")({
       { title: "Tickets & Disputes — Aurixa Mission Control" },
       {
         name: "description",
-        content:
-          "Client issue queue with response SLAs, plus the dispute and chargeback register.",
+        content: "Client issue queue with response SLAs, plus the dispute and chargeback register.",
       },
       { property: "og:title", content: "Tickets & Disputes — Aurixa Mission Control" },
       { property: "og:description", content: "Resolve client issues before they become churn." },
@@ -105,7 +111,9 @@ function TicketsPage() {
           )}
           {(tickets.data ?? []).map((t: any) => {
             const breached =
-              t.sla_due_at && new Date(t.sla_due_at) < new Date() && !["resolved", "closed"].includes(t.status);
+              t.sla_due_at &&
+              new Date(t.sla_due_at) < new Date() &&
+              !["resolved", "closed"].includes(t.status);
             return (
               <Card key={t.id}>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -124,7 +132,9 @@ function TicketsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {breached && <Badge variant="destructive">SLA breached</Badge>}
-                    <Badge variant={t.severity === "critical" ? "destructive" : "secondary"}>{t.severity}</Badge>
+                    <Badge variant={t.severity === "critical" ? "destructive" : "secondary"}>
+                      {t.severity}
+                    </Badge>
                     <Select
                       value={t.status}
                       onValueChange={async (v) => {
@@ -156,7 +166,7 @@ function TicketsPage() {
             <p className="text-sm text-muted-foreground">No disputes on record.</p>
           )}
           {(disputes.data ?? []).map((x: any) => (
-            <Card key={x.id}>
+            <RecordRow key={x.id}>
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div>
                   <p className="font-medium capitalize">{x.kind.replace(/_/g, " ")}</p>
@@ -168,14 +178,19 @@ function TicketsPage() {
                     >
                       {x.crm_accounts?.name ?? "—"}
                     </Link>{" "}
-                    · {money(x.amount_cents, x.currency)} · opened {formatDistanceToNow(x.opened_at)}
+                    · {money(x.amount_cents, x.currency)} · opened{" "}
+                    {formatDistanceToNow(x.opened_at)}
                   </p>
                 </div>
-                <Badge variant={["open", "under_review"].includes(x.status) ? "destructive" : "secondary"}>
+                <Badge
+                  variant={
+                    ["open", "under_review"].includes(x.status) ? "destructive" : "secondary"
+                  }
+                >
                   {x.status.replace(/_/g, " ")}
                 </Badge>
               </CardContent>
-            </Card>
+            </RecordRow>
           ))}
         </TabsContent>
       </Tabs>

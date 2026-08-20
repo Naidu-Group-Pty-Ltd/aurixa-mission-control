@@ -9,7 +9,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -26,6 +26,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RecordRow } from "@/components/record-row";
 import {
   approveRemediationRun,
   getSupportTicketDetail,
@@ -146,7 +147,7 @@ function SupportOpsPage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {PRIORITIES.map((p) => (
-          <Card key={p}>
+          <RecordRow key={p}>
             <CardContent className="py-4">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -156,7 +157,7 @@ function SupportOpsPage() {
               </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{kpis[p] ?? 0}</p>
             </CardContent>
-          </Card>
+          </RecordRow>
         ))}
         <Card>
           <CardContent className="py-4">
@@ -288,7 +289,7 @@ function SupportOpsPage() {
             </p>
           )}
           {(activityQuery.data?.activity ?? []).map((a: any) => (
-            <Card key={a.id}>
+            <RecordRow key={a.id}>
               <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{a.question}</p>
@@ -306,7 +307,7 @@ function SupportOpsPage() {
                   <Badge variant="secondary">{a.mode}</Badge>
                 </div>
               </CardContent>
-            </Card>
+            </RecordRow>
           ))}
         </TabsContent>
       </Tabs>
@@ -522,7 +523,7 @@ function TicketDetailSheet({
                 )}
                 <div className="space-y-2">
                   {(detail.data?.runs ?? []).map((run: any) => (
-                    <div key={run.id} className="rounded-md border p-2">
+                    <div key={run.id} className="border p-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-medium">{run.action_type.replace(/_/g, " ")}</span>
                         <div className="flex items-center gap-2">
@@ -578,7 +579,7 @@ function TicketDetailSheet({
               </section>
 
               {!["resolved", "closed"].includes(ticket.status) && (
-                <section className="space-y-3 rounded-md border p-3">
+                <section className="space-y-3 border p-3">
                   <h3 className="font-medium">Operator actions</h3>
                   <div className="flex flex-wrap items-center gap-2">
                     <Select value={overridePriority} onValueChange={setOverridePriority}>

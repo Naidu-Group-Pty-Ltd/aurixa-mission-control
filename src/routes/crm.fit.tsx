@@ -265,7 +265,7 @@ function FitPage() {
                 (leads.data ?? []).map((lead: any) => (
                   <div
                     key={lead.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                    className="flex flex-wrap items-center justify-between gap-3 border p-3"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
@@ -308,7 +308,7 @@ function FitPage() {
                   <button
                     key={row.id}
                     onClick={() => setOpenId(row.id)}
-                    className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+                    className="flex w-full flex-wrap items-center justify-between gap-3 border p-3 text-left transition-colors hover:bg-muted/50"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
@@ -389,7 +389,7 @@ function FitPage() {
               {(rubric.data ?? []).map((r: any) => (
                 <div
                   key={r.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2.5 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 border p-2.5 text-sm"
                 >
                   <span className="font-medium">{r.label}</span>
                   <div className="flex flex-wrap items-center gap-2">
@@ -519,7 +519,7 @@ function FitPage() {
                 analysis={detail.data?.analysis}
                 dimensions={detail.data?.dimensions ?? []}
               />
-              <div className="space-y-2 rounded-lg border p-3">
+              <div className="space-y-2 border p-3">
                 <Label>Override verdict</Label>
                 <div className="flex gap-2">
                   <Select value={overrideVerdict} onValueChange={setOverrideVerdict}>

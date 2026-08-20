@@ -142,7 +142,7 @@ export function BrandSyncCard() {
             claim, so it is shown as a surface rather than as a hex string. */}
         <div className="grid gap-2 sm:grid-cols-2">
           <div
-            className="rounded-md border p-3"
+            className="border p-3"
             style={{
               background: AURIXA_STRIPE_BRANDING.secondaryColor,
               borderColor: `${AURIXA_PALETTE.gold}40`,
@@ -158,7 +158,7 @@ export function BrandSyncCard() {
               {AURIXA_STRIPE_BRANDING.secondaryColor}
             </p>
             <span
-              className="mt-2 inline-block rounded px-2 py-1 text-[11px] font-medium"
+              className="mt-2 inline-block px-2 py-1 text-[11px] font-medium"
               style={{
                 background: AURIXA_STRIPE_BRANDING.primaryColor,
                 color: plan?.primaryInk ?? "#000000",
@@ -167,20 +167,20 @@ export function BrandSyncCard() {
               Pay invoice
             </span>
           </div>
-          <div className="rounded-md border p-3">
+          <div className="border p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Brand · accents &amp; buttons
             </p>
             <p className="font-mono text-xs">{AURIXA_STRIPE_BRANDING.primaryColor}</p>
             <div
-              className="mt-2 h-6 w-full rounded"
+              className="mt-2 h-6 w-full"
               style={{ background: AURIXA_STRIPE_BRANDING.primaryColor }}
             />
           </div>
         </div>
 
         {plan && !plan.ok && (
-          <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+          <div className="space-y-1 border border-destructive/40 bg-destructive/5 p-3">
             <p className="text-sm font-medium text-destructive">
               {plan.error ?? "Branding failed."}
             </p>
@@ -200,7 +200,7 @@ export function BrandSyncCard() {
         )}
 
         {fields.length > 0 && (
-          <div className="rounded-md border">
+          <div className="border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -221,7 +221,7 @@ export function BrandSyncCard() {
                       {IS_COLOUR(f.field) ? (
                         <span className="flex items-center gap-1.5">
                           <span
-                            className="inline-block h-3 w-3 rounded-sm border"
+                            className="inline-block h-3 w-3 border"
                             style={{ background: f.desired }}
                           />
                           {f.desired}
@@ -242,7 +242,7 @@ export function BrandSyncCard() {
             happens the File ids are the whole remedy, so they are shown rather
             than logged. */}
         {!!plan?.fileIds && !plan.accountUpdated && !!Object.keys(plan.fileIds).length && (
-          <div className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+          <div className="space-y-1 border border-amber-500/40 bg-amber-500/5 p-3">
             <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
               The marks uploaded. Paste these on the Stripe Branding page:
             </p>

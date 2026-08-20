@@ -42,10 +42,8 @@ async function loadInvite(token: string) {
     .eq("token_hash", token_hash)
     .maybeSingle();
   if (error || !data) return { ok: false as const, status: 404, error: "invite_not_found" };
-  if (data.revoked_at)
-    return { ok: false as const, status: 410, error: "invite_revoked" };
-  if (data.consumed_at)
-    return { ok: false as const, status: 410, error: "invite_already_used" };
+  if (data.revoked_at) return { ok: false as const, status: 410, error: "invite_revoked" };
+  if (data.consumed_at) return { ok: false as const, status: 410, error: "invite_already_used" };
   if (new Date(data.expires_at).getTime() < Date.now())
     return { ok: false as const, status: 410, error: "invite_expired" };
   return { ok: true as const, invite: data };
@@ -82,9 +80,7 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
         // Load minimal handoff + clone context for the client wizard.
         const { data: handoff } = await supabaseAdmin
           .from("clone_handoffs")
-          .select(
-            "id, state, target_region, target_plan_tier, clones(name, slug)",
-          )
+          .select("id, state, target_region, target_plan_tier, clones(name, slug)")
           .eq("id", res.invite.handoff_id)
           .maybeSingle();
 
@@ -119,10 +115,7 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
         }
         const parsed = SubmitSchema.safeParse(body);
         if (!parsed.success)
-          return json(
-            { ok: false, error: "invalid_input", issues: parsed.error.issues },
-            400,
-          );
+          return json({ ok: false, error: "invalid_input", issues: parsed.error.issues }, 400);
         const data = parsed.data;
 
         const invRes = await loadInvite(data.token);
@@ -144,10 +137,7 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
             { ok: false, error: "region_not_allowed", allowed: invite.region_allowlist },
             422,
           );
-        if (
-          invite.plan_allowlist?.length &&
-          !invite.plan_allowlist.includes(data.target_plan_tier)
-        )
+        if (invite.plan_allowlist?.length && !invite.plan_allowlist.includes(data.target_plan_tier))
           return json(
             { ok: false, error: "plan_not_allowed", allowed: invite.plan_allowlist },
             422,
@@ -159,8 +149,7 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
           .select("id, clone_id, state, client_account_id")
           .eq("id", invite.handoff_id)
           .maybeSingle();
-        if (hErr || !handoff)
-          return json({ ok: false, error: "handoff_not_found" }, 404);
+        if (hErr || !handoff) return json({ ok: false, error: "handoff_not_found" }, 404);
 
         // Encrypt the PAT before storing. Last-4 shown for admin display.
         const pat_ciphertext = encodeBytea(encryptSecret(data.pat));
@@ -178,8 +167,9 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
               org_id: data.org_id,
               org_slug: data.org_slug ?? null,
               plan_tier: data.target_plan_tier,
-              region_allowed:
-                invite.region_allowlist?.length ? invite.region_allowlist : [data.target_region],
+              region_allowed: invite.region_allowlist?.length
+                ? invite.region_allowlist
+                : [data.target_region],
               pat_ciphertext,
               pat_last4,
               verified_at: new Date().toISOString(),
@@ -197,8 +187,9 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
               org_id: data.org_id,
               org_slug: data.org_slug ?? null,
               plan_tier: data.target_plan_tier,
-              region_allowed:
-                invite.region_allowlist?.length ? invite.region_allowlist : [data.target_region],
+              region_allowed: invite.region_allowlist?.length
+                ? invite.region_allowlist
+                : [data.target_region],
               pat_ciphertext,
               pat_last4,
               verified_at: new Date().toISOString(),
@@ -206,7 +197,8 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
             })
             .select("id")
             .single();
-          if (aErr || !acct) return json({ ok: false, error: aErr?.message ?? "account_insert_failed" }, 500);
+          if (aErr || !acct)
+            return json({ ok: false, error: aErr?.message ?? "account_insert_failed" }, 500);
           accountId = acct.id;
         }
 
@@ -247,7 +239,9 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
         // at signing time so the contract is anchored to a concrete artifact set.
         const { data: snapshotRows } = await supabaseAdmin
           .from("handoff_snapshots")
-          .select("id, kind, status, sha256, size_bytes, storage_path, retention_expires_at, created_at")
+          .select(
+            "id, kind, status, sha256, size_bytes, storage_path, retention_expires_at, created_at",
+          )
           .eq("handoff_id", handoff.id)
           .order("created_at", { ascending: true });
         const snapshotManifest = (snapshotRows ?? []).map((s) => ({
@@ -279,9 +273,7 @@ export const Route = createFileRoute("/api/public/handoffs/consent")({
           snapshot_manifest: snapshotManifest,
         };
         const bundleJson = JSON.stringify(bundle);
-        const signatureBundleSha256 = createHash("sha256")
-          .update(bundleJson, "utf8")
-          .digest("hex");
+        const signatureBundleSha256 = createHash("sha256").update(bundleJson, "utf8").digest("hex");
 
         // Build a human-readable signed document (markdown) and upload it
         // to the private handoff-contracts bucket.

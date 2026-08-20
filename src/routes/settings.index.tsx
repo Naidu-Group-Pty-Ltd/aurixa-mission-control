@@ -136,7 +136,7 @@ function SettingsGeneralPage() {
           <CardTitle className="flex items-center gap-2 text-base">
             <Github className="h-4 w-4" /> Prime repository
             {!canEditPrime && !rolesLoading ? (
-              <span className="ml-2 inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="ml-2 inline-flex items-center gap-1 border border-border bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 <Lock className="h-3 w-3" /> Admin only
               </span>
             ) : null}
@@ -150,33 +150,33 @@ function SettingsGeneralPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {rolesLoading ? (
-            <div className="md:col-span-2 rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-muted-foreground">
+            <div className="md:col-span-2 border border-border bg-surface px-3 py-2 font-mono text-xs text-muted-foreground">
               Checking permissions…
             </div>
           ) : !canViewPrime ? (
-            <div className="md:col-span-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 font-mono text-xs text-warning">
+            <div className="md:col-span-2 border border-warning/40 bg-warning/5 px-3 py-2 font-mono text-xs text-warning">
               Your account does not have operator access. Ask an admin to grant you the operator or
               admin role to view or edit the Prime repository configuration.
             </div>
           ) : (
             <>
               {primeLoading && !prime ? (
-                <div className="md:col-span-2 rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-muted-foreground">
+                <div className="md:col-span-2 border border-border bg-surface px-3 py-2 font-mono text-xs text-muted-foreground">
                   Loading prime configuration…
                 </div>
               ) : null}
               {primeError ? (
-                <div className="md:col-span-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive">
+                <div className="md:col-span-2 border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive">
                   Failed to load prime config: {primeError}
                 </div>
               ) : null}
               {!primeLoading && !prime && !primeError && canEditPrime ? (
-                <div className="md:col-span-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 font-mono text-xs text-warning">
+                <div className="md:col-span-2 border border-warning/40 bg-warning/5 px-3 py-2 font-mono text-xs text-warning">
                   No prime config saved yet — fill in the fields below and click Save.
                 </div>
               ) : null}
               {!primeLoading && !prime && !primeError && !canEditPrime ? (
-                <div className="md:col-span-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 font-mono text-xs text-warning">
+                <div className="md:col-span-2 border border-warning/40 bg-warning/5 px-3 py-2 font-mono text-xs text-warning">
                   No prime config saved yet. An admin must configure the Prime repository.
                 </div>
               ) : null}

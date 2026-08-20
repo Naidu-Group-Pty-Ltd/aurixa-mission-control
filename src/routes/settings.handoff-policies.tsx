@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { RecordRow } from "@/components/record-row";
 import { toast } from "sonner";
 import {
   listHandoffPolicies,
@@ -67,7 +68,9 @@ function HandoffPoliciesPage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-semibold">Handoff Region + Plan Policies</h1>
+        <h1 className="font-display text-[1.75rem] leading-[1.1]">
+          Handoff Region + Plan Policies
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Define which target regions and plan tiers a handoff is allowed to select.
         </p>
@@ -125,7 +128,7 @@ function HandoffPoliciesPage() {
 
       <div className="space-y-3">
         {(q.data ?? []).map((p: any) => (
-          <Card key={p.id}>
+          <RecordRow key={p.id}>
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
@@ -151,7 +154,7 @@ function HandoffPoliciesPage() {
               </div>
               {p.notes && <div className="text-muted-foreground">{p.notes}</div>}
             </CardContent>
-          </Card>
+          </RecordRow>
         ))}
         {(q.data ?? []).length === 0 && (
           <p className="text-sm text-muted-foreground">No policies yet.</p>

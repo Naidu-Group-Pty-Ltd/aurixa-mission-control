@@ -195,8 +195,8 @@ export function OnboardingWizard() {
           </div>
         ) : (
           current && (
-            <div className="flex items-start gap-4 rounded-lg border border-border bg-surface p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 ring-1 ring-primary/30">
+            <div className="flex items-start gap-4 border border-border bg-surface p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-primary/10 ring-1 ring-primary/30">
                 <current.icon className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0 flex-1">

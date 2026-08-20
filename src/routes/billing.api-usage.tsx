@@ -9,15 +9,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  Coins,
-  KeyRound,
-  Receipt,
-  RefreshCw,
-  ShieldCheck,
-  TrendingUp,
-} from "lucide-react";
+import { AlertTriangle, Coins, KeyRound, Receipt, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { ProtectedRoute } from "@/components/protected-route";
@@ -30,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MetricCell } from "@/components/metric-bar";
 import {
   Table,
   TableBody,
@@ -244,12 +237,11 @@ function ApiUsagePage() {
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="glass grid overflow-hidden md:grid-cols-4">
         {/* `unknown` rather than a formatted zero whenever the read failed or is
             still in flight: on a billing page a confident "$0.00" is a claim,
             and one we cannot make until the data is actually in. */}
         <StatCard
-          icon={Coins}
           label="Billable this period"
           value={loadError ? "—" : overview.isPending ? "…" : formatMicros(totals.charge)}
           hint={
@@ -260,14 +252,12 @@ function ApiUsagePage() {
           tone={loadError ? "warning" : "default"}
         />
         <StatCard
-          icon={TrendingUp}
           label="Our vendor cost"
           value={loadError ? "—" : overview.isPending ? "…" : formatMicros(totals.cost)}
           hint={loadError ? "Unknown" : `Margin ${formatMicros(totals.margin)}`}
           tone={loadError ? "warning" : "default"}
         />
         <StatCard
-          icon={ShieldCheck}
           label="Covered by tenant keys"
           value={loadError ? "—" : byokTotal.toLocaleString()}
           hint="Units run on a workspace's own key — never charged"
@@ -462,18 +452,16 @@ function ApiUsagePage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, hint, tone = "default" }) {
+function StatCard({ label, value, hint, tone = "default" }) {
   return (
-    <Card className={tone === "warning" ? "border-warning/50" : undefined}>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Icon className="h-4 w-4" />
-          {label}
-        </div>
-        <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
-        <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
-      </CardContent>
-    </Card>
+    <MetricCell
+      label={label}
+      value={value}
+      note={hint}
+      size="sm"
+      tone={tone === "warning" ? "warning" : "neutral"}
+      alarm={tone === "warning"}
+    />
   );
 }
 

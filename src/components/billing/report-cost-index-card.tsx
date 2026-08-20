@@ -265,7 +265,7 @@ export function ReportCostIndexCard() {
         )}
 
         {canPublish && (
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+          <div className="space-y-3 border bg-muted/30 p-4">
             <Textarea
               placeholder="Why is this changing? (recorded on the publish history)"
               value={note}

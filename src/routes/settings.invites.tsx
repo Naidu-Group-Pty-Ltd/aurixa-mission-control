@@ -175,14 +175,12 @@ function InvitesPage() {
     <div className="space-y-6">
       <header className="flex items-end justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
             <MailPlus className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              closed system
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Outbound Invites</h1>
+            <p className="label-mono">closed system</p>
+            <h1 className="mt-1 font-display text-[1.75rem] leading-[1.1]">Outbound Invites</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Sign-up is disabled — invite links are the only way new users can join.
             </p>
@@ -274,7 +272,7 @@ function InvitesPage() {
                   This link is shown once. Only its hash is stored, so it cannot be recovered later
                   — send it to the invitee through a trusted channel.
                 </p>
-                <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-1.5">
+                <div className="flex items-center gap-2 border border-border bg-surface px-2 py-1.5">
                   <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground">
                     {mintedLink}
                   </code>

@@ -27,7 +27,10 @@ type SecretRow = {
   updated_at: string;
 };
 
-const STATUS_META: Record<SecretRow["status"], { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+const STATUS_META: Record<
+  SecretRow["status"],
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+> = {
   set: { label: "Set", variant: "default" },
   inherited: { label: "Inherited from prime", variant: "secondary" },
   missing: { label: "Missing — action required", variant: "destructive" },
@@ -54,12 +57,14 @@ function CloneSecretsPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm text-muted-foreground">
-              <Link to="/clones/$cloneId" params={{ cloneId }}>← Back to clone</Link>
+              <Link to="/clones/$cloneId" params={{ cloneId }}>
+                ← Back to clone
+              </Link>
             </div>
-            <h1 className="text-2xl font-semibold">Clone backend secrets</h1>
+            <h1 className="font-display text-[1.75rem] leading-[1.1]">Clone backend secrets</h1>
             <p className="text-sm text-muted-foreground">
-              Values are written directly to the clone's Supabase project. Values are
-              never stored in this dashboard.
+              Values are written directly to the clone's Supabase project. Values are never stored
+              in this dashboard.
             </p>
           </div>
           {missing > 0 && (
@@ -72,15 +77,15 @@ function CloneSecretsPage() {
         {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
         {!isLoading && data && !data.ok && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <div className="border border-destructive/40 bg-destructive/10 p-3 text-sm">
             {data.error}
           </div>
         )}
 
         {!isLoading && secrets.length === 0 && (
-          <div className="rounded-md border p-6 text-sm text-muted-foreground">
-            No secrets tracked for this clone yet. Once provisioning finishes, every
-            secret referenced by the prime's edge functions will appear here.
+          <div className="border p-6 text-sm text-muted-foreground">
+            No secrets tracked for this clone yet. Once provisioning finishes, every secret
+            referenced by the prime's edge functions will appear here.
           </div>
         )}
 
@@ -113,7 +118,7 @@ function SecretRowCard({ row, onSave }: { row: SecretRow; onSave: (v: string) =>
   const meta = STATUS_META[row.status];
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="border p-4">
       <div className="mb-2 flex items-center justify-between">
         <div className="font-mono text-sm font-medium">{row.name}</div>
         <Badge variant={meta.variant}>{meta.label}</Badge>
@@ -145,7 +150,9 @@ function SecretRowCard({ row, onSave }: { row: SecretRow; onSave: (v: string) =>
           autoComplete="off"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder={row.status === "set" || row.status === "inherited" ? "Replace value…" : "Paste value…"}
+          placeholder={
+            row.status === "set" || row.status === "inherited" ? "Replace value…" : "Paste value…"
+          }
         />
         <Button type="submit" disabled={!value || saving}>
           {saving ? "Saving…" : "Save"}

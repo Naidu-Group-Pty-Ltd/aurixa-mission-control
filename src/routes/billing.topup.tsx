@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { RecordRow } from "@/components/record-row";
 import {
   Select,
   SelectContent,
@@ -250,9 +251,7 @@ function TopupBody() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            credits
-          </p>
+          <p className="label-mono">credits</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">Top up tokens</h2>
         </div>
         <Link
@@ -362,7 +361,7 @@ function TopupBody() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {visible.map((p) => (
-          <Card key={p.id} className="flex flex-col">
+          <RecordRow key={p.id} className="flex flex-col">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{p.name}</CardTitle>
@@ -409,7 +408,7 @@ function TopupBody() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
+          </RecordRow>
         ))}
         {filtered.length === 0 && !packs.isLoading && (
           <p className="text-sm text-muted-foreground">No packs match the current filters.</p>
@@ -417,7 +416,7 @@ function TopupBody() {
       </div>
 
       {filtered.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-card/40 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-border /40 p-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>Page size</span>
             <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
@@ -484,7 +483,7 @@ function TopupBody() {
                   log.
                 </p>
                 {pending && (
-                  <div className="rounded border border-border bg-muted/30 p-3 font-mono text-xs">
+                  <div className="border border-border bg-muted/30 p-3 font-mono text-xs">
                     <Row
                       k="Tenant"
                       v={

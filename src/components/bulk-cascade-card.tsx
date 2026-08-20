@@ -39,7 +39,6 @@ import {
   AlertTriangle,
   Save,
   Trash2,
-  CheckSquare,
   Radio,
 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
@@ -827,7 +826,7 @@ export function BulkCascadeCard() {
                 </span>
                 {/* Inline confirmation for select-all */}
                 {showSelectAllConfirm && (
-                  <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/5 px-2.5 py-1.5 animate-in fade-in slide-in-from-left-2">
+                  <div className="flex items-center gap-2 border border-warning/40 bg-warning/5 px-2.5 py-1.5 animate-in fade-in slide-in-from-left-2">
                     <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
                     <span className="font-mono text-[10px] text-warning">
                       Include <strong>{filteredClones.length}</strong> clone
@@ -876,7 +875,7 @@ export function BulkCascadeCard() {
         {/* Dry-run preview */}
         {dryRun && progress.length > 0 && !running && (
           <CardContent className="border-t border-border pt-4">
-            <div className="rounded-md border border-info/30 bg-info/5 p-3">
+            <div className="border border-info/30 bg-info/5 p-3">
               <div className="flex items-center gap-2 mb-2">
                 <Eye className="h-4 w-4 text-info" />
                 <span className="font-mono text-xs font-semibold uppercase tracking-wider text-info">
@@ -891,7 +890,7 @@ export function BulkCascadeCard() {
                 {progress.map((p) => (
                   <li
                     key={p.clone_id}
-                    className="flex items-center gap-2 rounded border border-border px-2 py-1.5 text-xs"
+                    className="flex items-center gap-2 border border-border px-2 py-1.5 text-xs"
                   >
                     <div className="h-2 w-2 rounded-full bg-info" />
                     <span className="font-mono">{p.name}</span>
@@ -940,7 +939,7 @@ export function BulkCascadeCard() {
 
             {/* Retry failed */}
             {failed > 0 && !running && (
-              <div className="flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+              <div className="flex items-center justify-between border border-destructive/30 bg-destructive/5 px-3 py-2">
                 <span className="font-mono text-xs text-destructive">
                   {errorTypeFilter !== "all"
                     ? `${errorBreakdown[errorTypeFilter]} ${ERROR_TYPE_LABELS[errorTypeFilter].toLowerCase()} failure${errorBreakdown[errorTypeFilter] !== 1 ? "s" : ""}`
@@ -976,7 +975,7 @@ export function BulkCascadeCard() {
                 {filteredProgress.map((p) => (
                   <li
                     key={p.clone_id}
-                    className="flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                    className="flex items-center gap-3 border border-border bg-surface px-3 py-2 text-sm"
                   >
                     <StatusIcon status={p.status} />
                     <div className="flex-1 min-w-0">
@@ -1071,7 +1070,7 @@ export function BulkCascadeCard() {
                 <p>
                   This will revert{" "}
                   <strong className="text-foreground">{rollbackTarget?.name}</strong> to SHA{" "}
-                  <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                  <code className="bg-muted px-1 py-0.5 text-[11px]">
                     {rollbackTarget?.previous_sha?.slice(0, 12)}
                   </code>
                   .

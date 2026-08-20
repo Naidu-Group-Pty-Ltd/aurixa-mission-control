@@ -5,15 +5,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  ShoppingCart,
-  Users,
-  Zap,
-} from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, ShoppingCart } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { RouteError } from "@/components/route-error";
@@ -39,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { listPurchases, listPurchaseSources, purchaseRollups } from "@/lib/purchases.functions";
 import { RestorePurchasesDialog } from "@/components/billing/restore-purchases-dialog";
+import { MetricCell } from "@/components/metric-bar";
 import { formatMoneyByCurrency } from "@/lib/purchase-rollups";
 import { useClones } from "@/lib/queries";
 import { toCSV, downloadCSV } from "@/lib/csv";
@@ -169,14 +162,12 @@ function PurchasesPage() {
       </Link>
 
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
           <ShoppingCart className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            billing
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Purchases</h1>
+          <p className="label-mono">billing</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Purchases</h1>
           <p className="text-sm text-muted-foreground">
             Every checkout across the fleet — attributed to the clone and user who initiated it.
           </p>
@@ -184,16 +175,14 @@ function PurchasesPage() {
       </header>
 
       {/* 30-day rollups */}
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="glass grid overflow-hidden md:grid-cols-4">
         <StatTile
           label="Revenue 30d"
           value={rollups ? formatMoneyByCurrency(rollups.revenueByCurrency) : "—"}
-          icon={Zap}
         />
         <StatTile
           label="Purchases 30d"
           value={rollups?.completedCount ?? "—"}
-          icon={ShoppingCart}
           hint={
             rollups?.adminActionCount
               ? `+ ${rollups.adminActionCount} discretionary admin action${rollups.adminActionCount === 1 ? "" : "s"}`
@@ -203,7 +192,6 @@ function PurchasesPage() {
         <StatTile
           label="Clone-initiated"
           value={rollups ? `${Math.round(rollups.attributedShare * 100)}%` : "—"}
-          icon={Users}
           hint={rollups ? `${rollups.attributedCount} of ${rollups.completedCount}` : undefined}
         />
         <StatTile
@@ -328,7 +316,7 @@ function PurchasesPage() {
             <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
           )}
           {!listQ.isLoading && rows.length === 0 && (
-            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-8 text-center text-sm text-muted-foreground">
               No purchases match these filters.
             </div>
           )}
@@ -407,28 +395,11 @@ function PurchasesPage() {
 function StatTile({
   label,
   value,
-  icon: Icon,
   hint,
 }: {
   label: string;
   value: string | number;
-  icon?: any;
   hint?: string;
 }) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="mb-2 flex items-center gap-2">
-          {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
-          <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {label}
-          </div>
-        </div>
-        <div className="truncate text-xl font-semibold" title={String(value)}>
-          {value}
-        </div>
-        {hint && <div className="mt-1 font-mono text-[10px] text-muted-foreground">{hint}</div>}
-      </CardContent>
-    </Card>
-  );
+  return <MetricCell label={label} value={value} note={hint} size="sm" />;
 }

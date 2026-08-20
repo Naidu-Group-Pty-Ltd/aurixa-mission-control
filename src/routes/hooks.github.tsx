@@ -5,7 +5,6 @@ import { createCascadeForAllClones } from "@/server/cascade-trigger.server";
 import { executeCascade } from "@/server/cascade-engine.server";
 import { enqueueScanNoAuth, resolveScanTarget } from "@/server/codex-scheduling.server";
 
-
 // GitHub webhook receiver. Verifies HMAC-SHA256 signature with
 // GITHUB_WEBHOOK_SECRET, and on a `push` event to prime's default branch
 // auto-fires a cascade in prime_config.default_cascade_mode.
@@ -65,13 +64,20 @@ export const Route = createFileRoute("/hooks/github")({
             });
           }
           const action = prPayload?.action as string | undefined;
-          if (!action || !["opened", "reopened", "synchronize", "ready_for_review"].includes(action)) {
+          if (
+            !action ||
+            !["opened", "reopened", "synchronize", "ready_for_review"].includes(action)
+          ) {
             return new Response(
-              JSON.stringify({ skipped: true, reason: `pull_request action ${action ?? "?"} ignored` }),
+              JSON.stringify({
+                skipped: true,
+                reason: `pull_request action ${action ?? "?"} ignored`,
+              }),
               { headers: { "Content-Type": "application/json" } },
             );
           }
-          const repoOwner = prPayload?.repository?.owner?.login ?? prPayload?.repository?.owner?.name ?? "";
+          const repoOwner =
+            prPayload?.repository?.owner?.login ?? prPayload?.repository?.owner?.name ?? "";
           const repoName = prPayload?.repository?.name ?? "";
           const repoFullName = repoOwner && repoName ? `${repoOwner}/${repoName}` : "";
           const headSha = prPayload?.pull_request?.head?.sha ?? null;
@@ -120,10 +126,10 @@ export const Route = createFileRoute("/hooks/github")({
               headers: { "Content-Type": "application/json" },
             });
           } catch (err) {
-            return new Response(
-              JSON.stringify({ success: false, error: (err as Error).message }),
-              { status: 500, headers: { "Content-Type": "application/json" } },
-            );
+            return new Response(JSON.stringify({ success: false, error: (err as Error).message }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            });
           }
         }
 
@@ -134,7 +140,6 @@ export const Route = createFileRoute("/hooks/github")({
             { headers: { "Content-Type": "application/json" } },
           );
         }
-
 
         type PushPayload = {
           ref?: string;
@@ -242,7 +247,6 @@ export const Route = createFileRoute("/hooks/github")({
             console.error("post-merge codex scan enqueue failed:", e);
           }
         }
-
 
         return new Response(
           JSON.stringify({

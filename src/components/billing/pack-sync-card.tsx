@@ -138,7 +138,7 @@ export function PackSyncCard() {
         </div>
 
         {plan && !plan.ok && (
-          <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+          <div className="space-y-1 border border-destructive/40 bg-destructive/5 p-3">
             <p className="text-sm font-medium text-destructive">{plan.error ?? "Sync failed."}</p>
             {plan.errors?.map((e) => (
               <p key={e} className="font-mono text-xs text-destructive/80">
@@ -156,7 +156,7 @@ export function PackSyncCard() {
         )}
 
         {packs.length > 0 && (
-          <div className="rounded-md border">
+          <div className="border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -230,7 +230,7 @@ export function PackSyncCard() {
             an operator needs to know not to go looking for a bug that isn't
             there. */}
         {plan?.storefrontRefreshed === false && (
-          <p className="flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+          <p className="flex items-start gap-1.5 border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs text-amber-600 dark:text-amber-400">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             The packs are live here, but the pricing page still shows the old ones until the
             15-minute reconcile runs.

@@ -338,14 +338,12 @@ function NotificationsPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
             <Bell className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              inbox
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Notifications</h1>
+            <p className="label-mono">inbox</p>
+            <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Notifications</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Full history of cascade outcomes, drift findings, and fleet activity.
             </p>
@@ -675,7 +673,7 @@ function MuteSummaryChip({
   return (
     <Link
       to="/settings/notifications"
-      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-warning transition-colors hover:bg-warning/20"
+      className="mt-2 inline-flex items-center gap-1.5 border border-warning/40 bg-warning/10 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-warning transition-colors hover:bg-warning/20"
       title="Manage notification preferences"
     >
       <BellMinus className="h-3 w-3" />

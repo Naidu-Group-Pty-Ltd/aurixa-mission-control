@@ -131,7 +131,7 @@ export function CascadeLineagePanel({ event }: { event: CascadeEvent }) {
   if (!loading && nodes && nodes.length <= 1) return null;
 
   return (
-    <Card className="border-border/80">
+    <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-sm">
           <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />

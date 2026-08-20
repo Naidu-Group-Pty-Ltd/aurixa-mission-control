@@ -59,7 +59,9 @@ type Report = {
 };
 
 const money = (cents: number | null, currency: string | null) =>
-  cents == null ? "—" : `${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })} ${currency ?? ""}`;
+  cents == null
+    ? "—"
+    : `${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })} ${currency ?? ""}`;
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
@@ -169,7 +171,7 @@ export function RestorePurchasesDialog() {
                 Nothing missing in this window — every checkout session already has a row.
               </p>
             ) : (
-              <div className="max-h-72 overflow-y-auto rounded-md border">
+              <div className="max-h-72 overflow-y-auto border">
                 <Table>
                   <TableHeader>
                     <TableRow>

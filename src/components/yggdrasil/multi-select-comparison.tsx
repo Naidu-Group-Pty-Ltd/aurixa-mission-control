@@ -43,7 +43,7 @@ export function MultiSelectComparisonPanel({ nodes, onClose, onRemoveNode }: Pro
 
   return (
     <motion.div
-      className="absolute bottom-4 right-4 z-40 w-96 rounded-xl border border-border/60 bg-card/95 p-4 shadow-2xl backdrop-blur-xl"
+      className="absolute bottom-4 right-4 z-40 w-96 border /95 p-4 shadow-2xl backdrop-blur-xl"
       initial={{ opacity: 0, x: 40, scale: 0.95 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 40, scale: 0.95 }}

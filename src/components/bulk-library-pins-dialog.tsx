@@ -229,7 +229,7 @@ export function BulkLibraryPinsDialog({
                 {selectedClones.size === clones.length ? "clear" : "select all"}
               </button>
             </div>
-            <ScrollArea className="h-64 rounded-md border border-border bg-card p-2">
+            <ScrollArea className="h-64 border border-border p-2">
               <div className="space-y-1">
                 {clones.map((c) => {
                   const cloneIssues = issuesByClone.get(c.id) ?? [];
@@ -237,7 +237,7 @@ export function BulkLibraryPinsDialog({
                   return (
                     <label
                       key={c.id}
-                      className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 text-xs hover:bg-surface"
+                      className="flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs hover:bg-surface"
                     >
                       <Checkbox
                         checked={checked}
@@ -287,7 +287,7 @@ export function BulkLibraryPinsDialog({
                 className="h-6 w-32 font-mono text-[10px]"
               />
             </div>
-            <ScrollArea className="h-64 rounded-md border border-border bg-card p-2">
+            <ScrollArea className="h-64 border border-border p-2">
               {loading ? (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -303,7 +303,7 @@ export function BulkLibraryPinsDialog({
                     const versions = bySlug.get(slug) ?? [];
                     const value = picks[slug] ?? "";
                     return (
-                      <div key={slug} className="flex items-center gap-2 rounded px-1.5 py-1">
+                      <div key={slug} className="flex items-center gap-2 px-1.5 py-1">
                         <code className="min-w-0 flex-1 truncate font-mono text-xs">{slug}</code>
                         <Select
                           value={value}
@@ -337,7 +337,7 @@ export function BulkLibraryPinsDialog({
         </div>
 
         {issues && issues.length > 0 && (
-          <div className="rounded-md border border-warning/40 bg-warning/5 p-2 text-[11px] text-warning">
+          <div className="border border-warning/40 bg-warning/5 p-2 text-[11px] text-warning">
             <div className="mb-1 font-medium">{issues.length} issue(s) detected:</div>
             <div className="space-y-0.5">
               {issues.slice(0, 6).map((i, idx) => (

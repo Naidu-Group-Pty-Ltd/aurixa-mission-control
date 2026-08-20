@@ -112,7 +112,7 @@ export function ScheduleRecentFires({ scheduleId }: { scheduleId: string }) {
             <Link
               to="/cascades/$eventId"
               params={{ eventId: e.id }}
-              className="group flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background/50 px-2.5 py-1.5 transition-colors hover:border-primary/40"
+              className="group flex items-center justify-between gap-2 border bg-background/50 px-2.5 py-1.5 transition-colors hover:border-primary/40"
             >
               <div className="flex min-w-0 items-center gap-2">
                 <Badge

@@ -196,7 +196,7 @@ export function YggdrasilTree({
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-xl border border-border/40 bg-background"
+      className="relative w-full overflow-hidden border border-border/40 bg-background"
       style={{ cursor: dragging ? "grabbing" : "grab" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -360,7 +360,7 @@ export function YggdrasilTree({
       </AnimatePresence>
 
       {multiSelectedIds.length === 1 && (
-        <div className="absolute bottom-4 right-4 z-30 rounded-lg border border-border/40 bg-card/80 px-3 py-2 backdrop-blur-lg">
+        <div className="absolute bottom-4 right-4 z-30 border border-border/40 /80 px-3 py-2 backdrop-blur-lg">
           <p className="font-mono text-[10px] text-muted-foreground">
             Shift+click another node to select range · Ctrl+click to add individually
           </p>

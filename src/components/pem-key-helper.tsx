@@ -195,7 +195,7 @@ export function PemKeyHelper() {
   const canVerify = effectiveKey.trim().includes("-----BEGIN PRIVATE KEY-----");
 
   return (
-    <Card className="border-border/60 bg-card/80 backdrop-blur">
+    <Card className="/80">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-mono tracking-wide">
           <Key className="h-4 w-4 text-primary" />
@@ -203,20 +203,19 @@ export function PemKeyHelper() {
         </CardTitle>
         <CardDescription className="text-xs">
           GitHub App keys are often downloaded in <strong>PKCS#1</strong> format (
-          <code className="rounded bg-muted px-1">BEGIN RSA PRIVATE KEY</code>). Our system requires{" "}
-          <strong>PKCS#8</strong> format (
-          <code className="rounded bg-muted px-1">BEGIN PRIVATE KEY</code>). Convert and verify here
-          before saving.
+          <code className="bg-muted px-1">BEGIN RSA PRIVATE KEY</code>). Our system requires{" "}
+          <strong>PKCS#8</strong> format (<code className="bg-muted px-1">BEGIN PRIVATE KEY</code>).
+          Convert and verify here before saving.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* OpenSSL command reference */}
-        <div className="rounded-md border border-border bg-muted/40 p-3 space-y-2">
+        <div className="border border-border bg-muted/40 p-3 space-y-2">
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
             <Terminal className="h-3.5 w-3.5" />
             OpenSSL command (alternative)
           </div>
-          <pre className="overflow-x-auto rounded bg-background/80 p-2 font-mono text-[11px] leading-relaxed text-foreground/90 select-all">
+          <pre className="overflow-x-auto bg-background/80 p-2 font-mono text-[11px] leading-relaxed text-foreground/90 select-all">
             {`openssl pkcs8 -topk8 -inform PEM \\
   -outform PEM -nocrypt \\
   -in your-github-app-key.pem \\
@@ -314,7 +313,7 @@ export function PemKeyHelper() {
 
         {/* Error */}
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+          <div className="flex items-start gap-2 border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
             <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {error}
           </div>

@@ -13,7 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -21,7 +27,6 @@ import {
   setAccountStage,
   logActivity,
   upsertContact,
-  upsertTask,
   recomputeHealth,
   LIFECYCLE_STAGES,
 } from "@/lib/crm.functions";
@@ -50,6 +55,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { FitReport } from "@/components/fit-report";
+import { RecordRow } from "@/components/record-row";
 import { getFitHistory, runFitAnalysis } from "@/lib/fit-analysis.functions";
 import { useServerAction } from "@/lib/use-server-action";
 
@@ -62,7 +68,9 @@ function AccountFitTab({ accountId }: { accountId: string }) {
   });
   const run = useServerAction(runFitAnalysis, {
     successMessage: (r: any) =>
-      r?.ok ? `Fit analysis complete — ${r.grade} (${Number(r.score).toFixed(0)}/100)` : "Analysis finished",
+      r?.ok
+        ? `Fit analysis complete — ${r.grade} (${Number(r.score).toFixed(0)}/100)`
+        : "Analysis finished",
     onSuccess: () => qc.invalidateQueries({ queryKey: ["account-fit", accountId] }),
   });
 
@@ -75,7 +83,11 @@ function AccountFitTab({ accountId }: { accountId: string }) {
             Cross-examines this client against the live Aurixa capability catalog.
           </p>
         </div>
-        <Button size="sm" disabled={run.isPending} onClick={() => run.execute({ data: { accountId } })}>
+        <Button
+          size="sm"
+          disabled={run.isPending}
+          onClick={() => run.execute({ data: { accountId } })}
+        >
           <RefreshCw className="mr-2 h-4 w-4" />
           {run.isPending ? "Analysing…" : fit.data?.latest ? "Re-run analysis" : "Run analysis"}
         </Button>
@@ -117,7 +129,6 @@ function AccountFitTab({ accountId }: { accountId: string }) {
     </div>
   );
 }
-
 
 export const Route = createFileRoute("/crm/accounts/$accountId")({
   component: () => (
@@ -179,15 +190,15 @@ function AccountHub() {
         eyebrow="client account"
         icon={<Building2 className="h-6 w-6" />}
         title={a.name}
-        description={
-          [
-            a.classification?.replace(/_/g, " "),
-            a.clones?.name ? `clone: ${a.clones.name}` : null,
-            a.last_contacted_at ? `last contact ${formatDistanceToNow(a.last_contacted_at)}` : "never contacted",
-          ]
-            .filter(Boolean)
-            .join(" · ")
-        }
+        description={[
+          a.classification?.replace(/_/g, " "),
+          a.clones?.name ? `clone: ${a.clones.name}` : null,
+          a.last_contacted_at
+            ? `last contact ${formatDistanceToNow(a.last_contacted_at)}`
+            : "never contacted",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         actions={
           <>
             <Select
@@ -226,7 +237,9 @@ function AccountHub() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Health</p>
+            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+              Health
+            </p>
             <p className="mt-1 flex items-center gap-2 text-3xl font-semibold">
               <HeartPulse className="h-5 w-5 text-muted-foreground" />
               {a.health_score ?? "—"}
@@ -235,13 +248,17 @@ function AccountHub() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">MRR</p>
+            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+              MRR
+            </p>
             <p className="mt-1 text-3xl font-semibold">{money(a.mrr_cents)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Open tickets</p>
+            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+              Open tickets
+            </p>
             <p className="mt-1 text-3xl font-semibold">
               {d.tickets.filter((t: any) => !["resolved", "closed"].includes(t.status)).length}
             </p>
@@ -249,7 +266,9 @@ function AccountHub() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Credits</p>
+            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+              Credits
+            </p>
             <p className="mt-1 text-3xl font-semibold">{d.billing.balance?.available ?? "—"}</p>
           </CardContent>
         </Card>
@@ -295,7 +314,11 @@ function AccountHub() {
                       {formatDistanceToNow(ev.occurred_at)}
                     </span>
                   </div>
-                  {ev.body && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{ev.body}</p>}
+                  {ev.body && (
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+                      {ev.body}
+                    </p>
+                  )}
                 </div>
               ))}
             </CardContent>
@@ -307,7 +330,7 @@ function AccountHub() {
           <ContactForm accountId={a.id} onDone={refresh} />
           <div className="grid gap-3 md:grid-cols-2">
             {d.contacts.map((c: any) => (
-              <Card key={c.id}>
+              <RecordRow key={c.id}>
                 <CardContent className="py-4">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">
@@ -319,7 +342,7 @@ function AccountHub() {
                   <p className="mt-1 text-sm">{c.email}</p>
                   <p className="text-sm text-muted-foreground">{c.phone}</p>
                 </CardContent>
-              </Card>
+              </RecordRow>
             ))}
           </div>
         </TabsContent>
@@ -329,16 +352,21 @@ function AccountHub() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Opportunities</CardTitle>
-              <CardDescription>Winning a deal creates the contract and onboarding checklist.</CardDescription>
+              <CardDescription>
+                Winning a deal creates the contract and onboarding checklist.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {d.deals.map((deal: any) => (
-                <div key={deal.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                <div
+                  key={deal.id}
+                  className="flex flex-wrap items-center justify-between gap-3 border p-3"
+                >
                   <div>
                     <p className="font-medium">{deal.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {money(deal.expected_mrr_cents)}/mo · {deal.seats} seats · {deal.probability}% ·{" "}
-                      {deal.tier_slug ?? "no tier"}
+                      {money(deal.expected_mrr_cents)}/mo · {deal.seats} seats · {deal.probability}%
+                      · {deal.tier_slug ?? "no tier"}
                     </p>
                   </div>
                   <Select
@@ -396,15 +424,19 @@ function AccountHub() {
             </CardHeader>
             <CardContent className="space-y-2">
               {d.onboarding.map((step: any) => (
-                <label key={step.id} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
+                <label key={step.id} className="flex items-center gap-3 border px-3 py-2 text-sm">
                   <Checkbox
                     checked={step.status === "done"}
                     onCheckedChange={async (v) => {
-                      await setOnboardingStep({ data: { id: step.id, status: v ? "done" : "pending" } });
+                      await setOnboardingStep({
+                        data: { id: step.id, status: v ? "done" : "pending" },
+                      });
                       refresh();
                     }}
                   />
-                  <span className={step.status === "done" ? "text-muted-foreground line-through" : ""}>
+                  <span
+                    className={step.status === "done" ? "text-muted-foreground line-through" : ""}
+                  >
                     {step.label}
                   </span>
                 </label>
@@ -418,18 +450,16 @@ function AccountHub() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Live billing</CardTitle>
-              <CardDescription>Read straight from Stripe purchases, invoices, credits and seats.</CardDescription>
+              <CardDescription>
+                Read straight from Stripe purchases, invoices, credits and seats.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Row label="Credit balance" value={d.billing.balance?.available ?? "—"} />
               <Row label="Reserved credits" value={d.billing.balance?.reserved ?? "—"} />
               <Row
                 label="Seats used"
-                value={
-                  d.billing.seats
-                    ? `${d.billing.seats.seats_used ?? 0}`
-                    : "no entitlement"
-                }
+                value={d.billing.seats ? `${d.billing.seats.seats_used ?? 0}` : "no entitlement"}
               />
               <Row label="Purchases recorded" value={d.billing.purchases.length} />
               <Row label="Invoices" value={d.billing.invoices.length} />
@@ -441,17 +471,24 @@ function AccountHub() {
             </CardHeader>
             <CardContent className="space-y-2">
               {d.billing.purchases.length === 0 && (
-                <p className="text-sm text-muted-foreground">No purchases linked to this account's clone.</p>
+                <p className="text-sm text-muted-foreground">
+                  No purchases linked to this account's clone.
+                </p>
               )}
               {d.billing.purchases.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between border px-3 py-2 text-sm"
+                >
                   <div>
                     <p className="font-medium">{p.item_name ?? p.item_slug ?? p.mode}</p>
                     <p className="text-xs text-muted-foreground">
                       {p.status} · {formatDistanceToNow(p.created_at)}
                     </p>
                   </div>
-                  <span className="font-mono">{money(p.amount_cents ?? 0, p.currency ?? "AUD")}</span>
+                  <span className="font-mono">
+                    {money(p.amount_cents ?? 0, p.currency ?? "AUD")}
+                  </span>
                 </div>
               ))}
             </CardContent>
@@ -463,7 +500,7 @@ function AccountHub() {
           <NewTicketForm accountId={a.id} onDone={refresh} />
           <div className="space-y-2">
             {d.tickets.map((t: any) => (
-              <Card key={t.id}>
+              <RecordRow key={t.id}>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div>
                     <p className="font-medium">{t.subject}</p>
@@ -472,11 +509,13 @@ function AccountHub() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={t.severity === "critical" ? "destructive" : "secondary"}>{t.severity}</Badge>
+                    <Badge variant={t.severity === "critical" ? "destructive" : "secondary"}>
+                      {t.severity}
+                    </Badge>
                     <Badge variant="outline">{t.status.replace(/_/g, " ")}</Badge>
                   </div>
                 </CardContent>
-              </Card>
+              </RecordRow>
             ))}
             {d.tickets.length === 0 && <p className="text-sm text-muted-foreground">No tickets.</p>}
           </div>
@@ -487,18 +526,27 @@ function AccountHub() {
           <NewDisputeForm accountId={a.id} onDone={refresh} />
           <div className="space-y-2">
             {d.disputes.map((x: any) => (
-              <Card key={x.id}>
+              <RecordRow key={x.id}>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div>
                     <p className="font-medium capitalize">{x.kind.replace(/_/g, " ")}</p>
                     <p className="text-xs text-muted-foreground">
-                      {money(x.amount_cents, x.currency)} · opened {formatDistanceToNow(x.opened_at)}
+                      {money(x.amount_cents, x.currency)} · opened{" "}
+                      {formatDistanceToNow(x.opened_at)}
                     </p>
                   </div>
                   <Select
                     value={x.status}
                     onValueChange={async (v) => {
-                      await upsertDispute({ data: { id: x.id, account_id: a.id, kind: x.kind, status: v, amount_cents: x.amount_cents } });
+                      await upsertDispute({
+                        data: {
+                          id: x.id,
+                          account_id: a.id,
+                          kind: x.kind,
+                          status: v,
+                          amount_cents: x.amount_cents,
+                        },
+                      });
                       refresh();
                     }}
                   >
@@ -506,7 +554,15 @@ function AccountHub() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["open", "under_review", "evidence_submitted", "won", "lost", "withdrawn", "settled"].map((s) => (
+                      {[
+                        "open",
+                        "under_review",
+                        "evidence_submitted",
+                        "won",
+                        "lost",
+                        "withdrawn",
+                        "settled",
+                      ].map((s) => (
                         <SelectItem key={s} value={s}>
                           {s.replace(/_/g, " ")}
                         </SelectItem>
@@ -514,9 +570,11 @@ function AccountHub() {
                     </SelectContent>
                   </Select>
                 </CardContent>
-              </Card>
+              </RecordRow>
             ))}
-            {d.disputes.length === 0 && <p className="text-sm text-muted-foreground">No disputes. Good.</p>}
+            {d.disputes.length === 0 && (
+              <p className="text-sm text-muted-foreground">No disputes. Good.</p>
+            )}
           </div>
         </TabsContent>
 
@@ -542,9 +600,14 @@ function AccountHub() {
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              {d.feedback.length === 0 && <p className="text-sm text-muted-foreground">No requests yet.</p>}
+              {d.feedback.length === 0 && (
+                <p className="text-sm text-muted-foreground">No requests yet.</p>
+              )}
               {d.feedback.map((f: any) => (
-                <div key={f.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                <div
+                  key={f.id}
+                  className="flex items-center justify-between border px-3 py-2 text-sm"
+                >
                   <span>
                     {f.channel} · requested {formatDistanceToNow(f.requested_at)}
                   </span>
@@ -628,7 +691,10 @@ function AccountHub() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {(offboarding.checklist ?? []).map((step: any, i: number) => (
-                  <label key={step.key} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
+                  <label
+                    key={step.key}
+                    className="flex items-center gap-3 border px-3 py-2 text-sm"
+                  >
                     <Checkbox
                       checked={step.done}
                       onCheckedChange={async (v) => {
@@ -639,7 +705,9 @@ function AccountHub() {
                         refresh();
                       }}
                     />
-                    <span className={step.done ? "text-muted-foreground line-through" : ""}>{step.label}</span>
+                    <span className={step.done ? "text-muted-foreground line-through" : ""}>
+                      {step.label}
+                    </span>
                   </label>
                 ))}
                 {offboarding.path === "ownership_transfer" && (
@@ -654,7 +722,7 @@ function AccountHub() {
                   </>
                 )}
                 {offboarding.export_manifest?.datasets && (
-                  <div className="mt-3 rounded-md border p-3">
+                  <div className="mt-3 border p-3">
                     <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                       Export manifest
                     </p>
@@ -703,7 +771,9 @@ function LogActivityCard({ accountId, onDone }: { accountId: string; onDone: () 
         <Button
           disabled={!title.trim()}
           onClick={async () => {
-            await logActivity({ data: { account_id: accountId, kind, title: title.trim(), body: body || null } });
+            await logActivity({
+              data: { account_id: accountId, kind, title: title.trim(), body: body || null },
+            });
             setTitle("");
             setBody("");
             toast.success("Logged");
@@ -718,7 +788,13 @@ function LogActivityCard({ accountId, onDone }: { accountId: string; onDone: () 
 }
 
 function ContactForm({ accountId, onDone }: { accountId: string; onDone: () => void }) {
-  const [f, setF] = useState({ first_name: "", last_name: "", email: "", phone: "", job_title: "" });
+  const [f, setF] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    job_title: "",
+  });
   const set = (k: string) => (e: any) => setF((p) => ({ ...p, [k]: e.target.value }));
   return (
     <Card>
@@ -760,8 +836,18 @@ function NewDealForm({ accountId, onDone }: { accountId: string; onDone: () => v
   const [mrr, setMrr] = useState("");
   return (
     <div className="flex flex-wrap gap-2 border-t pt-3">
-      <Input className="min-w-[200px] flex-1" placeholder="Deal name" value={name} onChange={(e) => setName(e.target.value)} />
-      <Input className="w-40" placeholder="MRR (AUD)" value={mrr} onChange={(e) => setMrr(e.target.value)} />
+      <Input
+        className="min-w-[200px] flex-1"
+        placeholder="Deal name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <Input
+        className="w-40"
+        placeholder="MRR (AUD)"
+        value={mrr}
+        onChange={(e) => setMrr(e.target.value)}
+      />
       <Button
         disabled={!name.trim()}
         onClick={async () => {
@@ -806,7 +892,10 @@ function ContractCard({ accountId, contract, onDone }: any) {
         </div>
         <div className="space-y-1.5">
           <Label>Committed seats</Label>
-          <Input value={f.committed_seats} onChange={(e) => setF({ ...f, committed_seats: e.target.value })} />
+          <Input
+            value={f.committed_seats}
+            onChange={(e) => setF({ ...f, committed_seats: e.target.value })}
+          />
         </div>
         <div className="space-y-1.5">
           <Label>MRR (AUD)</Label>
@@ -814,7 +903,11 @@ function ContractCard({ accountId, contract, onDone }: any) {
         </div>
         <div className="space-y-1.5">
           <Label>Term end</Label>
-          <Input type="date" value={f.term_end ?? ""} onChange={(e) => setF({ ...f, term_end: e.target.value })} />
+          <Input
+            type="date"
+            value={f.term_end ?? ""}
+            onChange={(e) => setF({ ...f, term_end: e.target.value })}
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Notice period (days)</Label>
@@ -869,7 +962,12 @@ function NewTicketForm({ accountId, onDone }: { accountId: string; onDone: () =>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap gap-2">
-          <Input className="min-w-[220px] flex-1" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+          <Input
+            className="min-w-[220px] flex-1"
+            placeholder="Subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+          />
           <Select value={type} onValueChange={setType}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
@@ -895,12 +993,22 @@ function NewTicketForm({ accountId, onDone }: { accountId: string; onDone: () =>
             </SelectContent>
           </Select>
         </div>
-        <Textarea placeholder="What happened?" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <Textarea
+          placeholder="What happened?"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
         <Button
           disabled={!subject.trim()}
           onClick={async () => {
             await createTicket({
-              data: { account_id: accountId, subject: subject.trim(), type, severity, description: description || null },
+              data: {
+                account_id: accountId,
+                subject: subject.trim(),
+                type,
+                severity,
+                description: description || null,
+              },
             });
             setSubject("");
             setDescription("");
@@ -932,16 +1040,27 @@ function NewDisputeForm({ accountId, onDone }: { accountId: string; onDone: () =
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {["chargeback", "billing_disagreement", "service_credit", "contractual", "other"].map((k) => (
-                <SelectItem key={k} value={k}>
-                  {k.replace(/_/g, " ")}
-                </SelectItem>
-              ))}
+              {["chargeback", "billing_disagreement", "service_credit", "contractual", "other"].map(
+                (k) => (
+                  <SelectItem key={k} value={k}>
+                    {k.replace(/_/g, " ")}
+                  </SelectItem>
+                ),
+              )}
             </SelectContent>
           </Select>
-          <Input className="w-40" placeholder="Amount (AUD)" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input
+            className="w-40"
+            placeholder="Amount (AUD)"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
         </div>
-        <Textarea placeholder="Summary of the disagreement" value={summary} onChange={(e) => setSummary(e.target.value)} />
+        <Textarea
+          placeholder="Summary of the disagreement"
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+        />
         <Button
           onClick={async () => {
             await upsertDispute({
@@ -978,8 +1097,8 @@ function ChurnForm({ accountId, contractId, onDone }: any) {
           <DoorOpen className="h-4 w-4" /> Record cancellation
         </CardTitle>
         <CardDescription>
-          Creates the churn record and a governed offboarding checklist, including the data-portability
-          path and the 90-day retention clock.
+          Creates the churn record and a governed offboarding checklist, including the
+          data-portability path and the 90-day retention clock.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -1013,7 +1132,11 @@ function ChurnForm({ accountId, contractId, onDone }: any) {
             onChange={(e) => setCompetitor(e.target.value)}
           />
         </div>
-        <Textarea placeholder="What they told us" value={detail} onChange={(e) => setDetail(e.target.value)} />
+        <Textarea
+          placeholder="What they told us"
+          value={detail}
+          onChange={(e) => setDetail(e.target.value)}
+        />
         <label className="flex items-center gap-2 text-sm">
           <Checkbox checked={saveAttempted} onCheckedChange={(v) => setSaveAttempted(Boolean(v))} />
           A save attempt was made

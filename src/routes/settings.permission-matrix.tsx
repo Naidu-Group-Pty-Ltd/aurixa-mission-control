@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RecordRow } from "@/components/record-row";
 import {
   Crown,
   Gem,
@@ -75,13 +76,13 @@ const PERMISSIONS: PermissionRow[] = [
       type: "trigger",
       label: "guard_singular_high_king + hierarchy",
       detail:
-        "assignRole() explicitly blocks role='high_king'. DB trigger guard_singular_high_king() rejects granting the seat while occupied, and can_assign_role() requires level > 1000, which no role has. Succession is a deliberate database operation.",
+        "assignRole() explicitly blocks role='high_king'. DB trigger guard_singular_high_king() rejects granting the seat while occupied, and can_assign_role() requires level> 1000, which no role has. Succession is a deliberate database operation.",
     },
   },
   {
     category: "Role Management",
     capability: "Assign super_admin",
-    description: "Only the High King (level 1000 > 100)",
+    description: "Only the High King (level 1000> 100)",
     access: {
       high_king: "full",
       super_admin: "none",
@@ -93,7 +94,7 @@ const PERMISSIONS: PermissionRow[] = [
       type: "function",
       label: "can_assign_role(_assigner, 'super_admin')",
       detail:
-        "RLS INSERT policy on user_roles: WITH CHECK (can_assign_role(auth.uid(), role) AND assigned_by = auth.uid()). The function checks highest_role_level(assigner) > role_level('super_admin'=100). Only the High King (level 1000) passes.",
+        "RLS INSERT policy on user_roles: WITH CHECK (can_assign_role(auth.uid(), role) AND assigned_by = auth.uid()). The function checks highest_role_level(assigner)> role_level('super_admin'=100). Only the High King (level 1000) passes.",
     },
   },
   {
@@ -117,7 +118,7 @@ const PERMISSIONS: PermissionRow[] = [
   {
     category: "Role Management",
     capability: "Assign admin",
-    description: "Super_admin+ (level 100+ > 80)",
+    description: "Super_admin+ (level 100+> 80)",
     access: {
       high_king: "full",
       super_admin: "full",
@@ -129,13 +130,13 @@ const PERMISSIONS: PermissionRow[] = [
       type: "function",
       label: "can_assign_role(_assigner, 'admin')",
       detail:
-        "RLS INSERT policy on user_roles: WITH CHECK (can_assign_role(auth.uid(), role) AND assigned_by = auth.uid()). The function checks highest_role_level(assigner) > role_level('admin'=80). Levels 100 (super_admin) and 1000 (high_king) pass.",
+        "RLS INSERT policy on user_roles: WITH CHECK (can_assign_role(auth.uid(), role) AND assigned_by = auth.uid()). The function checks highest_role_level(assigner)> role_level('admin'=80). Levels 100 (super_admin) and 1000 (high_king) pass.",
     },
   },
   {
     category: "Role Management",
     capability: "Assign operator",
-    description: "Admin+ can assign operator (level 80+ > 50)",
+    description: "Admin+ can assign operator (level 80+> 50)",
     access: {
       high_king: "full",
       super_admin: "full",
@@ -153,7 +154,7 @@ const PERMISSIONS: PermissionRow[] = [
   {
     category: "Role Management",
     capability: "Assign user",
-    description: "Operator+ can assign user (level 50+ > 10)",
+    description: "Operator+ can assign user (level 50+> 10)",
     access: {
       high_king: "full",
       super_admin: "full",
@@ -183,7 +184,7 @@ const PERMISSIONS: PermissionRow[] = [
       type: "rls",
       label: "RLS DELETE + guard_last_high_king trigger",
       detail:
-        "RLS DELETE policy: USING can_manage_user(auth.uid(), user_id) — checks highest_role_level(manager) > highest_role_level(target). The High King outranks every tier; everyone else is hierarchy-scoped. DB trigger guard_last_high_king() raises an exception if the High King seat would be vacated.",
+        "RLS DELETE policy: USING can_manage_user(auth.uid(), user_id) — checks highest_role_level(manager)> highest_role_level(target). The High King outranks every tier; everyone else is hierarchy-scoped. DB trigger guard_last_high_king() raises an exception if the High King seat would be vacated.",
     },
   },
   {
@@ -561,7 +562,7 @@ function CapCell({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="group relative flex justify-center w-full py-1 rounded hover:bg-muted/50 transition-colors cursor-pointer"
+          className="group relative flex justify-center w-full py-1 hover:bg-muted/50 transition-colors cursor-pointer"
         >
           {icon}
           <Info className="absolute top-0 right-0 h-2.5 w-2.5 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -588,14 +589,12 @@ function PermissionMatrixPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
           <Grid3x3 className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            rbac matrix
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Permission Matrix</h1>
+          <p className="label-mono">rbac matrix</p>
+          <h1 className="mt-1 font-display text-[1.75rem] leading-[1.1]">Permission Matrix</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             What each role can do inside the dashboard. Click any cell to see the exact backend rule
             that grants or blocks access.
@@ -622,7 +621,7 @@ function PermissionMatrixPage() {
       </Card>
 
       {categories.map((cat) => (
-        <Card key={cat}>
+        <RecordRow key={cat}>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">{cat}</CardTitle>
           </CardHeader>
@@ -672,10 +671,7 @@ function PermissionMatrixPage() {
                     <TableCell className="text-center">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="p-1 rounded hover:bg-muted/50 transition-colors"
-                          >
+                          <button type="button" className="p-1 hover:bg-muted/50 transition-colors">
                             {(() => {
                               const EnfIcon = ENFORCEMENT_ICONS[perm.enforcement.type] ?? Lock;
                               const enfColor =
@@ -714,7 +710,7 @@ function PermissionMatrixPage() {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
+        </RecordRow>
       ))}
     </div>
   );

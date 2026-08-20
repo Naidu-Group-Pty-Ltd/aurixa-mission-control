@@ -65,11 +65,7 @@ function Sparkline({ series }: { series: number[] }) {
   return (
     <div className="flex h-16 items-end gap-[2px]">
       {series.map((v, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-sm bg-primary/70"
-          style={{ height: `${(v / max) * 100}%` }}
-        />
+        <div key={i} className="flex-1 bg-primary/70" style={{ height: `${(v / max) * 100}%` }} />
       ))}
     </div>
   );

@@ -144,10 +144,7 @@ export function AuditLogDetailDrawer({
                 ) : (
                   <dl className="mt-1.5 space-y-1.5">
                     {metaEntries.map(([k, v]) => (
-                      <div
-                        key={k}
-                        className="rounded-md border border-border/60 bg-surface px-2.5 py-1.5"
-                      >
+                      <div key={k} className="border bg-surface px-2.5 py-1.5">
                         <dt className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                           {k}
                         </dt>

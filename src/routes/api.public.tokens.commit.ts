@@ -3,7 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { jsonResponse, resolveCloneApiKey } from "@/server/clone-api-keys.server";
 import { checkRateLimit } from "@/server/token-rate-limit.server";
-import { fireTokenWebhook, balanceSnapshot } from "@/server/token-webhooks.server";
+import { balanceSnapshot } from "@/server/token-webhooks.server";
 
 const Schema = z.object({
   job_id: z.string().uuid(),

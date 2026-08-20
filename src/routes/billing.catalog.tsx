@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/protected-route";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import { PackSyncCard } from "@/components/billing/pack-sync-card";
 import { ModuleSyncCard } from "@/components/billing/module-sync-card";
 import { FeedbackCard } from "@/components/billing/feedback-card";
 import { StorefrontAccessCard } from "@/components/billing/storefront-access-card";
+import { RecordRow } from "@/components/record-row";
 
 const SearchSchema = z.object({ tenant: z.string().uuid().optional() });
 
@@ -97,7 +98,7 @@ function CatalogPage() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <Receipt className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-bold">Pricing Catalog</h1>
+            <h1 className="font-display text-[2.125rem] leading-[1.05]">Pricing Catalog</h1>
           </div>
           <p className="text-muted-foreground">
             Aurixa Systems — seat roles, add-on modules, setup packages, and per-report credit
@@ -154,7 +155,7 @@ function CatalogPage() {
             </p>
             <div className="grid gap-4 md:grid-cols-3">
               {data.roles.map((r: any) => (
-                <Card key={r.id}>
+                <RecordRow key={r.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>{r.name}</CardTitle>
@@ -179,7 +180,7 @@ function CatalogPage() {
                       ))}
                     </ul>
                   </CardContent>
-                </Card>
+                </RecordRow>
               ))}
             </div>
           </section>
@@ -195,7 +196,7 @@ function CatalogPage() {
             </p>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {data.addons.map((a: any) => (
-                <Card key={a.id}>
+                <RecordRow key={a.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">{a.name}</CardTitle>
@@ -221,7 +222,7 @@ function CatalogPage() {
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </RecordRow>
               ))}
             </div>
           </section>
@@ -237,7 +238,7 @@ function CatalogPage() {
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               {data.setups.map((s: any) => (
-                <Card key={s.id}>
+                <RecordRow key={s.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">{s.name}</CardTitle>
@@ -279,7 +280,7 @@ function CatalogPage() {
                           : "Stripe not linked"}
                     </Button>
                   </CardContent>
-                </Card>
+                </RecordRow>
               ))}
             </div>
           </section>

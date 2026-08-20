@@ -153,7 +153,7 @@ export function CloneSyncStatusCard({ clone }: { clone: Clone }) {
           </Tile>
         </div>
 
-        <div className="rounded-md border border-border bg-surface p-3">
+        <div className="border border-border bg-surface p-3">
           <div className="mb-2 flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               latest cascade run
@@ -244,7 +244,7 @@ export function CloneSyncStatusCard({ clone }: { clone: Clone }) {
 
 function Tile({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <div className="border border-border bg-surface p-3">
       <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         {label}
       </div>

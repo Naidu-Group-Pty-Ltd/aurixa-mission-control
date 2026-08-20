@@ -16,7 +16,6 @@ import {
   createClientSupabaseAccount,
   revokeClientSupabaseAccount,
   verifyClientSupabaseAccount,
-  updateClientSupabaseAccount,
   rotateClientSupabasePat,
 } from "@/lib/client-supabase-accounts.functions";
 
@@ -105,7 +104,7 @@ function ClientAccountsPage() {
   return (
     <div className="container mx-auto p-6 space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-semibold">Client Supabase Accounts</h1>
+        <h1 className="font-display text-[1.75rem] leading-[1.1]">Client Supabase Accounts</h1>
         <p className="text-sm text-muted-foreground">
           Captured client-org credentials used by the handoff orchestrator. PATs are encrypted at
           rest and never returned to the browser after capture.
@@ -187,7 +186,7 @@ function ClientAccountsPage() {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : q.data && q.data.length > 0 ? (
             q.data.map((a: any) => (
-              <div key={a.id} className="border rounded-lg p-4 space-y-2">
+              <div key={a.id} className="border p-4 space-y-2">
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-medium">{a.owner_email}</div>

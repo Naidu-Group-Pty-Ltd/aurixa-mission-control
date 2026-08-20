@@ -7,13 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import {
   Boxes,
-  Sparkles,
   Check,
-  X,
   Pencil,
   History,
   Settings2,
-  Zap,
   AlertTriangle,
   Search,
   ChevronDown,
@@ -28,7 +25,6 @@ import {
   Rocket,
   XCircle,
   Loader2,
-  ExternalLink,
   Library,
   BookOpen,
   FileCode,
@@ -88,7 +84,6 @@ import {
   resolveDriftAlert,
   getModuleIntelligence,
   approveAndDeploy,
-  getModuleCascadeJobs,
   publishToLibrary,
   getModuleLibrary,
   removeFromLibrary,
@@ -102,6 +97,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FleetModuleSyncCard } from "@/components/fleet-module-sync-card";
 import { ModuleCoverageStrip } from "@/components/module-coverage-strip";
 import { ModuleDependencyGraphButton } from "@/components/module-dependency-graph";
+import { MetricCell } from "@/components/metric-bar";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "@/lib/format";
@@ -253,10 +249,8 @@ function ModulesPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            module catalog
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Modules</h1>
+          <p className="label-mono">module catalog</p>
+          <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Modules</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Feature-first detection: the repo is partitioned into product domains, each owning its
             files exactly once, plus the edge functions, schema and secrets behind them.
@@ -333,7 +327,7 @@ function ModulesPage() {
         <>
           {/* Stats strip */}
           {modules.length > 0 && (
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="glass grid overflow-hidden md:grid-cols-4">
               <StatTile label="total" value={counts.total} />
               <StatTile label="proposed" value={counts.proposed} tone="warning" />
               <StatTile label="approved" value={counts.approved} tone="success" />
@@ -426,7 +420,7 @@ function ModulesPage() {
                 ))}
               </div>
               {filteredModules.length === 0 && (
-                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
                   No modules match your filters.
                 </div>
               )}
@@ -709,7 +703,7 @@ function DetectionHistoryPanel() {
         {loadingRuns ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
         ) : runs.length === 0 ? (
-          <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+          <div className="border border-dashed p-4 text-center text-xs text-muted-foreground">
             No detection runs yet.
           </div>
         ) : (
@@ -753,7 +747,7 @@ function DetectionRunRow({
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="flex items-stretch gap-1">
         <CollapsibleTrigger asChild>
-          <div className="flex flex-1 cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 transition-colors hover:bg-muted/40">
+          <div className="flex flex-1 cursor-pointer items-center gap-3 border border-border px-3 py-2 transition-colors hover:bg-muted/40">
             <ChevronDown
               className={cn(
                 "h-3.5 w-3.5 text-muted-foreground transition-transform",
@@ -808,7 +802,7 @@ function DetectionRunRow({
       <CollapsibleContent>
         <div className="ml-8 mt-2 space-y-2 border-l-2 border-border pl-4">
           {typeof r.error_message === "string" && r.error_message && (
-            <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-2 text-xs text-destructive">
+            <div className="flex items-start gap-2 border border-destructive/20 bg-destructive/5 p-2 text-xs text-destructive">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
               <span>{r.error_message}</span>
             </div>
@@ -819,7 +813,7 @@ function DetectionRunRow({
                 AI passes
               </div>
               {passes.map((p) => (
-                <div key={p.pass} className="rounded-md border border-border bg-card p-2 text-xs">
+                <div key={p.pass} className="border border-border p-2 text-xs">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="font-mono text-[9px]">
                       Pass {p.pass}
@@ -908,7 +902,7 @@ function DriftAlertsPanel() {
         {loadingAlerts ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
         ) : alerts.length === 0 ? (
-          <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+          <div className="border border-dashed p-4 text-center text-xs text-muted-foreground">
             <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-success" />
             No unresolved drift alerts.
           </div>
@@ -917,7 +911,7 @@ function DriftAlertsPanel() {
             {alerts.map((a) => (
               <div
                 key={a.id as string}
-                className="flex items-start gap-3 rounded-md border border-warning/20 bg-warning/5 px-3 py-2 text-xs"
+                className="flex items-start gap-3 border border-warning/20 bg-warning/5 px-3 py-2 text-xs"
               >
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
                 <div className="flex-1 min-w-0">
@@ -1007,7 +1001,7 @@ function ModuleIntelligencePanel() {
               ) : (
                 <div className="space-y-1.5">
                   {data.healthScores.map((h) => (
-                    <div key={h.moduleId} className="rounded-md border border-border px-3 py-2">
+                    <div key={h.moduleId} className="border border-border px-3 py-2">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-xs font-medium">{h.moduleName}</span>
                         <Badge
@@ -1063,7 +1057,7 @@ function ModuleIntelligencePanel() {
                   {data.coInstallation.map((p, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs"
+                      className="flex items-center gap-2 border border-border px-3 py-2 text-xs"
                     >
                       <code className="font-mono text-[10px]">{p.module_a}</code>
                       <span className="text-muted-foreground">×</span>
@@ -1098,24 +1092,7 @@ function StatTile({
   value: number;
   tone?: "success" | "warning" | "destructive";
 }) {
-  const toneCls =
-    tone === "success"
-      ? "text-success"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "destructive"
-          ? "text-destructive"
-          : "text-foreground";
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </div>
-        <div className={`mt-1 text-2xl font-semibold ${toneCls}`}>{value}</div>
-      </CardContent>
-    </Card>
-  );
+  return <MetricCell label={label} value={value} tone={tone} alarm={Boolean(tone)} />;
 }
 
 // ─── Module Row ─────────────────────────────────────────────────────
@@ -1294,7 +1271,7 @@ function ModuleRow({
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="mt-1.5 rounded-md border border-primary/20 bg-primary/5 p-2.5 text-xs text-muted-foreground">
+              <div className="mt-1.5 border border-primary/20 bg-primary/5 p-2.5 text-xs text-muted-foreground">
                 {reasoning}
               </div>
             </CollapsibleContent>
@@ -1309,7 +1286,7 @@ function ModuleRow({
           </div>
           <div className="flex flex-wrap gap-1">
             {(m.routes ?? []).map((r) => (
-              <code key={r} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+              <code key={r} className="bg-muted px-1.5 py-0.5 font-mono text-[11px]">
                 {r}
               </code>
             ))}
@@ -1321,7 +1298,7 @@ function ModuleRow({
           </div>
           <div className="flex flex-wrap gap-1">
             {(m.file_globs ?? []).slice(0, 3).map((f) => (
-              <code key={f} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+              <code key={f} className="bg-muted px-1.5 py-0.5 font-mono text-[11px]">
                 {f}
               </code>
             ))}
@@ -1582,14 +1559,14 @@ function ApproveAndDeployButton({
                 {selectedCloneIds.size === clones.length ? "Deselect all" : "Select all"}
               </Button>
             </div>
-            <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border border-border p-2">
+            <div className="max-h-48 overflow-y-auto space-y-1 border border-border p-2">
               {clones.length === 0 ? (
                 <div className="text-xs text-muted-foreground p-2">No clones available</div>
               ) : (
                 clones.map((c) => (
                   <label
                     key={c.id}
-                    className="flex items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted/40 cursor-pointer"
+                    className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted/40 cursor-pointer"
                   >
                     <Checkbox
                       checked={selectedCloneIds.has(c.id)}
@@ -1816,7 +1793,7 @@ function ModuleLibraryPanel() {
       </div>
 
       {selected.size > 0 && isAdmin && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 p-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border border-primary/40 bg-primary/5 p-2">
           <span className="font-mono text-xs text-muted-foreground">
             {selected.size} entry{selected.size === 1 ? "" : "s"} selected
           </span>
@@ -2010,7 +1987,7 @@ function ModuleLibraryPanel() {
                     </p>
                   ) : null}
                   {(e.deprecated_at as string | null) ? (
-                    <div className="rounded border border-warning/40 bg-warning/5 p-2 text-[11px]">
+                    <div className="border border-warning/40 bg-warning/5 p-2 text-[11px]">
                       <div className="font-mono uppercase tracking-wider text-warning">
                         Deprecated
                       </div>

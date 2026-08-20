@@ -9,6 +9,7 @@ import { getPrimeOrgCapacity } from "@/lib/org-capacity.functions";
 import { ArrowRightLeft, Plus, Gauge, AlertTriangle, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { CardRowSkeleton } from "@/components/list-skeletons";
+import { RecordRow } from "@/components/record-row";
 
 export const Route = createFileRoute("/handoffs")({
   component: () => (
@@ -45,7 +46,7 @@ function HandoffsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <h1 className="font-display text-[1.75rem] leading-[1.1] flex items-center gap-2">
             <ArrowRightLeft className="h-6 w-6" /> Client Handoffs
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -134,7 +135,7 @@ function HandoffsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {rows.map((h: any) => (
-          <Card key={h.id}>
+          <RecordRow key={h.id}>
             <CardHeader>
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -157,7 +158,7 @@ function HandoffsPage() {
                 Open →
               </Link>
             </CardContent>
-          </Card>
+          </RecordRow>
         ))}
       </div>
     </div>

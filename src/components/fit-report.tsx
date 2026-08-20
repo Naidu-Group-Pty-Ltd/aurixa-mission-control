@@ -194,7 +194,7 @@ function ScoreProvenance({ analysis }: { analysis: any }) {
           invented.length > 0 ||
           veto.configured === false ||
           integrity.failed_samples > 0) && (
-          <div className="space-y-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+          <div className="space-y-1.5 border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
             {skipped.length > 0 && (
               <p>
                 <span className="font-medium">Not assessed:</span> {skipped.join(", ")}. Excluded
@@ -271,7 +271,7 @@ function Metric({
           ? "text-destructive"
           : "text-foreground";
   return (
-    <div className="rounded-md border p-2.5" title={hint}>
+    <div className="border p-2.5" title={hint}>
       <div className={cn("text-xl font-semibold tabular-nums tracking-tight", toneClass)}>
         {value}
       </div>
@@ -360,7 +360,7 @@ export function FitReport({ analysis, dimensions }: { analysis: any; dimensions:
           </CardHeader>
           <CardContent className="space-y-3">
             {analysis.correlation_map.map((c: any, i: number) => (
-              <div key={i} className="rounded-lg border p-3">
+              <div key={i} className="border p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{c.pain_point}</span>
                   <Badge variant="outline" className="font-mono text-[10px]">

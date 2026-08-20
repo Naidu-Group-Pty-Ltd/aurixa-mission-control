@@ -69,12 +69,12 @@ export function CascadeTriageCard({
       </CardHeader>
       <CardContent className="space-y-2">
         {!proposals && (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
             Click <span className="font-mono">Triage</span> to ask AI for fix proposals.
           </div>
         )}
         {proposals?.length === 0 && (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
             AI returned no actionable proposals.
           </div>
         )}
@@ -125,7 +125,7 @@ function ProposalRow({ proposal }: { proposal: TriageProposal }) {
             />
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3 space-y-2 border-t border-border/60 pt-3">
+        <CollapsibleContent className="mt-3 space-y-2 border-t pt-3">
           <p className="text-sm text-muted-foreground">{proposal.rationale}</p>
           {proposal.steps.length > 0 && (
             <div className="font-mono text-xs">

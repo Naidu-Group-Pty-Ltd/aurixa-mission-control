@@ -30,6 +30,7 @@ import { bulkDeleteSchedules, bulkUpdateSchedules } from "@/server/bulk-ops.func
 import { describeCron } from "@/lib/cron";
 import { formatDistanceToNow } from "@/lib/format";
 import { ScheduleRecentFires } from "@/components/schedule-recent-fires";
+import { RecordRow } from "@/components/record-row";
 
 export const Route = createFileRoute("/schedules")({
   component: () => (
@@ -110,10 +111,8 @@ function SchedulesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-          recurring jobs
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Schedules</h1>
+        <p className="label-mono">recurring jobs</p>
+        <h1 className="mt-1 font-display text-[2.125rem] leading-[1.05]">Schedules</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Cron-driven cascades and module syncs. Times in UTC.
         </p>
@@ -229,7 +228,7 @@ function SchedulesPage() {
           </Card>
         ) : (
           list.map((s) => (
-            <Card key={s.id}>
+            <RecordRow key={s.id}>
               <CardContent className="space-y-3 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -247,7 +246,7 @@ function SchedulesPage() {
                         <Badge variant="outline" className="text-[10px] uppercase">
                           {s.mode.replace("_", " ")}
                         </Badge>
-                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+                        <code className="bg-muted px-1.5 py-0.5 font-mono text-[11px]">
                           {s.cron_expression}
                         </code>
                       </div>
@@ -313,11 +312,11 @@ function SchedulesPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="border-t border-border/60 pt-3">
+                <div className="border-t pt-3">
                   <ScheduleRecentFires scheduleId={s.id} />
                 </div>
               </CardContent>
-            </Card>
+            </RecordRow>
           ))
         )}
       </section>

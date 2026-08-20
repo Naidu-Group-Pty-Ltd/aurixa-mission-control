@@ -24,6 +24,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MetricCell } from "@/components/metric-bar";
+import { RecordRow } from "@/components/record-row";
 import {
   Shield,
   Lock,
@@ -133,14 +135,12 @@ function CloudflarePage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-info/15 ring-1 ring-info/40">
+        <div className="flex h-10 w-10 items-center justify-center bg-info/15 ring-1 ring-info/40">
           <Shield className="h-5 w-5 text-info" />
         </div>
         <div className="flex-1">
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            edge
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">Cloudflare</h1>
+          <p className="label-mono">edge</p>
+          <h1 className="font-display text-[2.125rem] leading-[1.05]">Cloudflare</h1>
           <p className="text-sm text-muted-foreground">
             Per-clone WAF, bot, and rate-limit control via the Cloudflare v4 API.
           </p>
@@ -190,19 +190,19 @@ function CloudflarePage() {
       {/* Capabilities */}
       <div className="grid gap-3 md:grid-cols-4">
         {CAPS.map((c) => (
-          <Card key={c.label} className="bg-card">
+          <RecordRow key={c.label}>
             <CardContent className="p-5">
               <c.icon className="mb-3 h-5 w-5 text-info" />
               <div className="font-mono text-sm font-semibold">{c.label}</div>
               <div className="mt-1 text-xs text-muted-foreground">{c.desc}</div>
             </CardContent>
-          </Card>
+          </RecordRow>
         ))}
       </div>
 
       {/* Fleet totals */}
       {tokenQ.data?.valid && (
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="glass grid overflow-hidden md:grid-cols-3">
           <StatCard label="24h requests" value={totals.requests.toLocaleString()} />
           <StatCard
             label="24h threats blocked"
@@ -242,7 +242,7 @@ function CloudflarePage() {
         </CardHeader>
         <CardContent>
           {attached.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="border border-dashed p-6 text-center text-sm text-muted-foreground">
               No clones wrapped yet. Attach a zone via API token, or seed one manually — both are
               optional.
             </div>
@@ -254,7 +254,7 @@ function CloudflarePage() {
                 return (
                   <div
                     key={cfg.clone_id}
-                    className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 md:flex-row md:items-center"
+                    className="flex flex-col gap-3 border border-border bg-surface p-4 md:flex-row md:items-center"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -307,7 +307,7 @@ function CloudflarePage() {
       </Card>
 
       {tokenQ.data?.error && (
-        <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <div className="flex items-start gap-2 border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{tokenQ.data.error}</span>
         </div>
@@ -318,18 +318,7 @@ function CloudflarePage() {
 
 function StatCard({ label, value, accent }: { label: string; value: string; accent?: "warning" }) {
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </div>
-        <div
-          className={`mt-1 text-2xl font-semibold ${accent === "warning" ? "text-warning" : ""}`}
-        >
-          {value}
-        </div>
-      </CardContent>
-    </Card>
+    <MetricCell label={label} value={value} size="sm" tone="warning" alarm={accent === "warning"} />
   );
 }
 

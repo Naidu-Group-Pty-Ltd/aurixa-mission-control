@@ -108,7 +108,7 @@ export function RatesTab() {
                 }
               />
               <textarea
-                className="min-h-[100px] rounded border border-border bg-background p-2 font-mono text-xs"
+                className="min-h-[100px] border border-border bg-background p-2 font-mono text-xs"
                 placeholder='Per-unit JSON, e.g. {"page": 5, "ai_token": 0.01}'
                 value={draft.per_unit_json ?? JSON.stringify(draft.per_unit ?? {})}
                 onChange={(e) => setDraft({ ...draft, per_unit_json: e.target.value })}

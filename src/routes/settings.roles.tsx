@@ -177,14 +177,12 @@ function RolesPage() {
     <div className="space-y-6">
       <header className="flex items-end justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+          <div className="flex h-10 w-10 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
             <Shield className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              access control
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Role Management</h1>
+            <p className="label-mono">access control</p>
+            <h1 className="mt-1 font-display text-[1.75rem] leading-[1.1]">Role Management</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Your level: <span className="font-mono text-foreground">{myLevel}</span> — you can
               assign roles below level {myLevel}
@@ -460,7 +458,7 @@ function UserRow({
             return (
               <div
                 key={r.id}
-                className="group flex items-center gap-1.5 rounded-md border border-border/60 bg-surface px-2 py-1"
+                className="group flex items-center gap-1.5 border bg-surface px-2 py-1"
               >
                 <Icon className={cn("h-3.5 w-3.5", meta.color)} />
                 <span className="text-xs font-medium">{meta.label}</span>
@@ -576,7 +574,7 @@ function UserRow({
                     </SelectContent>
                   </Select>
                   {selectedRole && (
-                    <div className="flex items-center gap-2 rounded-md border border-info/30 bg-info/5 px-3 py-2 text-xs text-info">
+                    <div className="flex items-center gap-2 border border-info/30 bg-info/5 px-3 py-2 text-xs text-info">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                       <span>
                         This grants <strong>{ROLE_META[selectedRole as AppRole]?.label}</strong>{" "}
@@ -616,7 +614,7 @@ function UserRow({
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm">
+                <div className="flex items-center gap-2 border border-border bg-surface px-3 py-2 text-sm">
                   <span className="font-mono text-xs text-muted-foreground">
                     {confirm?.from ? ROLE_META[confirm.from].label : "No role"}
                   </span>

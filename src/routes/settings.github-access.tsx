@@ -27,7 +27,7 @@ function Page() {
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
+        <h1 className="font-display text-[1.75rem] leading-[1.1] flex items-center gap-2">
           <Github className="h-5 w-5" /> GitHub App access
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -57,7 +57,7 @@ function Page() {
                 </Badge>
               </div>
               {r.failing.length > 0 && (
-                <ul className="text-xs space-y-1 rounded border p-2 max-h-96 overflow-auto">
+                <ul className="text-xs space-y-1 border p-2 max-h-96 overflow-auto">
                   {r.failing.map((f: any) => (
                     <li key={f.clone_id} className="border-b py-1">
                       <div className="flex justify-between">

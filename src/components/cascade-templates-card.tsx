@@ -237,7 +237,7 @@ export function CascadeTemplatesCard({
       </CardHeader>
       <CardContent className="space-y-2">
         {selected.size > 0 && (
-          <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/5 p-2">
+          <div className="flex items-center justify-between border border-primary/40 bg-primary/5 p-2">
             <span className="font-mono text-xs text-muted-foreground">
               {selected.size} selected
             </span>
@@ -254,16 +254,13 @@ export function CascadeTemplatesCard({
         {loading ? (
           <div className="font-mono text-xs text-muted-foreground">loading…</div>
         ) : templates.length === 0 ? (
-          <div className="rounded-md border border-dashed p-4 text-center font-mono text-[11px] text-muted-foreground">
+          <div className="border border-dashed p-4 text-center font-mono text-[11px] text-muted-foreground">
             No templates saved yet — configure mode + scope above and click{" "}
             <span className="text-foreground">Save current</span>.
           </div>
         ) : (
           templates.map((t) => (
-            <div
-              key={t.id}
-              className="flex items-center gap-3 rounded-md border border-border/80 bg-surface p-2.5"
-            >
+            <div key={t.id} className="flex items-center gap-3 border bg-surface p-2.5">
               <input
                 type="checkbox"
                 checked={selected.has(t.id)}
@@ -271,7 +268,7 @@ export function CascadeTemplatesCard({
                 className="h-4 w-4 cursor-pointer accent-primary"
                 aria-label="Select template"
               />
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center bg-primary/10 text-primary">
                 <Bookmark className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">

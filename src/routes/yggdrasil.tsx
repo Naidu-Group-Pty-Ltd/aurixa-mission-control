@@ -346,14 +346,12 @@ function YggdrasilPage() {
     <div className="space-y-6">
       <header>
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 ring-1 ring-primary/40">
+          <div className="flex h-9 w-9 items-center justify-center bg-primary/15 ring-1 ring-primary/40">
             <TreePine className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-              fleet visualization
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
+            <p className="label-mono">fleet visualization</p>
+            <h1 className="font-display text-[2.125rem] leading-[1.05]">
               Yggdrasil
               <span className="ml-3 font-mono text-sm font-normal text-muted-foreground">
                 the world tree
@@ -393,7 +391,7 @@ function YggdrasilPage() {
       />
 
       {loading ? (
-        <div className="flex h-[500px] items-center justify-center rounded-xl border border-border/40 bg-background">
+        <div className="flex h-[500px] items-center justify-center border border-border/40 bg-background">
           <div className="text-center">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="mt-3 font-mono text-xs text-muted-foreground">

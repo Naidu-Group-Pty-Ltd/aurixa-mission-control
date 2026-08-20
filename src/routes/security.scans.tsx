@@ -245,7 +245,7 @@ function ScanDetail({ jobId }: { jobId: string }) {
                 const rem = remByFinding[f.id];
                 const canDraft = !rem || ["failed", "closed"].includes(rem.status);
                 return (
-                  <div key={f.id} className="border rounded p-3 space-y-2">
+                  <div key={f.id} className="border p-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <span
                         className={`inline-block w-2 h-2 rounded-full ${sevColor[f.severity]}`}
@@ -338,7 +338,7 @@ function ScanDetail({ jobId }: { jobId: string }) {
 function RemediationExplainer() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mb-3 rounded-md border bg-muted/20 p-2 text-[11px]">
+    <div className="mb-3 border bg-muted/20 p-2 text-[11px]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -398,7 +398,7 @@ function RemediationEvidence({ remediation: rem }: { remediation: any }) {
   if (!hasRadius && checks.length === 0 && rem.verified == null) return null;
 
   return (
-    <div className="mt-2 space-y-1 rounded-md border bg-muted/20 p-2 text-[11px]">
+    <div className="mt-2 space-y-1 border bg-muted/20 p-2 text-[11px]">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-muted-foreground">
           patched by{" "}
@@ -452,7 +452,7 @@ function RemediationEvidence({ remediation: rem }: { remediation: any }) {
       )}
 
       {failed.length > 0 && failed[0].detail && (
-        <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words rounded border border-destructive/20 bg-destructive/5 p-1 font-mono text-[10px] text-destructive">
+        <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words border border-destructive/20 bg-destructive/5 p-1 font-mono text-[10px] text-destructive">
           {failed[0].detail.slice(-600)}
         </pre>
       )}
@@ -725,7 +725,7 @@ function EngineHealthPanel() {
           </p>
         ) : (
           problems.map((c: any) => (
-            <div key={c.key} className="flex gap-2 rounded-md border p-3">
+            <div key={c.key} className="flex gap-2 border p-3">
               {healthIcon[c.status]}
               <div className="space-y-1 min-w-0">
                 <div className="text-sm font-medium">{c.label}</div>
@@ -805,7 +805,7 @@ function SchedulingPanel() {
         </Button>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
-        <div className="flex items-center justify-between rounded-md border p-3">
+        <div className="flex items-center justify-between border p-3">
           <div>
             <Label className="font-medium">Nightly full scans</Label>
             <p className="text-xs text-muted-foreground">
@@ -817,7 +817,7 @@ function SchedulingPanel() {
             onCheckedChange={(v) => save.mutate({ codex_nightly_enabled: v })}
           />
         </div>
-        <div className="flex items-center justify-between rounded-md border p-3">
+        <div className="flex items-center justify-between border p-3">
           <div>
             <Label className="font-medium">PR-open scans</Label>
             <p className="text-xs text-muted-foreground">
@@ -829,7 +829,7 @@ function SchedulingPanel() {
             onCheckedChange={(v) => save.mutate({ codex_pr_scan_enabled: v })}
           />
         </div>
-        <div className="flex items-center justify-between rounded-md border p-3">
+        <div className="flex items-center justify-between border p-3">
           <div>
             <Label className="font-medium">Post-merge revalidate</Label>
             <p className="text-xs text-muted-foreground">
@@ -841,7 +841,7 @@ function SchedulingPanel() {
             onCheckedChange={(v) => save.mutate({ codex_post_merge_revalidate: v })}
           />
         </div>
-        <div className="rounded-md border p-3 space-y-2">
+        <div className="border p-3 space-y-2">
           <Label className="font-medium">Dedup window (hours)</Label>
           <div className="flex gap-2">
             <Input
@@ -864,7 +864,7 @@ function SchedulingPanel() {
             Suppress duplicate scans for the same target+kind within this window.
           </p>
         </div>
-        <div className="rounded-md border p-3 space-y-2 md:col-span-2">
+        <div className="border p-3 space-y-2 md:col-span-2">
           <Label className="font-medium">Nightly cron schedule (UTC)</Label>
           <div className="flex gap-2">
             <Input

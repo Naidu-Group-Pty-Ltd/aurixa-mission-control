@@ -165,7 +165,7 @@ function ApprovalsPage() {
               {events.map((e) => (
                 <label
                   key={e.id}
-                  className="flex items-start gap-3 rounded-md border border-border bg-surface p-3 hover:bg-sidebar-accent/40 cursor-pointer"
+                  className="flex items-start gap-3 border border-border bg-surface p-3 hover:bg-sidebar-accent/40 cursor-pointer"
                 >
                   <Checkbox
                     checked={picked.has(e.id)}

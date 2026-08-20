@@ -45,7 +45,7 @@ export function GitHubRateLimitMeter() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="flex items-center gap-1.5 rounded border border-border/60 bg-surface px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 border bg-surface px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
           <Github className={cn("h-3 w-3", tone)} />
           <span className={cn(tone)}>{state.remaining.toLocaleString()}</span>
           <span className="text-muted-foreground/60">/ {state.limit.toLocaleString()}</span>

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,7 +59,7 @@ function StepPip({ state, label, detail }: { state: StepState; label: string; de
         ? "text-destructive"
         : "text-muted-foreground";
   return (
-    <div className="flex items-start gap-3 rounded-md border border-border p-3">
+    <div className="flex items-start gap-3 border border-border p-3">
       <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium">{label}</div>
@@ -183,12 +183,12 @@ function DomainsSettings() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <h1 className="flex items-center gap-2 font-display text-[1.75rem] leading-[1.1]">
           <Globe className="h-6 w-6" /> Fleet domains
         </h1>
         <p className="text-sm text-muted-foreground">
           Every clone gets an optional{" "}
-          <code className="rounded bg-muted px-1 text-xs">{`<slug>.${form.primary_domain}`}</code>{" "}
+          <code className="bg-muted px-1 text-xs">{`<slug>.${form.primary_domain}`}</code>{" "}
           subdomain, managed via Cloudflare DNS.
         </p>
       </div>

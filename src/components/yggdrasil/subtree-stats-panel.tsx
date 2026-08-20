@@ -57,7 +57,7 @@ export function SubtreeStatsPanel({ node, zoom, pan, dimensions }: Props) {
 
   return (
     <motion.div
-      className="absolute z-30 w-36 rounded-lg border border-border/50 bg-card/90 p-2.5 shadow-xl backdrop-blur-lg"
+      className="absolute z-30 w-36 border p-2.5 shadow-xl backdrop-blur-lg"
       style={{ left: panelLeft, top: panelTop, pointerEvents: "none" }}
       initial={{ opacity: 0, scale: 0.85 }}
       animate={{ opacity: 1, scale: 1 }}

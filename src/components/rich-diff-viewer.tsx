@@ -1,5 +1,5 @@
 import { useState, useCallback, lazy, Suspense } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, FileDiff, ExternalLink, SplitSquareHorizontal, AlignJustify } from "lucide-react";
@@ -145,7 +145,7 @@ export function RichDiffViewer({
           </div>
         )}
         {error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 font-mono text-xs text-destructive">
+          <div className="border border-destructive/40 bg-destructive/5 p-3 font-mono text-xs text-destructive">
             {error}
             <Button size="sm" variant="outline" onClick={load} className="ml-3 h-6 text-[10px]">
               Retry
@@ -205,8 +205,8 @@ export function RichDiffViewer({
                 // If we have patch but no full content, show the patch as text
                 if (!file.oldContent && !file.newContent && file.patch) {
                   return (
-                    <div className="rounded-md border border-border/60 bg-surface overflow-x-auto">
-                      <div className="border-b border-border/60 px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
+                    <div className="border bg-surface overflow-x-auto">
+                      <div className="border-b px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
                         {file.filename}
                       </div>
                       <pre className="p-3 font-mono text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
@@ -217,8 +217,8 @@ export function RichDiffViewer({
                 }
 
                 return (
-                  <div className="rounded-md border border-border/60 overflow-hidden">
-                    <div className="border-b border-border/60 bg-surface px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
+                  <div className="border overflow-hidden">
+                    <div className="border-b bg-surface px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
                       {file.filename}
                     </div>
                     <div className="max-h-[600px] overflow-auto text-[11px] [&_pre]:!bg-transparent [&_td]:!bg-transparent [&_table]:!bg-transparent">
