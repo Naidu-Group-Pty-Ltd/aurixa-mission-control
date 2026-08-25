@@ -29,7 +29,6 @@ function asObject(value: unknown): Record<string, unknown> {
     : {};
 }
 
-
 // The metering tables are newer than the generated DB types.
 const adminAny = supabaseAdmin;
 

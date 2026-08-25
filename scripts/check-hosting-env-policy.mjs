@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Two failures that produce no runtime signal, on the deployment path.
+// Four failures that produce no runtime signal, on the deployment path.
 //
 // 1. A SECRET GIVEN A PUBLIC NAME.
 //
@@ -16,7 +16,22 @@
 //    writes into a component, a script, or a second env builder that never
 //    imports the policy.
 //
-// 2. A STATUS THE COLUMN WILL REFUSE.
+// 2. AN ENVIRONMENT THAT NAMES SOMEBODY ELSE'S BACKEND.
+//
+//    `buildCloneEnv` refuses a pair that names the prime — but only when it is
+//    TOLD which project the prime is. `primeProjectRef` is an optional input by
+//    design (a deployment that has not configured a prime still gets the pairing
+//    checks), so an edit that drops the argument at the call site turns the
+//    strongest half of the rule off with no test failing and no runtime signal:
+//    the environment is still built, still published, still coherent — just no
+//    longer checked against the one project it must never be.
+//
+//    This is the class the deployed client dashboard already demonstrated. Its
+//    hosting project never had `VITE_SUPABASE_URL` at all, its build fell
+//    through to a fallback that was the prime, and it served the prime's
+//    production database on a custom domain for a week with nothing failing.
+//
+// 3. A STATUS THE COLUMN WILL REFUSE.
 //
 //    `clone_deployments.status` has a CHECK constraint and the worker's state
 //    machine lives in TypeScript. When they drift, the update fails with
@@ -82,6 +97,32 @@ function walk(dir) {
 walk("src");
 if (PUBLIC_PREFIXES.length === 0) throw new Error("unreachable");
 
+// ── The prime ref reaches the policy ───────────────────────────────────────
+{
+  const DRAIN = "src/routes/hooks.deployment-drain.tsx";
+  const src = readFileSync(DRAIN, "utf8");
+  // The call, from `buildCloneEnv(` to its closing `});`. Matching the whole
+  // call rather than searching the file for the identifier is what makes this
+  // specific: `primeProjectRef` mentioned anywhere else in the module is not
+  // evidence that it is passed HERE.
+  const call = src.match(/buildCloneEnv\(\{([\s\S]*?)\n\s*\}\)/);
+  if (!call) {
+    failures.push(
+      `${DRAIN}  could not find the buildCloneEnv({...}) call. If the deployment ` +
+        `worker was restructured, update this check with it — a check that cannot ` +
+        `find its subject silently stops checking.`,
+    );
+  } else if (!/\bprimeProjectRef\b/.test(call[1])) {
+    failures.push(
+      `${DRAIN}  builds a clone environment without passing primeProjectRef. ` +
+        `buildCloneEnv can only refuse an environment that names the prime's ` +
+        `backend when it is told which project that is, so dropping this argument ` +
+        `turns the rule off with nothing failing. Resolve it with ` +
+        `resolvePrimeBackendRef() and pass it in.`,
+    );
+  }
+}
+
 // ── Status parity ──────────────────────────────────────────────────────────
 const MIGRATIONS = "supabase/migrations";
 const sql = readdirSync(MIGRATIONS)
@@ -135,9 +176,9 @@ if (!checkMatch) {
   }
 }
 
-// 3. A SUBDOMAIN STATUS THE COLUMN WILL REFUSE.
+// 4. A SUBDOMAIN STATUS THE COLUMN WILL REFUSE.
 //
-//    Same class as (2) and it has already bitten once on this path:
+//    Same class as (3) and it has already bitten once on this path:
 //    `awaiting_deployment` was written by three call sites before the CHECK
 //    constraint knew about it. Every one of those call sites discards the error
 //    from the update, so the write failed and the clone simply stayed in its
@@ -210,5 +251,6 @@ if (failures.length) {
 }
 
 console.log(
-  "✓ No secret carries a public env prefix, and the deployment state machine matches the column.",
+  "✓ No secret carries a public env prefix, no clone environment can be built without\n" +
+    "  checking it against the prime, and the deployment state machine matches the column.",
 );

@@ -46,13 +46,12 @@ function rows(raw: unknown): Row[] {
   return [];
 }
 
-export function getPrimeProjectRef(): string {
-  const url = process.env.SUPABASE_URL;
-  if (!url) throw new Error("SUPABASE_URL not configured on server");
-  const m = url.match(/https?:\/\/([a-z0-9]+)\.supabase\.co/i);
-  if (!m) throw new Error(`Cannot derive project ref from SUPABASE_URL=${url}`);
-  return m[1];
-}
+// `getPrimeProjectRef()` lived here too, a second copy deriving a ref from
+// `SUPABASE_URL` — this deployment's own project. Every parity report it fed
+// therefore diffed a clone against MISSION CONTROL's admin schema rather than
+// the product's, which makes each one a large and entirely bogus diff.
+// Callers now resolve the prime backend from configuration
+// (`resolvePrimeBackendRef`) and pass the ref in.
 
 // ── Introspection SQL ─────────────────────────────────────────────────
 

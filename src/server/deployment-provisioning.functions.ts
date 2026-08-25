@@ -18,7 +18,11 @@ import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { asHostingSlug, getHostingProvider } from "@/server/hosting";
 import "@/server/hosting/index";
-import { reading, DEPLOYMENT_STATUSES, type DeploymentStatus } from "@/server/hosting/deploymentState.pure";
+import {
+  reading,
+  DEPLOYMENT_STATUSES,
+  type DeploymentStatus,
+} from "@/server/hosting/deploymentState.pure";
 import { cloneFqdn, resolveDnsTarget } from "@/server/hosting/dnsTarget.pure";
 
 const admin = supabaseAdmin;

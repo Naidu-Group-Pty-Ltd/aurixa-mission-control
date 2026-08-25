@@ -93,9 +93,9 @@ export const Route = createFileRoute("/hooks/handoff-parity-refresh")({
           if (stale.length >= MAX_PER_RUN) break;
         }
 
-        const { computeParity, getPrimeProjectRef } =
-          await import("@/server/handoff-parity.server");
-        const primeRef = getPrimeProjectRef();
+        const { computeParity } = await import("@/server/handoff-parity.server");
+        const { resolvePrimeBackendRef } = await import("@/server/prime-backend.server");
+        const primeRef = await resolvePrimeBackendRef(supabaseAdmin);
 
         const results = { refreshed: 0, skipped: 0, failed: 0, details: [] as any[] };
         for (const h of stale) {

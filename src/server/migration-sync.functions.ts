@@ -5,6 +5,7 @@ import { getAppOctokit } from "./github-app.server";
 import {
   fetchPrimeMigrationList,
   fetchPrimeMigrations,
+  resolvePrimeBackendRef,
   resolvePrimeSource,
 } from "./prime-backend.server";
 import { applyPrimeMigrations } from "./backend-provisioning.server";
@@ -226,6 +227,86 @@ export const syncCloneMigrations = createServerFn({ method: "POST" })
       }
     },
   );
+
+/**
+ * Re-stamp a clone's migration ledger from the prime backend.
+ *
+ * The repair for a clone that has a schema and no ledger. That combination is
+ * what catalogue introspection leaves behind when the stamping step does not
+ * run, and it is unrecoverable through the ordinary sync path: every prime
+ * migration reads as pending, the replay starts at the first one, and it fails
+ * on objects the introspected schema already created.
+ *
+ * This records the prime's applied versions against the clone WITHOUT running
+ * any of them, which is exactly what introspection should have done. It is
+ * `on conflict do nothing`, so running it against a healthy clone is a no-op
+ * rather than a corruption — the repair is safe to offer next to the sync
+ * button and safe to press twice.
+ *
+ * It deliberately does NOT verify that the clone's schema matches the prime's.
+ * Stamping asserts "these versions are already reflected here", and only the
+ * operator repairing a known-introspected clone can make that claim. A clone
+ * that is genuinely behind must sync, not stamp — so the pre-flight in
+ * `applyPrimeMigrations` refuses only the states stamping actually fixes, and
+ * this stays an explicit operator action rather than an automatic recovery.
+ */
+export const restampCloneMigrationLedger = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth, requireAdmin])
+  .inputValidator((d: { cloneId: string }) => {
+    if (!d?.cloneId) throw new Error("cloneId is required");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: backend, error: backendErr } = await supabase
+      .from("clone_backends")
+      .select("supabase_project_ref, status")
+      .eq("clone_id", data.cloneId)
+      .maybeSingle();
+    // A read that FAILED is not a backend that is ABSENT.
+    if (backendErr) {
+      return {
+        ok: false as const,
+        error: `Could not read the clone backend: ${backendErr.message}`,
+      };
+    }
+    if (!backend?.supabase_project_ref) {
+      return { ok: false as const, error: "No backend provisioned for this clone" };
+    }
+
+    try {
+      const primeBackendRef = await resolvePrimeBackendRef(supabase);
+      const { stampMigrationLedgerFromPrime } = await import("./schema-introspection.server");
+      const { stamped } = await stampMigrationLedgerFromPrime(
+        backend.supabase_project_ref,
+        primeBackendRef,
+      );
+
+      const { error: auditErr } = await supabase.from("audit_log").insert({
+        action: "clone_backend.ledger_restamped",
+        entity_type: "clone",
+        entity_id: data.cloneId,
+        actor_user_id: userId,
+        metadata: {
+          stamped,
+          prime_backend_ref: primeBackendRef,
+          clone_project_ref: backend.supabase_project_ref,
+        },
+      });
+      // The stamp already succeeded; a lost audit row must not be reported as
+      // a failed repair, or an operator re-runs a repair that already worked.
+      if (auditErr) {
+        console.warn("[restamp] audit_log write failed:", auditErr.message);
+      }
+
+      return { ok: true as const, stamped };
+    } catch (e) {
+      return {
+        ok: false as const,
+        error: e instanceof Error ? e.message : "Ledger re-stamp failed",
+      };
+    }
+  });
 
 /**
  * Fleet-wide migration sync: apply the prime's pending migrations to all

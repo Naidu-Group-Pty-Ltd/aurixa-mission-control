@@ -150,7 +150,16 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
           patch.completed_at = nowIso;
         }
 
-        await admin.from("codex_remediations").update(asRow<TablesUpdate<"codex_remediations">>(patch)).eq("id", rem.id);
+        // The authoritative write. A lost update here means the remediation
+        // record disagrees with the workflow that just finished, so this one
+        // fails the hook and lets the sender retry rather than answering ok.
+        const { error: remErr } = await admin
+          .from("codex_remediations")
+          .update(asRow<TablesUpdate<"codex_remediations">>(patch))
+          .eq("id", rem.id);
+        if (remErr) {
+          return json({ error: "remediation update failed", detail: remErr.message }, 500);
+        }
 
         // Mirror finding state where applicable.
         const findingState = EVENT_FINDING_STATE[payload.event];
@@ -159,7 +168,15 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
           if (payload.pr_url) findingPatch.remediation_pr_url = payload.pr_url;
           if (payload.pr_state) findingPatch.remediation_pr_state = payload.pr_state;
           if (payload.event === "pr.merged") findingPatch.resolved_at = nowIso;
-          await admin.from("codex_findings").update(asRow<TablesUpdate<"codex_findings">>(findingPatch)).eq("id", rem.finding_id);
+          const { error: mirrorErr } = await admin
+            .from("codex_findings")
+            .update(asRow<TablesUpdate<"codex_findings">>(findingPatch))
+            .eq("id", rem.finding_id);
+          // A mirror, not the record of truth — log rather than fail a hook
+          // whose authoritative write already landed.
+          if (mirrorErr) {
+            console.warn("[codex-remediation] finding mirror failed:", mirrorErr.message);
+          }
         }
 
         // A failed remediation must not leave the finding parked in a state
@@ -171,17 +188,22 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
             .eq("id", rem.finding_id)
             .maybeSingle();
           if (finding && shouldReopenOnRemediationFailure(finding.state)) {
-            await admin
+            const { error: reopenErr } = await admin
               .from("codex_findings")
               .update({ state: "open", remediation_pr_state: "failed" })
               .eq("id", finding.id);
+            // Worth a loud line: a silent failure here leaves the finding
+            // parked in a state implying a fix is still on its way.
+            if (reopenErr) {
+              console.error("[codex-remediation] reopen-on-failure failed:", reopenErr.message);
+            }
           }
         }
 
         // codex_scan_events.job_id is NOT NULL; intake-sourced findings have
         // no scan job, so skip the audit row rather than failing the hook.
         if (rem.scan_job_id) {
-          await admin.from("codex_scan_events").insert({
+          const { error: eventErr } = await admin.from("codex_scan_events").insert({
             job_id: rem.scan_job_id,
             event_type: `remediation.${payload.event}`,
             payload: {
@@ -195,6 +217,9 @@ export const Route = createFileRoute("/api/public/hooks/codex-remediation")({
               error: payload.error,
             },
           });
+          if (eventErr) {
+            console.warn("[codex-remediation] scan event insert failed:", eventErr.message);
+          }
         }
 
         return json({ ok: true });

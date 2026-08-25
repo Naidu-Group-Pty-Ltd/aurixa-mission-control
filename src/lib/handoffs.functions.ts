@@ -498,8 +498,9 @@ export const runParityDryRun = createServerFn({ method: "POST" })
 
     // Compute parity (server-only module — imported inside the handler so it
     // never leaks into the client bundle).
-    const { computeParity, getPrimeProjectRef } = await import("@/server/handoff-parity.server");
-    const primeRef = getPrimeProjectRef();
+    const { computeParity } = await import("@/server/handoff-parity.server");
+    const { resolvePrimeBackendRef } = await import("@/server/prime-backend.server");
+    const primeRef = await resolvePrimeBackendRef(context.supabase);
     const parity = await computeParity(primeRef, backend.supabase_project_ref);
 
     const { data: row, error: insErr } = await context.supabase

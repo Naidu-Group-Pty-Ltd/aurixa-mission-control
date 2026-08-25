@@ -47,7 +47,9 @@ function countFile(source) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!WRITE.test(line)) continue;
-    if (!/\bfrom\s*\(|supabase|supabaseAdmin/.test(lines.slice(Math.max(0, i - 3), i + 1).join("\n")))
+    if (
+      !/\bfrom\s*\(|supabase|supabaseAdmin/.test(lines.slice(Math.max(0, i - 3), i + 1).join("\n"))
+    )
       continue;
 
     // Window covering the whole statement: back to the start of the chain and
@@ -112,7 +114,8 @@ try {
 const failures = [];
 for (const [f, n] of current) {
   const allowed = budget.get(f);
-  if (allowed === undefined) failures.push(`${f}: ${n} unchecked write(s) in a file with no budget`);
+  if (allowed === undefined)
+    failures.push(`${f}: ${n} unchecked write(s) in a file with no budget`);
   else if (n > allowed) failures.push(`${f}: ${n} unchecked write(s), budget is ${allowed}`);
 }
 

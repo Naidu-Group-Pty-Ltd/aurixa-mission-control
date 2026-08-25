@@ -10,6 +10,7 @@
 import crypto from "node:crypto";
 
 import { classifySecret } from "./prime-backend.server";
+import { assessLedgerState, ledgerRepairHint } from "./cloneLedgerState.pure";
 import type { PrimeBackendSnapshot } from "./prime-backend.server";
 import type { StageName, StageResult } from "./schema-introspection.server";
 
@@ -336,30 +337,22 @@ function normalizeBucket(raw: unknown): StorageBucketConfig | null {
   };
 }
 
-/**
- * Derive the prime project's ref from the server-side Supabase URL. Used to
- * point the Management API at the prime when we take a bucket snapshot.
- */
-/**
- * The prime's ref, or null when it is not configured. Every replication step
- * here is best-effort against the prime, so a missing SUPABASE_URL should
- * degrade the step rather than throw out of the whole provisioning run.
- */
-export function tryGetPrimeProjectRef(): string | null {
-  try {
-    return getPrimeProjectRef();
-  } catch {
-    return null;
-  }
-}
-
-export function getPrimeProjectRef(): string {
-  const url = process.env.SUPABASE_URL;
-  if (!url) throw new Error("SUPABASE_URL is not configured — cannot derive prime project ref");
-  const m = /^https?:\/\/([a-z0-9]+)\.supabase\.(co|in|net)/i.exec(url);
-  if (!m) throw new Error(`SUPABASE_URL is not a Supabase project URL: ${url}`);
-  return m[1];
-}
+// `getPrimeProjectRef()` / `tryGetPrimeProjectRef()` used to live here. Both
+// derived a ref from `SUPABASE_URL` and their doc comment said so plainly:
+// "Derive the prime project's ref from the server-side Supabase URL." That URL
+// is THIS deployment's own project — the database holding `clones`,
+// `prime_config` and `cascade_events` — so every step that "replicated from
+// the prime" was reading Mission Control's own admin project: the catalogue
+// introspection that builds a clone's schema, its storage buckets and seed
+// assets, its pg_cron schedule (which would have pointed a clone's jobs at
+// Mission Control's own /hooks endpoints), its realtime publication, and every
+// handoff parity report.
+//
+// There is no derivation that can answer this. The prime backend is a piece of
+// configuration — `prime_config.supabase_project_ref` — and the resolver that
+// reads it (`resolvePrimeBackendRef`, in prime-backend.server.ts) refuses both
+// an unset value and this deployment's own ref rather than substituting one.
+// Callers pass the resolved ref in; nothing in this module guesses it.
 
 /**
  * List every storage bucket on a project (config only — no object contents).
@@ -1338,6 +1331,29 @@ export function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+/**
+ * Count tables in the schemas a clone replicates. Used only to tell a fresh
+ * project apart from one whose schema exists but whose ledger is empty — the
+ * two are identical from the ledger's point of view and need opposite
+ * treatment.
+ */
+async function countReplicatedTables(projectRef: string): Promise<number> {
+  try {
+    const raw = await runSqlOnProject(
+      projectRef,
+      `select count(*)::int as n from pg_tables where schemaname in ('public', 'aml');`,
+    );
+    const rows = Array.isArray(raw) ? raw : [];
+    const n = (rows[0] as { n?: unknown } | undefined)?.n;
+    return typeof n === "number" ? n : Number(n ?? 0) || 0;
+  } catch {
+    // A project we cannot read is not a project we can judge. Returning 0 lets
+    // the replay proceed exactly as it did before this check existed, which is
+    // the right failure mode for a check whose only job is to refuse earlier.
+    return 0;
+  }
+}
+
 export type PrimeMigrationResult = {
   id: string;
   name: string;
@@ -1380,6 +1396,17 @@ export async function applyPrimeMigrations(
       .map((r) => (r as { version?: unknown })?.version)
       .filter((v): v is string => typeof v === "string"),
   );
+
+  // Pre-flight: refuse a replay that cannot succeed, rather than starting one
+  // that halts on migration #1 and reports the migration as the fault.
+  const cloneTableCount = await countReplicatedTables(projectRef);
+  const assessment = assessLedgerState({
+    appliedVersions: [...applied],
+    corpusVersions: migrations.map((m) => m.id),
+    cloneTableCount,
+  });
+  const refusal = ledgerRepairHint(assessment);
+  if (refusal) throw new Error(refusal);
 
   const results: PrimeMigrationResult[] = [];
   let latestApplied: string | null = null;
@@ -2266,6 +2293,13 @@ export type ProvisionBackendInput = {
    * prime's live catalog; `migration-replay` forces the legacy path.
    */
   schemaStrategy?: SchemaStrategy;
+  /**
+   * The prime PRODUCT's Supabase project ref — the source every replication
+   * step below reads from. Required rather than optional: it is not derivable,
+   * and the previous derivation silently pointed all of them at Mission
+   * Control's own project. Resolve it with `resolvePrimeBackendRef()`.
+   */
+  primeBackendRef: string;
 };
 
 export type SchemaStrategy = "introspection" | "migration-replay";
@@ -2371,7 +2405,7 @@ export async function provisionCloneBackend(
     await onStatusUpdate?.("migrating", "Introspecting the prime's live catalog...");
     const { replicateSchemaByIntrospection, stampMigrationLedgerFromPrime, verifyCloneIsEmpty } =
       await import("./schema-introspection.server");
-    const primeRef = getPrimeProjectRef();
+    const primeRef = input.primeBackendRef;
     const result = await replicateSchemaByIntrospection(projectRef, {
       primeRef,
       onStatusUpdate,
@@ -2396,9 +2430,16 @@ export async function provisionCloneBackend(
     }
     // Stamp the prime's applied migration IDs so future INCREMENTAL migrations
     // still apply cleanly instead of replaying history the clone already has.
-    const stamp = await stampMigrationLedgerFromPrime(projectRef, primeRef).catch(() => ({
-      stamped: 0,
-    }));
+    //
+    // NOT best-effort, despite reading like a finishing touch. The stamp is
+    // what makes the introspected schema syncable at all: without it the
+    // ledger is empty, `migration-sync` computes every prime migration as
+    // pending, and the replay dies on #1 against objects that already exist —
+    // permanently, on every retry. The failure surfaces months later as "this
+    // clone will not take migrations", with nothing connecting it back to
+    // provisioning. A `.catch(() => ({ stamped: 0 }))` here turned that into a
+    // success that printed "stamped 0 migration ID(s)" and moved on.
+    const stamp = await stampMigrationLedgerFromPrime(projectRef, primeRef);
     latestApplied =
       [...snapshot.migrations].sort((a, b) => a.name.localeCompare(b.name)).at(-1)?.id ?? null;
     await onStatusUpdate?.(
@@ -2430,7 +2471,7 @@ export async function provisionCloneBackend(
     await onStatusUpdate?.("migrating", "Enforcing required Postgres extensions...");
     // Mirror the prime's extensions, not a hard-coded guess. See
     // resolveRequiredExtensions for what that list used to miss.
-    requiredExtensions = await enforceRequiredExtensions(projectRef, tryGetPrimeProjectRef());
+    requiredExtensions = await enforceRequiredExtensions(projectRef, input.primeBackendRef);
     const failedExt = requiredExtensions.filter((r) => r.status === "failed");
     if (failedExt.length > 0) {
       await onStatusUpdate?.(
@@ -2455,7 +2496,7 @@ export async function provisionCloneBackend(
   // surface per-bucket errors so operators can retry from the clone page.
   let storageBuckets: BucketReplicationResult[] = [];
   try {
-    const primeRef = getPrimeProjectRef();
+    const primeRef = input.primeBackendRef;
     await onStatusUpdate?.("migrating", "Replicating storage buckets + seed assets from prime...");
     storageBuckets = await replicateStorageBuckets(primeRef, projectRef);
     const failed = storageBuckets.filter((b) => b.status === "failed");
@@ -2519,7 +2560,7 @@ export async function provisionCloneBackend(
   let vaultSeed: { ok: boolean; error?: string } = { ok: false };
   let functionRepoints: FunctionRepointResult[] = [];
   try {
-    const primeRef = getPrimeProjectRef();
+    const primeRef = input.primeBackendRef;
     await onStatusUpdate?.("migrating", "Seeding this project's own URL into its vault...");
     vaultSeed = await seedCloneVaultUrl(projectRef);
     if (!vaultSeed.ok) {
@@ -2546,7 +2587,7 @@ export async function provisionCloneBackend(
 
   let cronJobs: CronJobReplicationResult[] = [];
   try {
-    const primeRef = getPrimeProjectRef();
+    const primeRef = input.primeBackendRef;
     await onStatusUpdate?.("migrating", "Replicating pg_cron schedule from prime...");
     const primeJobs = await fetchPrimeCronJobs(primeRef);
     const primeKeys = selectProjectKeys(await getProjectApiKeys(primeRef).catch(() => []));
@@ -2577,7 +2618,7 @@ export async function provisionCloneBackend(
     failures: [],
   };
   try {
-    const primeRef = getPrimeProjectRef();
+    const primeRef = input.primeBackendRef;
     await onStatusUpdate?.("migrating", "Replicating realtime publication from prime...");
     const primeTables = await fetchRealtimePublicationTables(primeRef);
     realtimePublication = await replicateRealtimePublication(projectRef, primeTables);

@@ -35,7 +35,6 @@ import { exportRowsAsCSV } from "@/lib/csv";
 import { SavedViewsBar } from "@/components/saved-views-bar";
 import { CronDeliveryHealthCard } from "@/components/cron-delivery-health-card";
 
-
 export const Route = createFileRoute("/health")({
   component: () => (
     <ProtectedRoute>
@@ -127,7 +126,6 @@ function FleetHealthPage() {
       )}
 
       <CronDeliveryHealthCard />
-
 
       {!data && loading && (
         <Card>

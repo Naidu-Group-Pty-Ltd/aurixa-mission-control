@@ -77,18 +77,19 @@ export const reviewRemediation = createServerFn({ method: "POST" })
     // that was never tied to a scan job simply has no event trail to append to.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const scanJobId = rem.scan_job_id;
-    if (scanJobId) await supabaseAdmin.from("codex_scan_events").insert({
-      job_id: scanJobId,
-      event_type: `remediation.review.${data.decision}`,
-      actor: userId,
-      payload: {
-        remediation_id: rem.id,
-        approvals,
-        rejects,
-        changes_requested: changes,
-        required: rem.approvals_required,
-      },
-    });
+    if (scanJobId)
+      await supabaseAdmin.from("codex_scan_events").insert({
+        job_id: scanJobId,
+        event_type: `remediation.review.${data.decision}`,
+        actor: userId,
+        payload: {
+          remediation_id: rem.id,
+          approvals,
+          rejects,
+          changes_requested: changes,
+          required: rem.approvals_required,
+        },
+      });
 
     return { approvals, rejects, changes_requested: changes, status: newStatus ?? rem.status };
   });
@@ -245,18 +246,19 @@ export const mergeRemediationPR = createServerFn({ method: "POST" })
       .from("codex_findings")
       .update({ state: "fix_merged", resolved_at: new Date().toISOString() })
       .eq("id", rem.finding_id);
-    if (scanJobId) await supabaseAdmin.from("codex_scan_events").insert({
-      job_id: scanJobId,
-      event_type: "remediation.merged",
-      actor: userId,
-      payload: {
-        remediation_id: rem.id,
-        sha: merge.sha,
-        pr_number: rem.pr_number,
-        cascade_event_id: cascadeEventId,
-        cascade_error: cascadeError,
-      },
-    });
+    if (scanJobId)
+      await supabaseAdmin.from("codex_scan_events").insert({
+        job_id: scanJobId,
+        event_type: "remediation.merged",
+        actor: userId,
+        payload: {
+          remediation_id: rem.id,
+          sha: merge.sha,
+          pr_number: rem.pr_number,
+          cascade_event_id: cascadeEventId,
+          cascade_error: cascadeError,
+        },
+      });
     if (cascadeEventId && scanJobId) {
       await supabaseAdmin.from("codex_scan_events").insert({
         job_id: scanJobId,

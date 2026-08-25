@@ -24,7 +24,6 @@ src/lib/token-webhooks.functions.ts 2
 src/routes/api.public.clones.rotate-key.ts 2
 src/routes/api.public.handoff.audit-ingest.ts 2
 src/routes/api.public.handoffs.consent.ts 3
-src/routes/api.public.hooks.codex-remediation.ts 2
 src/routes/api.public.hooks.codex-security.ts 6
 src/routes/api.public.leads.capture.ts 2
 src/routes/api.public.security.intake.ts 3

@@ -122,7 +122,10 @@ export const Route = createFileRoute("/api/public/hooks/codex-security")({
             .update({ ...runPatch, status: "running", started_at: nowIso, last_error: null })
             .eq("id", job.id);
         } else if (Object.keys(runPatch).length) {
-          await admin.from("codex_scan_jobs").update(asRow<TablesUpdate<"codex_scan_jobs">>(runPatch)).eq("id", job.id);
+          await admin
+            .from("codex_scan_jobs")
+            .update(asRow<TablesUpdate<"codex_scan_jobs">>(runPatch))
+            .eq("id", job.id);
         }
 
         let regressions = 0;
