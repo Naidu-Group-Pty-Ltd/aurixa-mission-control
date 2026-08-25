@@ -1,12 +1,34 @@
 import { describe, expect, it } from "vitest";
 import {
   EnvPolicyError,
+  backendRefusalReason,
   buildCloneEnv,
   envDigest,
   isPublicName,
   looksSecret,
+  projectRefFromAnonKey,
+  projectRefFromUrl,
   refuseReason,
 } from "./envPolicy.pure";
+
+/** A real anon-key shape: header.payload.signature, `ref` in the payload. */
+function anonKeyFor(ref: string): string {
+  const b64 = (o: unknown) =>
+    Buffer.from(JSON.stringify(o))
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  return `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ iss: "supabase", ref, role: "anon" })}.sig`;
+}
+
+const CLONE = "plisdzywzleljorrphxv";
+const PRIME = "dduzbchuswwbefdunfct";
+const cloneBackend = {
+  supabaseUrl: `https://${CLONE}.supabase.co`,
+  supabaseProjectRef: CLONE,
+  supabaseAnonKey: anonKeyFor(CLONE),
+};
 
 describe("public-name classification", () => {
   it("knows which prefixes a bundler inlines", () => {
@@ -48,11 +70,7 @@ describe("refuseReason", () => {
 
 describe("buildCloneEnv", () => {
   it("emits both anon-key spellings so an older clone still builds", () => {
-    const vars = buildCloneEnv({
-      supabaseUrl: "https://abc.supabase.co",
-      supabaseProjectRef: "abc",
-      supabaseAnonKey: "anon-123",
-    });
+    const vars = buildCloneEnv(cloneBackend);
     const keys = vars.map((v) => v.key);
     expect(keys).toContain("VITE_SUPABASE_ANON_KEY");
     expect(keys).toContain("VITE_SUPABASE_PUBLISHABLE_KEY");
@@ -62,6 +80,46 @@ describe("buildCloneEnv", () => {
     // An empty VITE_SUPABASE_URL builds fine and fails at the first request.
     const vars = buildCloneEnv({ supabaseUrl: "  ", supabaseAnonKey: null });
     expect(vars).toEqual([]);
+  });
+
+  it("REFUSES half a Supabase pair", () => {
+    // This used to emit the URL alone. A URL with no key is not a partial
+    // configuration, it is a client rejected on every request — and it
+    // overwrites whatever working default the clone's own build carries.
+    expect(() => buildCloneEnv({ supabaseUrl: `https://${CLONE}.supabase.co` })).toThrow(
+      EnvPolicyError,
+    );
+    expect(() => buildCloneEnv({ supabaseAnonKey: anonKeyFor(CLONE) })).toThrow(EnvPolicyError);
+  });
+
+  it("REFUSES a URL and a key from different projects", () => {
+    expect(() =>
+      buildCloneEnv({
+        supabaseUrl: `https://${CLONE}.supabase.co`,
+        supabaseAnonKey: anonKeyFor(PRIME),
+      }),
+    ).toThrow(/authenticates to nothing/);
+  });
+
+  it("REFUSES an environment that names the prime's backend", () => {
+    // The rule the deployed client dashboard was the counter-example to.
+    expect(() =>
+      buildCloneEnv({
+        supabaseUrl: `https://${PRIME}.supabase.co`,
+        supabaseProjectRef: PRIME,
+        supabaseAnonKey: anonKeyFor(PRIME),
+        primeProjectRef: PRIME,
+      }),
+    ).toThrow(/never be able to reach the prime/);
+  });
+
+  it("publishes the clone's own pair with the same prime configured", () => {
+    // The refusal must be about WHOSE project it is, not about the check being
+    // switched on. Same prime, clone's own backend, published.
+    const vars = buildCloneEnv({ ...cloneBackend, primeProjectRef: PRIME });
+    expect(vars.find((v) => v.key === "VITE_SUPABASE_URL")?.value).toBe(
+      `https://${CLONE}.supabase.co`,
+    );
   });
 
   it("THROWS when an extra would publish a secret", () => {
@@ -78,10 +136,7 @@ describe("buildCloneEnv", () => {
   });
 
   it("marks every emitted var with whether the bundle will carry it", () => {
-    const vars = buildCloneEnv({
-      supabaseUrl: "https://abc.supabase.co",
-      extra: { SENTRY_DSN: "https://x@y/1" },
-    });
+    const vars = buildCloneEnv({ ...cloneBackend, extra: { SENTRY_DSN: "https://x@y/1" } });
     expect(vars.find((v) => v.key === "VITE_SUPABASE_URL")?.publicToBundle).toBe(true);
     expect(vars.find((v) => v.key === "SENTRY_DSN")?.publicToBundle).toBe(false);
   });
@@ -89,7 +144,7 @@ describe("buildCloneEnv", () => {
 
 describe("envDigest", () => {
   it("is stable across ordering", () => {
-    const a = buildCloneEnv({ supabaseUrl: "https://a.co", supabaseAnonKey: "k" });
+    const a = buildCloneEnv(cloneBackend);
     const b = [...a].reverse();
     expect(envDigest(a)).toBe(envDigest(b));
   });
@@ -103,8 +158,36 @@ describe("envDigest", () => {
   });
 
   it("changes when a variable is added", () => {
-    const one = buildCloneEnv({ supabaseUrl: "https://a.co" });
-    const two = buildCloneEnv({ supabaseUrl: "https://a.co", aurixaApiKey: "ak" });
+    const one = buildCloneEnv(cloneBackend);
+    const two = buildCloneEnv({ ...cloneBackend, aurixaApiKey: "ak" });
     expect(envDigest(one)).not.toBe(envDigest(two));
+  });
+});
+
+describe("reading which project a value belongs to", () => {
+  it("reads the ref from a project URL", () => {
+    expect(projectRefFromUrl(`https://${CLONE}.supabase.co`)).toBe(CLONE);
+    expect(projectRefFromUrl("https://example.com")).toBeNull();
+  });
+
+  it("reads the ref claim from a publishable key", () => {
+    expect(projectRefFromAnonKey(anonKeyFor(PRIME))).toBe(PRIME);
+    expect(projectRefFromAnonKey("not-a-jwt")).toBeNull();
+  });
+
+  it("an UNREADABLE ref is not a MISMATCHED one", () => {
+    // A self-hosted URL has no <ref>.supabase.co and an opaque key has no ref
+    // claim. Guessing in either direction is worse than the check not applying,
+    // so a half that cannot be read is passed over rather than refused.
+    expect(
+      backendRefusalReason({
+        supabaseUrl: "https://supabase.internal.example",
+        supabaseAnonKey: "opaque-token",
+      }),
+    ).toBeNull();
+  });
+
+  it("says nothing when there is no backend to judge", () => {
+    expect(backendRefusalReason({})).toBeNull();
   });
 });

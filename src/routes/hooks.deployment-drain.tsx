@@ -214,10 +214,22 @@ async function step(row: DeploymentRow): Promise<StepOutcome> {
       // build reads, and `cascadeApiKeyToRepo` rewrites that file on rotation.
       // A second copy in the hosting provider's environment is a second source
       // of truth that goes stale the first time the key is rotated.
+      // Best-effort: a deployment that has not configured the prime backend
+      // still gets the pairing checks, it just has no name to compare against.
+      // Resolving it must never be able to STOP a deployment — an unconfigured
+      // prime is a Mission Control setting, not a fault in this clone.
+      let primeProjectRef: string | null = null;
+      try {
+        const { resolvePrimeBackendRef } = await import("@/server/prime-backend.server");
+        primeProjectRef = await resolvePrimeBackendRef(admin);
+      } catch {
+        primeProjectRef = null;
+      }
       const vars = buildCloneEnv({
         supabaseUrl: backend.supabase_url,
         supabaseProjectRef: backend.supabase_project_ref,
         supabaseAnonKey: backend.anon_key,
+        primeProjectRef,
       });
       const digest = envDigest(vars);
       if (digest === row.env_digest) {
