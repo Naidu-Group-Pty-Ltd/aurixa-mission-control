@@ -32,11 +32,11 @@ An empty bearer, against the preview host rather than the production one.
 
 Measured before the repair, from `net._http_response`:
 
-| status | calls in 3h |
-| --- | --- |
-| 200 | 560 |
-| **401** | **215** |
-| 404 | 14 |
+| status  | calls in 3h |
+| ------- | ----------- |
+| 200     | 560         |
+| **401** | **215**     |
+| 404     | 14          |
 
 All 208 of the `{"error":"Unauthorized"}` bodies were this job. Measured after:
 **0 × 401, 25 × 200** in the following six minutes.
@@ -79,3 +79,48 @@ from the code, from the job list, or from pg_cron's own reporting.
 - `CREDENTIALS_ENC_KEY`, `VERCEL_API_TOKEN`, `VERCEL_TEAM_ID`,
   `VERCEL_WEBHOOK_SECRET` and `CLOUDFLARE_API_TOKEN` are deployment
   environment variables, not database state.
+
+---
+
+# 26 Aug 2026 — the six workers that had never been scheduled
+
+Applied to Mission Control's live database (`0fb4d803-…`) through the Lovable
+MCP, and expressed as `20260826000000_schedule_the_engine.sql` so a rebuild
+reproduces it. Full analysis: [`THE_CLONING_ENGINE.md`](./THE_CLONING_ENGINE.md).
+
+`cron.job` held **16** hook jobs; twenty-two are required. Six had never been
+created, because each of their migrations reads `vault.decrypted_secrets` into
+a variable and `RETURN`s when it is absent — and the vault was empty when they
+ran. Two of the six are the cloning engine.
+
+| Job                               | Cadence        | Endpoint                            | Why it matters                                                      |
+| --------------------------------- | -------------- | ----------------------------------- | ------------------------------------------------------------------- |
+| `backend-provisioning-drain-1min` | `* * * * *`    | `/hooks/backend-provisioning-drain` | drains `clone_backends` — the clone's own Supabase project          |
+| `cascade-drain-1min`              | `* * * * *`    | `/hooks/cascade-drain`              | drains `cascade_events` — module files into the clone's repo        |
+| `entitlement-drain-2min`          | `*/2 * * * *`  | `/hooks/entitlement-drain`          | module reconciliation after a plan change                           |
+| `codex-security-sweep`            | `*/10 * * * *` | `/hooks/codex-sweep`                | clears stalled scans (17 have been stalled for weeks)               |
+| `codex-security-nightly`          | `0 7 * * *`    | `/hooks/codex-nightly`              | nightly scans — still gated by `prime_config.codex_nightly_enabled` |
+| `feedback-forward-retry`          | `*/10 * * * *` | `/hooks/feedback-forward-retry`     | replays undelivered feedback                                        |
+
+Each is scheduled with the vault lookup **inside** the command, matching the
+sixteen that were already healthy, so a rotation needs no reschedule and a
+missing secret produces a visible 401 rather than a job that was never made.
+
+**A schedule is not a policy switch.** Turning `codex-security-nightly` on does
+not turn nightly scanning on — `codex_nightly_enabled` does, and it was not
+touched. The cron job's only job is to call the worker; whether work happens is
+the worker's decision, already implemented.
+
+**Blast radius.** Four of the six drain queues that are currently EMPTY
+(`clone_backends`, `cascade_events`, `clone_entitlement_reconciliations` and
+`clones` all have zero rows), so they have nothing to do on their first run.
+The two with a backlog: `codex-security-sweep` marks 10 scans that have been
+`running` since 31 Jul–6 Aug as timed out and may re-dispatch up to 7 `queued`
+since 27 Jul (bounded by `MAX_DISPATCH_ATTEMPTS`); `feedback-forward-retry`
+forwards one unforwarded submission.
+
+**Note on the MCP.** The Lovable connector returned `499 request_cancelled` on
+several of these calls while the statement had in fact COMMITTED — `cron.schedule`
+returned jobid 46 for the first one only when queried afterwards. State was
+re-read after every error rather than the call being retried blind. `cron.schedule`
+is upsert-by-name, so a repeat would have been safe either way.
