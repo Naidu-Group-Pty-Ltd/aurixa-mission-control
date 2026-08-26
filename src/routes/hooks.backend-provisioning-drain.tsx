@@ -34,6 +34,22 @@ async function reclaimStalled() {
     .in("status", ["pending", "provisioning", "migrating", "seeding_admin"]);
 }
 
+/**
+ * Claim one job.
+ *
+ * A READ THAT FAILED IS NOT A QUEUE THAT IS EMPTY, and a CLAIM that failed is
+ * not a race that was lost. PostgREST resolves to `{ data: null, error }` on any
+ * failure, and `data: null` is also what both of those normal outcomes look
+ * like — so a database fault returned "nothing to do", the worker reported
+ * success, and `clone_backends` stayed at `pending` showing the operator
+ * "Queued — background worker will start within ~60 seconds" for ever. That is
+ * the same sentence this worker's absence produced, which is exactly why it
+ * must not be reachable a second way. Inert until now only because the job was
+ * never scheduled.
+ *
+ * A genuine failure THROWS: the route's catch turns it into a non-200 that
+ * lands in `net._http_response`, where `cron_delivery_health()` can see it.
+ */
 async function claimOne(): Promise<null | {
   clone_id: string;
   queued_admin_password_enc: string | null;
@@ -44,7 +60,7 @@ async function claimOne(): Promise<null | {
   attempts: number;
 }> {
   const nowIso = new Date().toISOString();
-  const { data: candidates } = await admin
+  const { data: candidates, error: selectError } = await admin
     .from("clone_backends")
     .select("clone_id, attempts")
     .eq("status", "pending")
@@ -53,9 +69,12 @@ async function claimOne(): Promise<null | {
     .lt("attempts", MAX_ATTEMPTS)
     .order("queued_at", { ascending: true, nullsFirst: false })
     .limit(1);
+  if (selectError) {
+    throw new Error(`backend-provisioning claim: could not read the queue: ${selectError.message}`);
+  }
   if (!candidates?.length) return null;
   const target = candidates[0];
-  const { data: claimed } = await admin
+  const { data: claimed, error: claimError } = await admin
     .from("clone_backends")
     .update({
       worker_started_at: nowIso,
@@ -69,6 +88,12 @@ async function claimOne(): Promise<null | {
       "clone_id, queued_admin_password_enc, queued_module_ids, admin_email, region, enqueued_by, attempts",
     )
     .maybeSingle();
+  // Losing the race returns no row and no error. A fault is not that.
+  if (claimError) {
+    throw new Error(
+      `backend-provisioning claim: could not claim ${target.clone_id}: ${claimError.message}`,
+    );
+  }
   return claimed ?? null;
 }
 
