@@ -21,6 +21,7 @@ import {
 import { isBlockedByApproval } from "./cascade-approvals.server";
 import { validateClonePinsServer } from "./library-validation.server";
 import { validateModuleGlobs } from "@/lib/module-globs";
+import { mapWithConcurrency } from "@/lib/concurrency";
 
 type CascadeResultUpdate = Database["public"]["Tables"]["cascade_results"]["Update"];
 type SupabaseLike = SupabaseClient<Database>;
@@ -542,15 +543,30 @@ async function processClone(args: {
     sha: string | null;
   }> = [];
 
-  for (const path of primeFiles) {
+  // Bounded concurrency, and this is the difference between a cascade that
+  // finishes and one that does not exist.
+  //
+  // The first mirror run measured 71 candidate paths, each needing a content
+  // read and a blob create -- ~144 sequential round-trips. Run one at a time
+  // that overruns the 60-second `timeout_milliseconds` on the pg_cron
+  // `net.http_post` that drives the scheduled path, and outlives the isolate on
+  // the webhook path. Both were observed: three cascade_events sat in `running`
+  // with their results at `pushing`, `net._http_response` recorded
+  // `timed_out = true` at exactly 60,000 ms, and no branch was ever created on
+  // the clone. Nothing reported a failure, because nothing got far enough to.
+  //
+  // Eight at a time is chosen against GitHub's secondary rate limits rather
+  // than for maximum speed: the work is IO, not CPU, and the same 144 calls
+  // finish inside the budget with room to spare.
+  const prepared = await mapWithConcurrency(primeFiles, 8, async (path) => {
     const primeFile = await getFileContent(octokit, primeRef, path);
-    if (!primeFile) continue;
+    if (!primeFile) return null;
     // A mirror already knows this path differs -- the blob SHAs said so -- and
     // re-reading the clone's copy to confirm it would double the request count
     // of the one scope that cannot afford it.
     if (!isMirror) {
       const cloneFile = await getFileContent(octokit, cloneRef, path);
-      if (cloneFile && cloneFile.content === primeFile.content) continue;
+      if (cloneFile && cloneFile.content === primeFile.content) return null;
     }
 
     const { data: blob } = await octokit.git.createBlob({
@@ -559,7 +575,10 @@ async function processClone(args: {
       content: Buffer.from(primeFile.content, "utf8").toString("base64"),
       encoding: "base64",
     });
-    treeEntries.push({ path, mode: "100644", type: "blob", sha: blob.sha });
+    return { path, mode: "100644" as const, type: "blob" as const, sha: blob.sha };
+  });
+  for (const entry of prepared) {
+    if (entry) treeEntries.push(entry);
   }
 
   if (treeEntries.length === 0) {

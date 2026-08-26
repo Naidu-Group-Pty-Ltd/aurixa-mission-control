@@ -21,12 +21,67 @@ const MAX_ATTEMPTS = 3;
 
 async function reclaimStalled() {
   const cutoff = new Date(Date.now() - STALL_MINUTES * 60 * 1000).toISOString();
-  await admin
+
+  // Every step below is checked, and a failure THROWS rather than being logged
+  // past. A reclaim that half-happened leaves the queue in a state this worker
+  // cannot reason about — and the specific way it goes wrong is that the event
+  // comes back to `pending` while its results stay at `pushing`, so the re-run
+  // finds nothing queued and reports "0 of 0": a success message for work that
+  // never happened. Failing the tick is recoverable; pg_cron calls again in a
+  // minute and `net._http_response` records the non-200.
+
+  // Rows this worker claimed and then died holding.
+  const { error: claimedErr } = await admin
     .from("cascade_events")
     .update({ worker_started_at: null, status: "pending" })
     .lt("worker_started_at", cutoff)
     .is("worker_finished_at", null)
     .in("status", ["pending", "running"]);
+  if (claimedErr) {
+    throw new Error(`cascade-drain reclaim: stalled claims: ${claimedErr.message}`);
+  }
+
+  // And rows NOBODY claimed, because the cascade was executed somewhere else.
+  //
+  // `executeCascade` is called directly by the GitHub webhook and by the
+  // schedule runner; neither sets `worker_started_at`, so the reclaim above --
+  // which filters on it -- could never see them. When one of those runs is cut
+  // short, and a mirror cascade is long enough that it was, the event sits at
+  // `running` for ever with nothing to move it and nothing reporting a failure.
+  // Three of them did exactly that: `started_at` set, `worker_started_at` null,
+  // `net._http_response.timed_out = true` at 60,000 ms.
+  const { error: orphanErr } = await admin
+    .from("cascade_events")
+    .update({ worker_started_at: null, status: "pending" })
+    .is("worker_started_at", null)
+    .is("completed_at", null)
+    .lt("started_at", cutoff)
+    .eq("status", "running");
+  if (orphanErr) {
+    throw new Error(`cascade-drain reclaim: orphaned runs: ${orphanErr.message}`);
+  }
+
+  // The results have to come back with them.
+  const { data: revived, error: revivedErr } = await admin
+    .from("cascade_events")
+    .select("id")
+    .eq("status", "pending")
+    .is("completed_at", null)
+    .lt("started_at", cutoff);
+  if (revivedErr) {
+    throw new Error(`cascade-drain reclaim: could not list revived events: ${revivedErr.message}`);
+  }
+  const ids = (revived ?? []).map((r) => r.id);
+  if (ids.length > 0) {
+    const { error: resultsErr } = await admin
+      .from("cascade_results")
+      .update({ status: "queued", started_at: null })
+      .in("cascade_event_id", ids)
+      .in("status", ["pushing"]);
+    if (resultsErr) {
+      throw new Error(`cascade-drain reclaim: could not requeue results: ${resultsErr.message}`);
+    }
+  }
 }
 
 /**
@@ -50,7 +105,14 @@ async function claimOne(): Promise<{ id: string; attempts: number } | null> {
     .select("id, attempts")
     .eq("status", "pending")
     .eq("requires_approval", false)
-    .eq("mode", "auto_merge")
+    // Any mode, not just auto_merge.
+    //
+    // The original filter was justified as "so we never bypass approvals", but
+    // `requires_approval = false` above is what actually enforces that, and the
+    // mode filter left `pr` cascades with no retry at all: a webhook-driven
+    // cascade that died mid-flight was reclaimed to `pending` by the sweep and
+    // then skipped for ever by this claim. A `pr` cascade opens a pull request
+    // on the clone -- it is the SAFER of the two to retry, not the riskier.
     .is("worker_started_at", null)
     .lt("attempts", MAX_ATTEMPTS)
     .order("created_at", { ascending: true })
