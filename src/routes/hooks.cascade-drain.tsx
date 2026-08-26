@@ -29,9 +29,23 @@ async function reclaimStalled() {
     .in("status", ["pending", "running"]);
 }
 
+/**
+ * Claim one job.
+ *
+ * A READ THAT FAILED IS NOT A QUEUE THAT IS EMPTY, and a CLAIM that failed is
+ * not a race that was lost. PostgREST resolves to `{ data: null, error }` on any
+ * failure, and `data: null` is also what both of those normal outcomes look
+ * like — so a database fault returned "nothing to do", the worker reported
+ * success, and the queue never drained with nothing anywhere to grep. That is
+ * the defect `SCREENING_EXECUTION.md` records in the prime, and it was inert
+ * here only because this worker had never been scheduled. It is not inert now.
+ *
+ * A genuine failure THROWS: the route's catch turns it into a non-200 that
+ * lands in `net._http_response`, where `cron_delivery_health()` can see it.
+ */
 async function claimOne(): Promise<{ id: string; attempts: number } | null> {
   const nowIso = new Date().toISOString();
-  const { data: candidates } = await admin
+  const { data: candidates, error: selectError } = await admin
     .from("cascade_events")
     .select("id, attempts")
     .eq("status", "pending")
@@ -41,9 +55,12 @@ async function claimOne(): Promise<{ id: string; attempts: number } | null> {
     .lt("attempts", MAX_ATTEMPTS)
     .order("created_at", { ascending: true })
     .limit(1);
+  if (selectError) {
+    throw new Error(`cascade-drain claim: could not read the queue: ${selectError.message}`);
+  }
   if (!candidates?.length) return null;
   const target = candidates[0];
-  const { data: claimed } = await admin
+  const { data: claimed, error: claimError } = await admin
     .from("cascade_events")
     .update({
       worker_started_at: nowIso,
@@ -54,6 +71,10 @@ async function claimOne(): Promise<{ id: string; attempts: number } | null> {
     .is("worker_started_at", null)
     .select("id, attempts")
     .maybeSingle();
+  // Losing the race returns no row and no error. A fault is not that.
+  if (claimError) {
+    throw new Error(`cascade-drain claim: could not claim ${target.id}: ${claimError.message}`);
+  }
   return claimed ?? null;
 }
 

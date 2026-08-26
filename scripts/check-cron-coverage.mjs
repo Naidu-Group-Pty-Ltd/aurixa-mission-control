@@ -63,11 +63,56 @@ for (const { body } of migrationFiles) {
   }
 }
 
+// ── And exactly once ───────────────────────────────────────────────────────
+//
+// The other way a hook is wrong is being driven TWICE. `/hooks/brand-drift` was
+// hit every 30 minutes by both `aurixa-brand-drift-scan` and `brand-drift-30min`
+// — fixed in production once, and still latent in the corpus afterwards, because
+// nothing compared job names to endpoints. Retiring a legacy name is also where
+// a typo reintroduces it: unschedule `brand-drift-30mn`, schedule the canonical
+// one, and the corpus quietly has two again.
+//
+// Last action wins, in position order, so a name the corpus goes on to
+// unschedule does not count as driving anything.
+const jobHook = new Map();
+for (const { body } of migrationFiles) {
+  const code = body
+    .split("\n")
+    .filter((l) => !l.trimStart().startsWith("--"))
+    .join("\n");
+  const actions = [];
+  for (const m of code.matchAll(/cron\.schedule\s*\(\s*'([^']+)'([\s\S]*?)\)\s*;/g)) {
+    const hook = (m[2].match(/\/hooks\/([a-z0-9-]+)/) ?? [])[1];
+    if (hook) actions.push({ at: m.index, name: m[1], kind: "schedule", hook });
+  }
+  for (const m of code.matchAll(/cron\.unschedule\s*\(\s*'([^']+)'/g)) {
+    actions.push({ at: m.index, name: m[1], kind: "unschedule" });
+  }
+  actions.sort((a, b) => a.at - b.at);
+  for (const a of actions) {
+    if (a.kind === "schedule") jobHook.set(a.name, a.hook);
+    else jobHook.delete(a.name);
+  }
+}
+const perHook = new Map();
+for (const [job, hook] of jobHook) {
+  if (!perHook.has(hook)) perHook.set(hook, []);
+  perHook.get(hook).push(job);
+}
+const doubled = [...perHook.entries()].filter(([, jobs]) => jobs.length > 1);
+
 const orphans = hooks.filter((h) => !scheduled.has(h) && !NOT_SCHEDULED.has(h));
 const staleExemptions = [...NOT_SCHEDULED.keys()].filter((h) => !hooks.includes(h));
 const contradictions = [...NOT_SCHEDULED.keys()].filter((h) => scheduled.has(h));
 
 const problems = [];
+if (doubled.length)
+  problems.push(
+    `Hook endpoints driven by more than one job:\n` +
+      doubled.map(([h, jobs]) => `  • /hooks/${h} ← ${jobs.join(", ")}`).join("\n") +
+      `\n  Each fires on its own schedule, so the worker runs twice as often as\n` +
+      `  anything says it does. Retire the superseded name with cron.unschedule.`,
+  );
 if (orphans.length)
   problems.push(
     `Hook routes with no schedule:\n` +
@@ -96,5 +141,6 @@ if (problems.length) {
 console.log(
   `✓ Cron coverage: ${hooks.length} hook routes — ` +
     `${hooks.length - NOT_SCHEDULED.size} scheduled, ` +
-    `${NOT_SCHEDULED.size} declared event-driven.`,
+    `${NOT_SCHEDULED.size} declared event-driven, ` +
+    `${perHook.size} endpoints each driven by exactly one job.`,
 );

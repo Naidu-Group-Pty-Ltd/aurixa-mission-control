@@ -69,9 +69,24 @@ type StepOutcome =
   | { kind: "done"; patch?: Record<string, unknown>; result?: unknown }
   | { kind: "error"; error: string; retryAfterSeconds?: number | null; retryable: boolean };
 
+/**
+ * Claim up to `limit` rows.
+ *
+ * A READ THAT FAILED IS NOT A QUEUE THAT IS EMPTY. Both statements here used to
+ * destructure `data` alone. PostgREST resolves to `{ data: null, error }` on any
+ * failure, and `data: null` is *also* what an empty queue and a lost claim race
+ * look like — so a database fault returned `[]`, the drain reported
+ * `claimed: 0` with `success: true`, and the queue simply never drained with
+ * nothing anywhere to grep. That is the defect `SCREENING_EXECUTION.md` records
+ * in the prime, in the same shape, in the worker that had actually been running.
+ *
+ * So a genuine failure THROWS. The route's catch turns it into a non-200 with
+ * the message, which lands in `net._http_response` where `cron_delivery_health()`
+ * can see it. Silence is the one outcome that converges nowhere.
+ */
 async function claim(limit: number): Promise<DeploymentRow[]> {
   const nowIso = new Date().toISOString();
-  const { data: candidates } = await admin
+  const { data: candidates, error: selectError } = await admin
     .from("clone_deployments")
     .select("clone_id")
     .in("status", CLAIMABLE)
@@ -79,10 +94,13 @@ async function claim(limit: number): Promise<DeploymentRow[]> {
     .is("worker_started_at", null)
     .order("next_attempt_at", { ascending: true })
     .limit(limit);
+  if (selectError) {
+    throw new Error(`claim: could not read the queue: ${selectError.message}`);
+  }
   if (!candidates?.length) return [];
 
   const ids = candidates.map((c: { clone_id: string }) => c.clone_id);
-  const { data: claimed } = await admin
+  const { data: claimed, error: claimError } = await admin
     .from("clone_deployments")
     .update({ worker_started_at: nowIso })
     .in("clone_id", ids)
@@ -91,6 +109,11 @@ async function claim(limit: number): Promise<DeploymentRow[]> {
     .select(
       "clone_id, provider_slug, status, project_id, project_name, team_id, latest_deployment_id, provider_origin, domain, dns_target_type, dns_target_value, domain_verification, env_digest, attempts, max_attempts, created_at",
     );
+  // Losing the race is normal and returns zero rows with no error. A fault is
+  // not, and must not be reported as one.
+  if (claimError) {
+    throw new Error(`claim: could not claim ${ids.length} row(s): ${claimError.message}`);
+  }
   return (claimed ?? []) as DeploymentRow[];
 }
 
@@ -573,13 +596,20 @@ const TEARDOWN_ROWS_PER_RUN = 3;
 
 async function processTeardowns() {
   const nowIso = new Date().toISOString();
-  const { data: rows } = await admin
+  const { data: rows, error } = await admin
     .from("hosting_teardowns")
     .select("*")
     .eq("status", "queued")
     .lte("next_attempt_at", nowIso)
     .order("created_at", { ascending: true })
     .limit(TEARDOWN_ROWS_PER_RUN);
+
+  // Same rule as the sweep: a queue that could not be READ is not a queue that
+  // is EMPTY, and a teardown that never runs leaves a provider project billing.
+  if (error) {
+    console.error("deployment-drain teardown: could not read the queue:", error.message);
+    return { claimed: 0, done: 0, failed: 0, error: error.message };
+  }
 
   let done = 0;
   let failed = 0;
@@ -657,7 +687,7 @@ async function processTeardowns() {
       }
     }
   }
-  return { claimed: rows?.length ?? 0, done, failed };
+  return { claimed: rows?.length ?? 0, done, failed, error: null as string | null };
 }
 
 /**
@@ -682,7 +712,7 @@ const SWEEP_INTERVAL_MINUTES = 30;
 
 async function sweepLiveBuilds() {
   const cutoff = new Date(Date.now() - SWEEP_INTERVAL_MINUTES * 60 * 1000).toISOString();
-  const { data: rows } = await admin
+  const { data: rows, error } = await admin
     .from("clone_deployments")
     .select(
       "clone_id, provider_slug, project_id, team_id, status, domain, last_build_state, last_build_deployment_id",
@@ -692,6 +722,17 @@ async function sweepLiveBuilds() {
     .or(`build_checked_at.is.null,build_checked_at.lt.${cutoff}`)
     .order("build_checked_at", { ascending: true, nullsFirst: true })
     .limit(SWEEP_ROWS_PER_RUN);
+
+  // This sweep is the backup for a webhook that was never delivered, so it is
+  // the last thing that should fail quietly: a discarded error here reported
+  // `checked: 0` — identical to "no build was due" — and the backup for one
+  // silent failure mode became a second one. It does not throw, because the
+  // claim work above it already succeeded and is worth keeping; it is named in
+  // the response instead.
+  if (error) {
+    console.error("deployment-drain sweep: could not read live deployments:", error.message);
+    return { checked: 0, changed: 0, error: error.message };
+  }
 
   let checked = 0;
   let changed = 0;
@@ -779,7 +820,7 @@ async function sweepLiveBuilds() {
       });
     }
   }
-  return { checked, changed };
+  return { checked, changed, error: null as string | null };
 }
 
 async function drain() {

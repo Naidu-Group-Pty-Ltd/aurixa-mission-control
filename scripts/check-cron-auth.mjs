@@ -15,9 +15,38 @@
 // degrade into a valid-looking wrong one:
 //
 //   1. No COALESCE(..., '') around a secret used in an Authorization header.
-//   2. A cron command that sends Authorization must read the secret from the
-//      vault, and must read it INSIDE the command so each run picks up a
+//   2. A cron command that POSTS TO A /hooks/ PATH must read the secret from
+//      the vault, and must read it INSIDE the command so each run picks up a
 //      rotation instead of replaying whatever was true at install time.
+//
+// Rule 2 used to be gated on the command mentioning `Authorization`, and that
+// is how it missed SIX workers — including both halves of the cloning engine.
+// They build the header into a variable first and pass it through format(%L):
+//
+//     v_headers := jsonb_build_object('Authorization','Bearer ' || v_secret)::text;
+//     PERFORM cron.schedule('backend-provisioning-drain-1min', '* * * * *',
+//       format($f$SELECT net.http_post(url:='…/hooks/backend-provisioning-drain',
+//         headers:=%L::jsonb, body:='{}'::jsonb)$f$, v_headers));
+//
+// The scheduled command contains neither the word `Authorization` nor the
+// vault, so the check skipped it entirely — and the same `%L` is the "baked at
+// install" fault this file exists to catch, one indirection further out.
+//
+// It also carried a worse consequence than a bad credential. Reading the secret
+// early means DECIDING on it early, and every one of those six migrations does:
+//
+//     IF v_secret IS NULL THEN
+//       RAISE NOTICE 'Vault entry cron_secret not found; skipping … schedule.';
+//       RETURN;
+//     END IF;
+//
+// The vault was empty when they ran. Six workers were never scheduled, the
+// migrations recorded as applied, and a NOTICE nobody reads was the only trace.
+// Gating on the /hooks/ path rather than on the header dissolves both faults at
+// once, because a command that reads the vault at RUN time has no reason to
+// read it at INSTALL time — so there is nothing left to make the schedule
+// conditional on. A missing secret then fails the way it should: a 401 in
+// `net._http_response`, which `cron_delivery_health()` already reports.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -63,9 +92,28 @@ for (const file of files) {
     });
   }
 
-  // Record the last scheduling of each job name.
+  // Record the last ACTION on each job name, in position order.
+  //
+  // Scheduling is not the only thing that happens to a job. A name can also be
+  // RETIRED — `cron.unschedule('brand-drift-30min')` — and four names are,
+  // because production runs them under different names and the corpus scheduled
+  // both. Judging the credential of a job the corpus goes on to delete reports a
+  // defect on correct code, which is how a guard earns the reputation that gets
+  // it silenced. So the last action wins, and only a name still SCHEDULED at the
+  // end of the corpus is judged.
+  const actions = [];
   for (const m of code.matchAll(/cron\.schedule\s*\(\s*'([^']+)'([\s\S]*?)\)\s*;/g)) {
-    lastSchedule.set(m[1], { file, body: m[2] });
+    actions.push({ at: m.index, name: m[1], kind: "schedule", body: m[2] });
+  }
+  for (const m of code.matchAll(/cron\.unschedule\s*\(\s*'([^']+)'/g)) {
+    actions.push({ at: m.index, name: m[1], kind: "unschedule" });
+  }
+  // Within one file a canonical block unschedules the name and then schedules
+  // it again, so position decides — not which regex ran first.
+  actions.sort((a, b) => a.at - b.at);
+  for (const a of actions) {
+    if (a.kind === "schedule") lastSchedule.set(a.name, { file, body: a.body });
+    else lastSchedule.delete(a.name);
   }
 }
 
@@ -79,12 +127,24 @@ for (const f of rawFindings) {
 }
 
 for (const [jobname, { file, body }] of lastSchedule) {
-  if (!/Authorization/i.test(body)) continue;
+  // Every /hooks/ endpoint is behind verifyCronAuth, so a job that posts to one
+  // needs a credential whether or not the word appears in the command text.
+  // Asking about the PATH rather than the header is what catches a header
+  // hidden behind format(%L).
+  if (!/\/hooks\//.test(body)) continue;
   if (/vault\.decrypted_secrets/i.test(body)) continue;
+  const interpolated = /%L/.test(body);
   findings.push({
     file,
-    why: `the effective scheduling of '${jobname}' sends Authorization without reading vault.decrypted_secrets`,
-    snippet: body.replace(/\s+/g, " ").slice(0, 100),
+    why:
+      `the effective scheduling of '${jobname}' posts to a /hooks/ path without reading ` +
+      `vault.decrypted_secrets inside the command` +
+      (interpolated
+        ? " — its headers are interpolated with format(%L), so the credential is " +
+          "frozen at install time and the schedule is conditional on the secret " +
+          "already existing"
+        : ""),
+    snippet: body.replace(/\s+/g, " ").slice(0, 120),
   });
 }
 
