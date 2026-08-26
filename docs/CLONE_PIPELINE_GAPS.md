@@ -9,11 +9,24 @@ Everything below is evidence, not review. Counts come from the two live
 projects (`dduzbchuswwbefdunfct`, `plisdzywzleljorrphxv`); line references are
 to this repository.
 
-> **Status, 20 Aug 2026.** §2, §3, §4, §5, §6 and §8 are **fixed** —
-> see the commit that added `clone-repo-retarget.server.ts`. §1 (the only
-> schema path is a migration replay that cannot run) and §7 (the convergence
-> rules that path needs) are **open**, and §1 is still what blocks a clone of
-> this prime. Each section below is marked.
+> **Status, 26 Aug 2026.** All nine are now **fixed**. §2, §3, §4, §5, §6 and
+> §8 were closed by the commit that added `clone-repo-retarget.server.ts`.
+>
+> §1 and §7 were still marked open at 20 Aug and are closed now — the marker
+> was stale rather than the work incomplete. §1 said the only schema path was a
+> migration replay that halts on migration #1; that replay is no longer the
+> path. `provisionCloneBackend` defaults to `schemaStrategy: "introspection"`
+> and so does the worker's own call, so a clone is built from the prime's live
+> catalogue. §7's three convergence rules are implemented in
+> `schema-introspection.server.ts` — `add column if not exists`, repeated
+> function passes until the failure count stops falling, and `conindid`
+> filtering for constraint-backed indexes.
+>
+> **This document therefore no longer describes a blocked pipeline**, and the
+> headline below is kept only as a record of what August measured. What the
+> pipeline was actually missing was not a schema path but a DRIVER: two of its
+> three workers had never been scheduled. See
+> [`THE_CLONING_ENGINE.md`](./THE_CLONING_ENGINE.md).
 
 **The headline: the pipeline cannot currently clone this prime at all**, and
 several of the checks that would have caught that measure the wrong thing.
@@ -22,7 +35,7 @@ auth policy, realtime membership and the `_shared` bundling are all sound.
 
 ---
 
-## 1 · BLOCKING — the only schema path is a migration replay that cannot run  — **OPEN**
+## 1 · BLOCKING — the only schema path is a migration replay that cannot run — **FIXED** (introspection is the default path)
 
 `applyPrimeMigrations` (`backend-provisioning.server.ts:1145`) replays
 `supabase/migrations/**` from the prime's repository in filename order, and
@@ -45,24 +58,24 @@ Supabase project slot and halts.
 
 **A replay of a repo's migrations is not a clone of a database.** It
 reproduces the history someone wrote down, not the schema that exists. The
-gap is not a bug in the replay; it is that the replay is the *only* path.
+gap is not a bug in the replay; it is that the replay is the _only_ path.
 
 ### What worked instead
 
 Introspecting the prime's live catalog over the Management API and applying
 generated DDL to the clone, in dependency order, reconciling each stage:
 
-| Stage | Result |
-| --- | --- |
-| enum types | 94 / 94 |
-| tables | 641 / 641, column signature md5-identical |
-| functions | 491 / 491 (three passes — see §7) |
-| constraints | 2,560 / 2,560, name-set md5-identical |
-| indexes | 2,136 / 2,136 |
-| views / matviews | 13 / 1 |
-| triggers | 472 / 472 |
-| RLS policies | 1,149 / 1,149 |
-| storage buckets | 32 / 32, 0 objects |
+| Stage            | Result                                    |
+| ---------------- | ----------------------------------------- |
+| enum types       | 94 / 94                                   |
+| tables           | 641 / 641, column signature md5-identical |
+| functions        | 491 / 491 (three passes — see §7)         |
+| constraints      | 2,560 / 2,560, name-set md5-identical     |
+| indexes          | 2,136 / 2,136                             |
+| views / matviews | 13 / 1                                    |
+| triggers         | 472 / 472                                 |
+| RLS policies     | 1,149 / 1,149                             |
+| storage buckets  | 32 / 32, 0 objects                        |
 
 Total DDL moved: **1.58 MB**. The whole transfer takes minutes and needs only
 the Management API — no database password, no open Postgres port.
@@ -94,12 +107,12 @@ opposite: its value is that only one deployment holds it.
 
 **Recommendation.** Classify shelled secrets three ways rather than two:
 
-| Class | Action |
-| --- | --- |
-| platform (`SUPABASE_*`) | never copy — already correct |
-| **identity** (`INTERNAL_EDGE_SECRET`, `CSRF_TOKEN_PEPPER`, anything `*_SECRET`/`*_PEPPER` signing local tokens) | **generate fresh per clone** |
-| deployment config (`ALLOWED_ORIGINS`, `APP_URL`, `APP_BASE_URL`) | derive from the clone's own origins — copying names the prime's domain |
-| vendor credentials | inherit — current behaviour |
+| Class                                                                                                           | Action                                                                 |
+| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| platform (`SUPABASE_*`)                                                                                         | never copy — already correct                                           |
+| **identity** (`INTERNAL_EDGE_SECRET`, `CSRF_TOKEN_PEPPER`, anything `*_SECRET`/`*_PEPPER` signing local tokens) | **generate fresh per clone**                                           |
+| deployment config (`ALLOWED_ORIGINS`, `APP_URL`, `APP_BASE_URL`)                                                | derive from the clone's own origins — copying names the prime's domain |
+| vendor credentials                                                                                              | inherit — current behaviour                                            |
 
 The manual clone generated 32 random bytes for each identity secret and
 verified the values differed from the prime's before finishing.
@@ -112,11 +125,11 @@ The repository is created with `createFork` / `createUsingTemplate`
 (`clone-provisioning.functions.ts:118,130`) — a byte copy. Nothing rewrites it
 afterwards. Three artefacts therefore arrive naming the **prime's** project:
 
-| Artefact | Effect |
-| --- | --- |
-| `supabase/config.toml` → `project_id` | `rotate-internal-edge-secret` and `aml-sanctions-refresh` (a **daily cron**) resolve their target by reading this line |
-| `.github/workflows/deploy-supabase-functions.yml` (×2) and `apply-migration.yml` | `${{ vars.SUPABASE_PROJECT_REF \|\| '<prime ref>' }}` — and the deploy workflow runs on **every push to `main`** |
-| `supabase/.temp/linked-project.json` | checked in, holds `{"ref":"<prime>"}`; any bare `supabase …` command resolves from it whatever `config.toml` says |
+| Artefact                                                                         | Effect                                                                                                                 |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `supabase/config.toml` → `project_id`                                            | `rotate-internal-edge-secret` and `aml-sanctions-refresh` (a **daily cron**) resolve their target by reading this line |
+| `.github/workflows/deploy-supabase-functions.yml` (×2) and `apply-migration.yml` | `${{ vars.SUPABASE_PROJECT_REF \|\| '<prime ref>' }}` — and the deploy workflow runs on **every push to `main`**       |
+| `supabase/.temp/linked-project.json`                                             | checked in, holds `{"ref":"<prime>"}`; any bare `supabase …` command resolves from it whatever `config.toml` says      |
 
 `SUPABASE_PROJECT_REF` appears **nowhere** in this repository, so the variable
 that would override the default is never set on a clone. `linked-project`
@@ -125,8 +138,8 @@ appears nowhere either.
 What stops this today is that Mission Control pushes only Codex secrets
 (`github-secrets.server.ts:258`) — `SUPABASE_ACCESS_TOKEN` is never written to
 a clone repo. So the workflows fail loudly instead of acting. On the manual
-clone the run of 19 Aug 10:18 UTC shows `TOKEN:` empty → *"nothing was
-deployed"*, exit 1.
+clone the run of 19 Aug 10:18 UTC shows `TOKEN:` empty → _"nothing was
+deployed"_, exit 1.
 
 **That is protection by absent credential, not by correct configuration.**
 Adding that token — the obvious step when wiring a clone to deploy its own
@@ -190,7 +203,7 @@ parity should be visibly incomplete, not green.
 `backend-provisioning.server.ts:955`:
 
 ```ts
-export const REQUIRED_EXTENSIONS = ["pgcrypto","pg_net","pg_cron","pg_graphql","vault"];
+export const REQUIRED_EXTENSIONS = ["pgcrypto", "pg_net", "pg_cron", "pg_graphql", "vault"];
 ```
 
 Checked against a live project:
@@ -218,7 +231,7 @@ the prime already knows the answer.
 
 ---
 
-## 7 · Three things the DDL path has to do that a single pass does not — **OPEN** (needed by §1)
+## 7 · Three things the DDL path has to do that a single pass does not — **FIXED** (all three implemented in `schema-introspection.server.ts`)
 
 Found while applying 1.58 MB of generated DDL. Each produced a wrong result
 that looked like a right one.
@@ -255,7 +268,7 @@ Two other places hold the same URL:
 `invoke_pdf_parse_recover_stuck_jobs`. Each reads
 `vault.decrypted_secrets` for `supabase_url` first and falls back to a
 hardcoded prime URL **when the vault is empty — which is exactly a fresh
-clone's state**. `bootstrap_cron_vault` is worse than a fallback: it *seeds*
+clone's state**. `bootstrap_cron_vault` is worse than a fallback: it _seeds_
 the vault with the prime's URL literally, so calling it on a clone points that
 clone at the prime permanently. No `prosrc` rewriting exists in the
 provisioning path (`pg_proc` appears only in `handoff-parity`).
@@ -293,9 +306,9 @@ the prime ref and re-create it. The manual clone did both and finished with
   snapshot from the repository rather than from the prime's deployed list is
   **correct** and already what this pipeline does — worth stating so nobody
   "fixes" it toward the live list.
-- **`groupFunctionPaths` ships the whole `_shared/**` tree with every bundle.**
-  That is more robust than resolving each function's imports: a resolver keyed
-  on `from` silently misses a bare `import './x.ts'`, which cost one function
+- **`groupFunctionPaths` ships the whole `\_shared/**`tree with every bundle.**
+That is more robust than resolving each function's imports: a resolver keyed
+on`from`silently misses a bare`import './x.ts'`, which cost one function
   its bundle in the manual clone. Keep it. The cost is upload volume — 423
   functions over ~19 MB of shared source.
 - **Region and Postgres version are not matched.** The manual clone landed in
