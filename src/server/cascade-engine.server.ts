@@ -718,7 +718,88 @@ async function processClone(args: {
     }
   }
 
-  // === pr mode: branch + open PR (do not merge) ===
+  // === pr mode: one open cascade pull request per clone, kept current ===
+  //
+  // Opening a fresh pull request every time is what the first live run
+  // actually did: prime merged eight pull requests in the minutes it took a
+  // fix to deploy, eight cascades queued, and every one of them opened its own
+  // pull request carrying THE SAME 57 files. They could not see each other,
+  // because in `pr` mode nothing merges -- each one diffs prime against a clone
+  // `main` that no earlier cascade had changed, so each one found identical
+  // work and proposed it again. #27 through #34.
+  //
+  // "The first will win and the rest will skip" is only true of `auto_merge`.
+  // Under `pr` the correct behaviour is the one Dependabot has: keep ONE
+  // proposal and move it forward.
+  //
+  //   same tree  -> nothing new to say; report the pull request that already
+  //                 says it, and open nothing.
+  //   new tree   -> move that pull request's branch to the new commit. The
+  //                 commit's parent is the clone's current default branch, so
+  //                 the diff stays honest.
+  //   none open  -> open one.
+  //
+  // Failing to LIST is not failing to find: if the lookup errors we fall
+  // through to opening a new pull request, because a duplicate is a tidiness
+  // problem and a cascade that silently did not propose anything is not.
+  const existing = await findOpenCascadePr(octokit, cloneRef);
+
+  if (existing) {
+    let existingTreeSha: string | null = null;
+    try {
+      const { data: headCommit } = await octokit.git.getCommit({
+        owner: cloneRef.owner,
+        repo: cloneRef.repo,
+        commit_sha: existing.headSha,
+      });
+      existingTreeSha = headCommit.tree.sha;
+    } catch {
+      existingTreeSha = null;
+    }
+
+    if (existingTreeSha && existingTreeSha === newTree.sha) {
+      return {
+        status: "skipped",
+        pr_url: existing.url,
+        diff_summary: `Already proposed — PR #${existing.number} carries this exact tree (${treeEntries.length} file(s))`,
+        files_changed: treeEntries.length,
+        completed_at: new Date().toISOString(),
+      };
+    }
+
+    try {
+      await octokit.git.updateRef({
+        owner: cloneRef.owner,
+        repo: cloneRef.repo,
+        ref: `heads/${existing.branch}`,
+        sha: newCommit.sha,
+        // Its only writer is this engine, and the new commit sits on the
+        // clone's current default branch rather than on the old proposal.
+        force: true,
+      });
+      await octokit.pulls.update({
+        owner: cloneRef.owner,
+        repo: cloneRef.repo,
+        pull_number: existing.number,
+        title: `Aurixa cascade · prime@${shortSha(sourceSha)} → ${treeEntries.length} file(s)`,
+        body: cascadeBody(
+          `Automated cascade from **${primeRef.owner}/${primeRef.repo}@${shortSha(sourceSha)}**.\n\n` +
+            `_This pull request was updated in place rather than replaced, so one proposal tracks prime._`,
+        ),
+      });
+      return {
+        status: "pr_opened",
+        pr_url: existing.url,
+        commit_sha: newCommit.sha.slice(0, 7),
+        diff_summary: `PR #${existing.number} updated: ${fileSummary}`,
+        files_changed: treeEntries.length,
+        completed_at: new Date().toISOString(),
+      };
+    } catch {
+      // Branch deleted under an open pull request, or a race. Fall through.
+    }
+  }
+
   const branch = branchName(sourceSha);
   await octokit.git.createRef({
     owner: cloneRef.owner,
@@ -745,4 +826,44 @@ async function processClone(args: {
     files_changed: treeEntries.length,
     completed_at: new Date().toISOString(),
   };
+}
+
+/**
+ * The clone's open cascade proposal, if it has one.
+ *
+ * Identified by the branch name this engine gives its own branches
+ * (`aurixa/cascade-…`) rather than by author, because the pull request is
+ * opened by whichever GitHub App installation is configured and that is not a
+ * stable identity to match on.
+ *
+ * The OLDEST is chosen when several are open. That is the one a reviewer is
+ * most likely already looking at, and after the duplicate storm there were
+ * eight; picking the newest would have kept abandoning the one with the
+ * comments on it.
+ */
+async function findOpenCascadePr(
+  octokit: ReturnType<typeof getAppOctokit>,
+  cloneRef: RepoRef,
+): Promise<{ number: number; url: string; branch: string; headSha: string } | null> {
+  try {
+    const { data: open } = await octokit.pulls.list({
+      owner: cloneRef.owner,
+      repo: cloneRef.repo,
+      base: cloneRef.branch,
+      state: "open",
+      sort: "created",
+      direction: "asc",
+      per_page: 100,
+    });
+    const mine = open.find((p) => (p.head?.ref ?? "").startsWith("aurixa/cascade-"));
+    if (!mine) return null;
+    return {
+      number: mine.number,
+      url: mine.html_url,
+      branch: mine.head.ref,
+      headSha: mine.head.sha,
+    };
+  } catch {
+    return null;
+  }
 }

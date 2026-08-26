@@ -138,3 +138,34 @@ gates the prime does, and a cascade that would break it is caught there rather
 than in production.
 
 `auto_merge` and `notify` still behave as they did.
+
+### One open proposal per clone, kept current
+
+Opening a fresh pull request per cascade is what the first live run did:
+prime merged eight pull requests in the minutes a fix was deploying, eight
+cascades queued, and each opened its own pull request carrying **the same 57
+files** — #27 through #34 on the clone.
+
+They could not see each other. In `pr` mode nothing merges, so every one of
+them diffed prime against a clone `main` no earlier cascade had changed, found
+identical work, and proposed it again. "The first will win and the rest will
+skip" is only true of `auto_merge`.
+
+So `pr` mode now keeps one proposal and moves it forward, the way Dependabot
+does:
+
+| state | what happens |
+| --- | --- |
+| same tree as the open cascade PR | report that PR, open nothing |
+| new tree | move that PR's branch to the new commit and retitle it |
+| none open | open one |
+
+The open proposal is found by branch prefix (`aurixa/cascade-`), not by author,
+because the pull request is opened by whichever App installation is configured
+and that is not a stable identity to match on. When several are open the
+**oldest** wins — it is the one a reviewer is most likely already reading, and
+after the duplicate storm there were eight.
+
+Failing to LIST is not failing to find: if the lookup errors the engine falls
+through to opening a new pull request. A duplicate is a tidiness problem; a
+cascade that silently proposed nothing is not.
