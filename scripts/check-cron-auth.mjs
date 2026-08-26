@@ -46,7 +46,10 @@
 // once, because a command that reads the vault at RUN time has no reason to
 // read it at INSTALL time — so there is nothing left to make the schedule
 // conditional on. A missing secret then fails the way it should: a 401 in
-// `net._http_response`, which `cron_delivery_health()` already reports.
+// `net._http_response`. Read it THERE: `cron_delivery_health()` joins a run to a
+// response through `return_message`, which pg_cron sets to `"1 row"` for a
+// `SELECT net.http_post(...)` rather than to the request id, so its
+// `last_http_status` is NULL for every job. Measured 26 Aug 2026.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 

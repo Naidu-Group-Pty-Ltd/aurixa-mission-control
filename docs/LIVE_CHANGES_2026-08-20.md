@@ -86,7 +86,9 @@ from the code, from the job list, or from pg_cron's own reporting.
 
 Applied to Mission Control's live database (`0fb4d803-…`) through the Lovable
 MCP, and expressed as `20260826000000_schedule_the_engine.sql` so a rebuild
-reproduces it. Full analysis: [`THE_CLONING_ENGINE.md`](./THE_CLONING_ENGINE.md).
+reproduces it. **Three of the six landed in that first pass and three did not** —
+the correction and the delivery evidence are the section below, which is the
+authority on what is actually scheduled. Full analysis: [`THE_CLONING_ENGINE.md`](./THE_CLONING_ENGINE.md).
 
 `cron.job` held **16** hook jobs; twenty-two are required. Six had never been
 created, because each of their migrations reads `vault.decrypted_secrets` into
@@ -124,3 +126,108 @@ several of these calls while the statement had in fact COMMITTED — `cron.sched
 returned jobid 46 for the first one only when queried afterwards. State was
 re-read after every error rather than the call being retried blind. `cron.schedule`
 is upsert-by-name, so a repeat would have been safe either way.
+
+---
+
+# 26 Aug 2026, 02:4x UTC — the other three, and what delivery actually proves
+
+## The record above was wrong for half of it
+
+The connector answered `499 request_cancelled` on several calls in that pass and
+the note above reads them as "committed anyway". That was true for three of them
+and false for three. Read back before touching anything:
+
+```
+cron.job -> 46 backend-provisioning-drain-1min   * * * * *
+            47 cascade-drain-1min                * * * * *
+            48 entitlement-drain-2min            */2 * * * *
+            (no codex-security-nightly, no codex-security-sweep,
+             no feedback-forward-retry)
+```
+
+So a 499 is not evidence either way, in either direction. The rule the note
+states — re-read state after every error rather than retrying blind — is the
+right one; the mistake was recording the conclusion before doing it for all six.
+
+The remaining three were scheduled in one `DO` block (transactional, so
+all-or-nothing) with the same vault-inside-command shape, and confirmed by
+reading `cron.job` back:
+
+| jobid | job                      | schedule       | endpoint                        | reads vault |
+| ----: | ------------------------ | -------------- | ------------------------------- | ----------- |
+|    49 | `codex-security-nightly` | `0 7 * * *`    | `/hooks/codex-nightly`          | yes         |
+|    50 | `codex-security-sweep`   | `*/10 * * * *` | `/hooks/codex-sweep`            | yes         |
+|    51 | `feedback-forward-retry` | `*/10 * * * *` | `/hooks/feedback-forward-retry` | yes         |
+
+All six now exist, are `active`, and resolve `v_base` to
+`https://mission-control.aurixasystems.com.au`.
+
+## Delivery, from `net._http_response` and nothing else
+
+98 responses in the 20 minutes after the schedules landed. **Every one 200.**
+No 401, no 5xx, no timeout — so the vault-inside-command credential is being
+read and accepted on every tick.
+
+The two ten-minute jobs are the ones with observable first runs, and both fired
+at exactly the two boundaries since they were created — `02:40` and `02:50`,
+and at no earlier boundary in a 75-minute window:
+
+| Job                      | 02:40                                    | 02:50                                  |
+| ------------------------ | ---------------------------------------- | -------------------------------------- |
+| `codex-security-sweep`   | `retried: 7, failed: 0, timedOut: 12`    | `retried: 0, failed: 0, timedOut: 0`   |
+| `feedback-forward-retry` | `attempted: 1, delivered: 0, failed: 1`  | `attempted: 1, delivered: 0, failed: 1` |
+
+The sweeper cleared its whole backlog on its first run — the 19 scans the
+migration comment described, stalled since late July — and returned zeros ten
+minutes later. That is the engine doing work, not just answering.
+
+`codex-security-nightly` fires at `0 7 * * *` and had not come due. Its command
+is byte-identical in shape to the two above; that is all that can honestly be
+said about it yet.
+
+**`feedback-forward-retry` is a finding, not a success.** It runs, it is
+reached, and it fails the same single submission every ten minutes. The worker
+was never the problem; whatever it forwards to is. Nothing here fixes that, and
+it was invisible for as long as the job did not exist.
+
+## `cron_delivery_health()` cannot attribute a response to a job
+
+This is the function this deployment has for exactly the question above, and it
+answers `NULL` for every job, always. It joins a run to its response like this:
+
+```sql
+rp.id::TEXT = regexp_replace(runs.last_message, '\D', '', 'g')
+```
+
+`last_message` is `cron.job_run_details.return_message`, and for a command of
+the form `SELECT net.http_post(...)` pg_cron records the **row count**, not the
+returned value:
+
+```
+jobid 43 -> "1 row"    jobid 46 -> "1 row"    jobid 48 -> "1 row"
+jobid 22 -> "1 row"    jobid 47 -> "1 row"    jobid 50 -> "1 row"
+```
+
+Stripping non-digits from `"1 row"` gives `"1"`, so the lateral looks up
+`net._http_response.id = 1` — a row purged long ago, ids now being ~411,000.
+`last_http_status` and `delivered` are therefore NULL on every row of every
+call, which reads as "never delivered" rather than as "cannot tell".
+
+It is also unusable in practice for a second reason: casting `rp.id` to text
+defeats the primary key, so the function seq-scans `net._http_response` and the
+connector times it out.
+
+**pg_net keeps no URL**, and `net.http_request_queue` is drained, so nothing in
+the database currently ties a response back to the job that made it. The
+attribution above was done by response-body signature — each hook returns a
+distinctly-shaped JSON object — which works but is not something a function
+should have to do.
+
+The fix is a dispatch ledger: have each job command write `(jobname,
+request_id)` and join `request_id = net._http_response.id` as a bigint. That
+rewrites the command of **every** currently-working job, so it is not being
+applied here on inference — it is written up rather than done, and applying it
+is one migration.
+
+**A green cron run is not a delivered request; a delivery-health function that
+answers NULL is not a delivery report either.**

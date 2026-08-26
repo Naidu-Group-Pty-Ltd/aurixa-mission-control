@@ -114,7 +114,12 @@ vault **inside** its command:
 Evaluated per run, so a rotated secret needs no reschedule — and with nothing
 read at install time, there is nothing left for the schedule to be conditional
 on. A missing secret then fails the way it should: a 401 in
-`net._http_response`, which `cron_delivery_health()` already surfaces.
+`net._http_response` — which is where you have to read it. `cron_delivery_health()`
+reports the RUN, not the delivery: it matches a response by digits pulled out of
+`cron.job_run_details.return_message`, and pg_cron records `"1 row"` there for a
+`SELECT net.http_post(...)`, never the request id. So its `last_http_status` and
+`delivered` are NULL for every job on every call. See the 26 Aug entry in
+[`LIVE_CHANGES_2026-08-20.md`](./LIVE_CHANGES_2026-08-20.md).
 
 `20260826000000_schedule_the_engine.sql` writes all eleven that way. It is
 idempotent, and against the live job set it adds exactly the six that are
