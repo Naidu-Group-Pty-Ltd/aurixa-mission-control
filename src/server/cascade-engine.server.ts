@@ -767,18 +767,65 @@ async function processClone(args: {
             `Direct push to \`${cloneRef.branch}\` was blocked — falling back to PR + merge.`,
           ),
         });
+        // Ask GitHub to merge it WHEN THE CHECKS PASS, rather than now.
+        //
+        // This used to call `pulls.merge` immediately. On a clone with branch
+        // protection that is refused, which is the only reason it never landed
+        // a broken tree — protection was doing the work the cascade thought it
+        // was doing itself. Where protection is absent it merged a tree nothing
+        // had built.
+        //
+        // That is not hypothetical. On 26 Aug 2026 a mirror cascade carried
+        // prime's `package.json` and `package-lock.json` at a commit where the
+        // pair fails `npm ci` (27 missing `esbuild@0.28.2` entries — the prime
+        // reverted it a few commits later). Six of eight checks went red and
+        // the clone's `main` could not install or deploy. That one was merged
+        // by a person; on `auto_merge` it would have been merged by this
+        // function, on every clone, every time prime merges.
+        //
+        // `MERGE`, never `SQUASH`. A squash rewrites the cascade commit that
+        // names the prime SHA it came from, which is the one durable record of
+        // what a clone has received.
+        let autoMergeArmed = false;
+        try {
+          await octokit.graphql(
+            `mutation($id: ID!) {
+               enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: MERGE }) {
+                 pullRequest { autoMergeRequest { enabledAt } }
+               }
+             }`,
+            { id: pr.node_id },
+          );
+          autoMergeArmed = true;
+        } catch {
+          // Auto-merge is a repository setting and can be off, and GitHub
+          // refuses to arm it on a pull request with nothing to wait for.
+          // Fall through: with no required checks there is nothing this would
+          // have protected anyway.
+        }
+
+        if (autoMergeArmed) {
+          return {
+            status: "pr_opened",
+            pr_url: pr.html_url,
+            diff_summary: `Queued for auto-merge once checks pass (direct push blocked): ${fileSummary}`,
+            files_changed: treeEntries.length,
+            completed_at: new Date().toISOString(),
+          };
+        }
+
         const { data: merged } = await octokit.pulls.merge({
           owner: cloneRef.owner,
           repo: cloneRef.repo,
           pull_number: pr.number,
-          merge_method: "squash",
+          merge_method: "merge",
           commit_title: `Aurixa cascade prime@${shortSha(sourceSha)} (#${pr.number})`,
         });
         return {
           status: "succeeded",
           commit_sha: merged.sha?.slice(0, 7) ?? null,
           pr_url: pr.html_url,
-          diff_summary: `Auto-merged via PR (direct push blocked): ${fileSummary}`,
+          diff_summary: `Auto-merged via PR (direct push blocked, auto-merge unavailable): ${fileSummary}`,
           files_changed: treeEntries.length,
           completed_at: new Date().toISOString(),
         };
