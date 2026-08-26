@@ -222,6 +222,11 @@ export const DEFAULT_MIRROR_EXCLUSIONS: readonly SyncExclusion[] = [
   { pattern: ".env.example", reason: "protected", note: "Documents the clone's own variables." },
   { pattern: ".gitignore", reason: "protected", note: "Keeps supabase/.temp untracked here." },
   {
+    pattern: ".gitleaks.toml",
+    reason: "protected",
+    note: "Allowlists THIS deployment's own publishable anon key by literal. Prime's copy would allow prime's key and re-flag the clone's.",
+  },
+  {
     pattern: ".github/workflows/deploy-supabase-functions.yml",
     reason: "protected",
     note: "Fail-closed guard against deploying into the wrong project.",
@@ -257,4 +262,141 @@ export const DEFAULT_MIRROR_EXCLUSIONS: readonly SyncExclusion[] = [
     reason: "manual_reconcile",
     note: "Clone reads VITE_TEST_CALL_NUMBERS instead of hardcoding staff mobiles.",
   },
+  // ── Added after a cascade reverted them. Both are backend identity. ───────
+  //
+  // These two were overwritten by the 26 Aug mirror cascade of prime@14af87a
+  // and are the reason `backendIdentityHold` exists: a list only protects what
+  // somebody remembered to add to it, and nobody had added these.
+  {
+    pattern: "public/lead-magnet-embed.html",
+    reason: "manual_reconcile",
+    note: "Served verbatim from public/ and hard-codes a Supabase URL and anon key. Prime's pair is prime's project — this embed captured leads into the prime's database from the clone's own domain until it was fixed, and the next cascade wrote prime's copy straight back over it.",
+  },
+  {
+    pattern: "src/lib/reportTemplate/__tests__/renderAssetNormalisation.spec.ts",
+    reason: "manual_reconcile",
+    note: "Clone derives PROJECT from SUPABASE_URL; prime hard-codes its own project. compileTemplateHtmlForPdf admits SUPABASE_URL and nothing else, so prime's literal is a FOREIGN origin here and the fixture is correctly dropped — the assertion fails on any clone with its own backend.",
+  },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The content rule: a clone's backend identity is not a file the cascade owns,
+// whatever the file is called.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A Supabase project ref is exactly twenty lowercase letters. Both shapes that
+ * carry one into a shipped file are matched: the project URL, and the `ref`
+ * claim inside an anon key — a URL from one project with a key from another
+ * authenticates to nothing, so the pair travels together and both halves have
+ * to be seen.
+ */
+const PROJECT_URL_REF = /\b([a-z]{20})\.supabase\.co\b/g;
+const JWT_CLAIM_REF = /"ref"\s*:\s*"([a-z]{20})"/g;
+
+/** Every Supabase project this content names, deduplicated, in first-seen order. */
+export function backendRefsIn(content: string): string[] {
+  const seen = new Set<string>();
+  for (const rx of [PROJECT_URL_REF, JWT_CLAIM_REF]) {
+    rx.lastIndex = 0;
+    for (const m of content.matchAll(rx)) seen.add(m[1]);
+  }
+  return [...seen];
+}
+
+/**
+ * Whether a path is one whose content this deployment SHIPS or EXECUTES — the
+ * only paths where naming another tenant's project has a consequence.
+ *
+ * Deliberately the same rule the clone's own `backendIsolation.spec.ts`
+ * enforces, and no wider. `src/**` excluding tests, plus the whole of
+ * `public/**` — every file in it is copied into `dist/` untouched and is
+ * reachable on the deployment's own domain, which makes it the most exposed
+ * directory rather than the least.
+ *
+ * `docs/**` is deliberately OUT. 185 tracked files in the mirror name the
+ * prime's ref, nearly all of them prose and captured integration payloads,
+ * and holding those back on every cascade would bury the four lines that
+ * matter under a list nobody reads.
+ */
+export function isShippedPath(path: string): boolean {
+  if (path.startsWith("public/")) return true;
+  if (!path.startsWith("src/")) return false;
+  if (path.includes("/__tests__/")) return false;
+  if (/\.(test|spec)\.[jt]sx?$/.test(path)) return false;
+  return /\.[jt]sx?$/.test(path);
+}
+
+/**
+ * Decide whether prime's copy of one path would revert this clone's backend.
+ *
+ * The question is NOT "does prime's version name a foreign project" on its own.
+ * Prime naming its own project is prime being correct. What matters is whether
+ * writing it here would UNDO a divergence: the clone's copy is clean and
+ * prime's is not.
+ *
+ * That distinction is the difference between a guard and a nuisance. Three
+ * `supabase/functions/**` files in the mirror name the prime today, inherited
+ * and never fixed; a rule keyed on prime's content alone would report those on
+ * every cascade forever, and a "needs a human" section that is never empty is
+ * one nobody reads.
+ *
+ * ## Why this is not covered by the path list
+ *
+ * It already wasn't. `public/lead-magnet-embed.html` was fixed on the clone on
+ * 26 Aug — the embed had been posting names, emails and phone numbers into the
+ * PRIME's database from the clone's own domain — and the very next cascade
+ * wrote prime's copy back over it, because nobody had thought to add that path
+ * to `clone_sync_exclusions`. A list only protects what somebody remembered.
+ * This protects the property.
+ *
+ * ## `ownRef` unknown is not `ownRef` absent
+ *
+ * A clone with no registered backend cannot have "its own project" compared
+ * against, so every foreign ref is unresolvable rather than benign. Pass null
+ * and every ref counts as foreign: the cascade still runs, and the handful of
+ * paths that name a project are held and named instead of written blind.
+ */
+export function backendIdentityHold(args: {
+  path: string;
+  primeContent: string;
+  /** The clone's copy, or null when the clone does not have this file. */
+  cloneContent: string | null;
+  /** This clone's own Supabase project ref, or null when it has no backend. */
+  ownRef: string | null;
+}): HeldPath | null {
+  const { path, primeContent, cloneContent, ownRef } = args;
+  if (!isShippedPath(path)) return null;
+
+  const foreign = (c: string) => backendRefsIn(c).filter((r) => r !== ownRef);
+  const primeForeign = foreign(primeContent);
+  if (primeForeign.length === 0) return null;
+
+  // The clone does not have this file. Writing it would introduce a foreign
+  // project into a shipped path, which is the clone's own isolation spec going
+  // red on the cascade's own pull request.
+  if (cloneContent === null) {
+    return {
+      path,
+      pattern: "(content: foreign backend ref)",
+      reason: "manual_reconcile",
+      note:
+        `New upstream file names Supabase project ${primeForeign.join(", ")}, which is not this ` +
+        `clone's. Bring it across with this deployment's own project and key.`,
+    };
+  }
+
+  // The clone's copy names one too — nothing is being reverted, so this is
+  // prime moving and the clone following. Not this guard's business.
+  if (foreign(cloneContent).length > 0) return null;
+
+  return {
+    path,
+    pattern: "(content: foreign backend ref)",
+    reason: "manual_reconcile",
+    note:
+      `This clone's copy names no foreign project and prime's names ` +
+      `${primeForeign.join(", ")}. Writing prime's version would point a shipped file at ` +
+      `another tenant's database.`,
+  };
+}

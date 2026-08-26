@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   assertMirrorPolicy,
+  backendIdentityHold,
+  backendRefsIn,
   DEFAULT_MIRROR_EXCLUSIONS,
+  isShippedPath,
   MissingExclusionPolicyError,
   partitionCascadePaths,
   reportableHeld,
@@ -138,5 +143,203 @@ describe("a mirror must have a policy", () => {
     // An empty set stays valid on the read path; it is the mirror-specific
     // assertion that rejects it.
     expect(requireExclusions("c1", [])).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The content rule
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PRIME = "dduzbchuswwbefdunfct";
+const CLONE = "plisdzywzleljorrphxv";
+
+/** The two shapes as they actually appeared in the file that was reverted. */
+const primeEmbed = `
+  <script>
+    (function () {
+      var SUPABASE_URL = 'https://${PRIME}.supabase.co';
+      var ANON_KEY = 'eyJhbG.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IiR7UFJJTUV9In0.sig';
+    })();
+  </script>`;
+const cloneEmbed = primeEmbed.replaceAll(PRIME, CLONE);
+
+describe("backendRefsIn", () => {
+  it("reads a project out of its URL", () => {
+    expect(backendRefsIn(`https://${PRIME}.supabase.co/rest/v1/x`)).toEqual([PRIME]);
+  });
+
+  it("reads a project out of an anon key's ref claim", () => {
+    expect(backendRefsIn(`{"iss":"supabase","ref":"${CLONE}","role":"anon"}`)).toEqual([CLONE]);
+  });
+
+  it("finds both halves of a mismatched pair, because that pair authenticates to nothing", () => {
+    expect(
+      backendRefsIn(`url=https://${PRIME}.supabase.co key={"ref":"${CLONE}"}`).sort(),
+    ).toEqual([CLONE, PRIME].sort());
+  });
+
+  it("does not mistake an ordinary word for a project ref", () => {
+    // Twenty lowercase letters is the whole shape, so the boundary matters.
+    expect(backendRefsIn("see supabase.co for docs")).toEqual([]);
+    expect(backendRefsIn("https://short.supabase.co")).toEqual([]);
+  });
+});
+
+describe("isShippedPath — the same rule the clone's own isolation spec enforces", () => {
+  it("covers everything under public/, which is copied into dist untouched", () => {
+    expect(isShippedPath("public/lead-magnet-embed.html")).toBe(true);
+    expect(isShippedPath("public/robots.txt")).toBe(true);
+  });
+
+  it("covers src/ source but not its tests", () => {
+    expect(isShippedPath("src/lib/env.ts")).toBe(true);
+    expect(isShippedPath("src/pages/Index.tsx")).toBe(true);
+    expect(isShippedPath("src/lib/__tests__/thing.ts")).toBe(false);
+    expect(isShippedPath("src/lib/thing.spec.ts")).toBe(false);
+    expect(isShippedPath("src/lib/thing.test.tsx")).toBe(false);
+  });
+
+  it("leaves docs alone", () => {
+    // 185 tracked files in the mirror name the prime, nearly all of them prose
+    // and captured integration payloads. A section that is never empty is one
+    // nobody reads.
+    expect(isShippedPath("docs/BACKEND_ISOLATION.md")).toBe(false);
+    expect(isShippedPath("docs/integrations/blueprints/make/x.json")).toBe(false);
+  });
+});
+
+describe("backendIdentityHold", () => {
+  it("holds prime's copy when the clone's has been fixed — the reverted case", () => {
+    const hold = backendIdentityHold({
+      path: "public/lead-magnet-embed.html",
+      primeContent: primeEmbed,
+      cloneContent: cloneEmbed,
+      ownRef: CLONE,
+    });
+    expect(hold).not.toBeNull();
+    expect(hold!.reason).toBe("manual_reconcile");
+    expect(hold!.note).toContain(PRIME);
+  });
+
+  it("stays quiet when the clone's copy names the prime too", () => {
+    // Nothing is being reverted: this is prime moving and the clone following.
+    // Three supabase/functions files in the mirror are in exactly this state,
+    // and reporting them on every cascade forever is how a guard becomes noise.
+    expect(
+      backendIdentityHold({
+        path: "src/lib/thing.ts",
+        primeContent: `https://${PRIME}.supabase.co`,
+        cloneContent: `https://${PRIME}.supabase.co`,
+        ownRef: CLONE,
+      }),
+    ).toBeNull();
+  });
+
+  it("holds a NEW upstream file that would introduce a foreign project", () => {
+    const hold = backendIdentityHold({
+      path: "public/new-embed.html",
+      primeContent: primeEmbed,
+      cloneContent: null,
+      ownRef: CLONE,
+    });
+    expect(hold).not.toBeNull();
+    expect(hold!.note).toContain("Bring it across");
+  });
+
+  it("says nothing about a file that names only this clone's own project", () => {
+    expect(
+      backendIdentityHold({
+        path: "src/lib/env.ts",
+        primeContent: `https://${CLONE}.supabase.co`,
+        cloneContent: null,
+        ownRef: CLONE,
+      }),
+    ).toBeNull();
+  });
+
+  it("treats every ref as foreign when the clone has no registered backend", () => {
+    // Unknown is not absent. A clone with no backend cannot have "its own
+    // project" compared against, so the cascade names the paths instead of
+    // writing them blind.
+    const hold = backendIdentityHold({
+      path: "public/lead-magnet-embed.html",
+      primeContent: primeEmbed,
+      cloneContent: "<html>no project here</html>",
+      ownRef: null,
+    });
+    expect(hold).not.toBeNull();
+  });
+
+  it("ignores docs however loudly they name another project", () => {
+    expect(
+      backendIdentityHold({
+        path: "docs/BACKEND_ISOLATION.md",
+        primeContent: primeEmbed,
+        cloneContent: "clean",
+        ownRef: CLONE,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("the two paths the 26 Aug cascade reverted are now listed as well", () => {
+  // Belt and braces: `backendIdentityHold` would catch the embed on content
+  // alone, but the spec file it also reverted is a *test* file and so outside
+  // the shipped-path rule by design. A list and a property, covering each
+  // other's gap.
+  it("withholds both, and reports both to a human", () => {
+    const paths = [
+      "public/lead-magnet-embed.html",
+      "src/lib/reportTemplate/__tests__/renderAssetNormalisation.spec.ts",
+      "src/pages/Index.tsx",
+    ];
+    const { write, held } = partitionCascadePaths(paths, DEFAULT_MIRROR_EXCLUSIONS);
+    expect(write).toEqual(["src/pages/Index.tsx"]);
+    expect(reportableHeld(held).map((h) => h.path).sort()).toEqual([
+      "public/lead-magnet-embed.html",
+      "src/lib/reportTemplate/__tests__/renderAssetNormalisation.spec.ts",
+    ]);
+  });
+});
+
+describe("the seeding migration is a projection of this constant, not a second copy", () => {
+  // A hand-maintained second copy of a safety list is precisely how
+  // `public/lead-magnet-embed.html` came to be missing from the live table
+  // while sitting in nobody's list at all. There is one authority; this asserts
+  // the migration says what it says.
+  const MIGRATION = "supabase/migrations/20260826070000_seed_mirror_exclusions.sql";
+
+  const rows = () => {
+    const sql = readFileSync(join(process.cwd(), MIGRATION), "utf8");
+    const values = sql.slice(sql.indexOf("CROSS JOIN (VALUES"), sql.indexOf(") AS d(pattern"));
+    // ('pattern', 'reason', 'note') with '' as the escaped quote.
+    const rx = /\(\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*\)/g;
+    return [...values.matchAll(rx)].map((m) => ({
+      pattern: m[1].replaceAll("''", "'"),
+      reason: m[2].replaceAll("''", "'"),
+      note: m[3].replaceAll("''", "'"),
+    }));
+  };
+
+  it("carries every default, in order, with the same reason and note", () => {
+    expect(rows()).toEqual(
+      DEFAULT_MIRROR_EXCLUSIONS.map((e) => ({
+        pattern: e.pattern,
+        reason: e.reason,
+        note: e.note ?? "",
+      })),
+    );
+  });
+
+  it("adds rows and removes none — an operator's own exclusion is not ours to withdraw", () => {
+    const sql = readFileSync(join(process.cwd(), MIGRATION), "utf8");
+    expect(sql).toContain("ON CONFLICT (clone_id, pattern) DO NOTHING");
+    expect(sql).not.toMatch(/\bDELETE\b/i);
+  });
+
+  it("touches mirrors only — a module-scoped clone has no business with this set", () => {
+    expect(readFileSync(join(process.cwd(), MIGRATION), "utf8")).toContain(
+      "WHERE c.sync_scope = 'mirror'",
+    );
   });
 });
