@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createCascadeForAllClones } from "@/server/cascade-trigger.server";
 import { executeCascade } from "@/server/cascade-engine.server";
 import { enqueueScanNoAuth, resolveScanTarget } from "@/server/codex-scheduling.server";
+import { writeAuditLog } from "@/server/audit.server";
 
 // GitHub webhook receiver. Verifies HMAC-SHA256 signature with
 // GITHUB_WEBHOOK_SECRET, and on a `push` event to prime's default branch
@@ -64,6 +65,135 @@ export const Route = createFileRoute("/hooks/github")({
             });
           }
           const action = prPayload?.action as string | undefined;
+          // Declared once for both branches below: the merged-PR cascade needs
+          // to know whether this repository is prime before it does anything.
+          const repoOwner =
+            prPayload?.repository?.owner?.login ?? prPayload?.repository?.owner?.name ?? "";
+          const repoName = prPayload?.repository?.name ?? "";
+          const repoFullName = repoOwner && repoName ? `${repoOwner}/${repoName}` : "";
+
+          // ── A merged pull request is prime moving ──────────────────────────
+          //
+          // This is the trigger an operator actually thinks in: work lands when
+          // a PR merges. The `push` handler below already fires on the commit
+          // that same merge creates, and both now go through
+          // `createCascadeForAllClones`, which deduplicates on the prime SHA --
+          // so a merge produces exactly one cascade whichever delivery arrives
+          // first, and a direct push (Lovable writes to this prime's main
+          // constantly) still cascades on its own.
+          //
+          // A closed-unmerged pull request changes nothing on prime and must
+          // not cascade.
+          if (action === "closed") {
+            const merged = prPayload?.pull_request?.merged === true;
+            const mergeSha: string | null = prPayload?.pull_request?.merge_commit_sha ?? null;
+            const baseBranch: string | null = prPayload?.pull_request?.base?.ref ?? null;
+            const prNum = prPayload?.pull_request?.number ?? null;
+
+            const { data: primeCfgForMerge } = await supabaseAdmin
+              .from("prime_config")
+              .select("*")
+              .limit(1)
+              .maybeSingle();
+
+            const primeBranch = primeCfgForMerge?.default_branch || "main";
+            const onPrime =
+              Boolean(primeCfgForMerge) &&
+              repoOwner.toLowerCase() === primeCfgForMerge!.github_owner.toLowerCase() &&
+              repoName.toLowerCase() === primeCfgForMerge!.github_repo.toLowerCase();
+
+            const decline =
+              !primeCfgForMerge
+                ? "prime_not_configured"
+                : !onPrime
+                  ? `not_prime:${repoOwner}/${repoName}`
+                  : !merged
+                    ? "closed_without_merge"
+                    : baseBranch !== primeBranch
+                      ? `not_default_branch:${baseBranch}`
+                      : !mergeSha
+                        ? "no_merge_commit_sha"
+                        : null;
+
+            if (decline) {
+              await writeAuditLog({
+                action: "webhook.skipped",
+                entityType: "cascade_event",
+                metadata: { delivery: deliveryId, event: "pull_request.closed", reason: decline },
+              });
+              return new Response(JSON.stringify({ skipped: true, reason: decline }), {
+                headers: { "Content-Type": "application/json" },
+              });
+            }
+
+            const merge = await createCascadeForAllClones({
+              supabase: supabaseAdmin,
+              mode: primeCfgForMerge!.default_cascade_mode,
+              trigger: "commit",
+              sourceBranch: primeBranch,
+              sourceSha: mergeSha,
+              initiatedBy: null,
+              summary: `PR #${prNum}: ${String(prPayload?.pull_request?.title ?? "").slice(0, 180)}`,
+            });
+
+            if (merge.alreadyExisted) {
+              return new Response(
+                JSON.stringify({
+                  skipped: true,
+                  reason: "already_cascaded_for_sha",
+                  cascadeEventId: merge.eventId,
+                }),
+                { headers: { "Content-Type": "application/json" } },
+              );
+            }
+
+            if (merge.error || !merge.eventId) {
+              await writeAuditLog({
+                action: "webhook.skipped",
+                entityType: "cascade_event",
+                metadata: {
+                  delivery: deliveryId,
+                  event: "pull_request.closed",
+                  reason: merge.error ?? "no event",
+                },
+              });
+              return new Response(
+                JSON.stringify({ skipped: true, reason: merge.error ?? "no clones" }),
+                { headers: { "Content-Type": "application/json" } },
+              );
+            }
+
+            await writeAuditLog({
+              action: "webhook.cascade_triggered",
+              entityType: "cascade_event",
+              entityId: merge.eventId,
+              metadata: {
+                delivery: deliveryId,
+                event: "pull_request.closed",
+                pr: prNum,
+                sha: mergeSha,
+                mode: primeCfgForMerge!.default_cascade_mode,
+                cloneCount: merge.cloneCount,
+              },
+            });
+
+            executeCascade(supabaseAdmin, merge.eventId).catch((e) => {
+              console.error("PR-merge cascade failed:", e);
+            });
+
+            return new Response(
+              JSON.stringify({
+                success: true,
+                cascadeEventId: merge.eventId,
+                trigger: "pull_request.closed",
+                pr: prNum,
+                sha: mergeSha,
+                cloneCount: merge.cloneCount,
+              }),
+              { headers: { "Content-Type": "application/json" } },
+            );
+          }
+
           if (
             !action ||
             !["opened", "reopened", "synchronize", "ready_for_review"].includes(action)
@@ -76,10 +206,6 @@ export const Route = createFileRoute("/hooks/github")({
               { headers: { "Content-Type": "application/json" } },
             );
           }
-          const repoOwner =
-            prPayload?.repository?.owner?.login ?? prPayload?.repository?.owner?.name ?? "";
-          const repoName = prPayload?.repository?.name ?? "";
-          const repoFullName = repoOwner && repoName ? `${repoOwner}/${repoName}` : "";
           const headSha = prPayload?.pull_request?.head?.sha ?? null;
           const prNumber = prPayload?.pull_request?.number ?? null;
           const baseRef = prPayload?.pull_request?.base?.ref ?? null;
@@ -203,9 +329,9 @@ export const Route = createFileRoute("/hooks/github")({
         });
 
         if (error || !eventId) {
-          await supabaseAdmin.from("audit_log").insert({
+          await writeAuditLog({
             action: "webhook.skipped",
-            entity_type: "cascade_event",
+            entityType: "cascade_event",
             metadata: { delivery: deliveryId, reason: error ?? "no event" },
           });
           return new Response(JSON.stringify({ skipped: true, reason: error ?? "no clones" }), {
@@ -213,10 +339,10 @@ export const Route = createFileRoute("/hooks/github")({
           });
         }
 
-        await supabaseAdmin.from("audit_log").insert({
+        await writeAuditLog({
           action: "webhook.cascade_triggered",
-          entity_type: "cascade_event",
-          entity_id: eventId,
+          entityType: "cascade_event",
+          entityId: eventId,
           metadata: { delivery: deliveryId, mode, sourceSha, cloneCount },
         });
 

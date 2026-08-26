@@ -131,7 +131,9 @@ export async function listFilesMatchingGlobs(
   if (globs.length === 0) return [];
   // Defence in depth: even if a caller forgets to run validateModuleGlobs,
   // never build a matcher for a pattern that could escape the module scope.
-  const { validateModuleGlobs, isSafeRepoPath } = await import("@/lib/module-globs");
+  const { validateModuleGlobs, isSafeRepoPath, globToRegex } = await import(
+    "@/lib/module-globs"
+  );
   const { valid, invalid } = validateModuleGlobs(globs);
   if (invalid.length > 0) {
     console.warn(
@@ -160,26 +162,47 @@ export async function listFilesMatchingGlobs(
     .filter((p) => isSafeRepoPath(p) && matchers.some((rx) => rx.test(p)));
 }
 
-function globToRegex(glob: string): RegExp {
-  let out = "^";
-  for (let i = 0; i < glob.length; i++) {
-    const c = glob[i];
-    if (c === "*" && glob[i + 1] === "*") {
-      out += ".*";
-      i++;
-      if (glob[i + 1] === "/") i++;
-    } else if (c === "*") {
-      out += "[^/]*";
-    } else if (c === "?") {
-      out += "[^/]";
-    } else if (".+^${}()|[]\\".includes(c)) {
-      out += "\\" + c;
-    } else {
-      out += c;
-    }
+/**
+ * Every blob in a ref's tree, as path -> blob SHA.
+ *
+ * `listFilesMatchingGlobs` already walks this exact tree and then throws the
+ * SHAs away, because a module-scoped cascade re-reads both sides' CONTENT to
+ * decide whether a file changed. That is two API calls per file, which is fine
+ * for a module and impossible for a mirror: the prime tree is thousands of
+ * files, so content-comparing all of them is ~20,000 calls against an hourly
+ * budget of 5,000.
+ *
+ * Git already computed the answer. A blob SHA is a hash of the content, so
+ * `prime[path] !== clone[path]` IS "this file differs", for two calls total,
+ * and content is then fetched only for the handful that actually changed.
+ *
+ * Truncated trees are reported rather than silently short — a partial tree read
+ * as complete would look exactly like a clone that is already in sync.
+ */
+export async function listTreeEntries(
+  octokit: Octokit,
+  ref: RepoRef,
+): Promise<{ entries: Map<string, string>; truncated: boolean }> {
+  const { isSafeRepoPath } = await import("@/lib/module-globs");
+  const { data: branch } = await octokit.repos.getBranch({
+    owner: ref.owner,
+    repo: ref.repo,
+    branch: ref.branch,
+  });
+  const { data: tree } = await octokit.git.getTree({
+    owner: ref.owner,
+    repo: ref.repo,
+    tree_sha: branch.commit.commit.tree.sha,
+    recursive: "true",
+  });
+  const entries = new Map<string, string>();
+  for (const node of tree.tree ?? []) {
+    if (node.type !== "blob") continue;
+    if (typeof node.path !== "string" || typeof node.sha !== "string") continue;
+    if (!isSafeRepoPath(node.path)) continue;
+    entries.set(node.path, node.sha);
   }
-  out += "$";
-  return new RegExp(out);
+  return { entries, truncated: Boolean(tree.truncated) };
 }
 
 export async function getFileContent(

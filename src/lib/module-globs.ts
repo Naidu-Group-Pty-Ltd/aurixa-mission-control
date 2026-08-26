@@ -91,3 +91,37 @@ export function isSafeRepoPath(path: string): boolean {
   if (path.split("/").some((seg) => seg === "..")) return false;
   return true;
 }
+
+/**
+ * Compile a repo glob to a regex.
+ *
+ * This lived privately inside `github-app.server.ts`, where it decides which
+ * files the cascade READS out of prime. It is exported here because the same
+ * question is now asked a second time — which files the cascade must NOT WRITE
+ * into a clone (`server/cascade/syncExclusions.pure.ts`) — and two glob
+ * implementations answering the same question differently is how an exclusion
+ * silently stops excluding. One implementation, imported by both.
+ *
+ * `**` crosses directory separators, `*` and `?` do not.
+ */
+export function globToRegex(glob: string): RegExp {
+  let out = "^";
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === "*" && glob[i + 1] === "*") {
+      out += ".*";
+      i++;
+      if (glob[i + 1] === "/") i++;
+    } else if (c === "*") {
+      out += "[^/]*";
+    } else if (c === "?") {
+      out += "[^/]";
+    } else if (".+^${}()|[]\\".includes(c)) {
+      out += "\\" + c;
+    } else {
+      out += c;
+    }
+  }
+  out += "$";
+  return new RegExp(out);
+}

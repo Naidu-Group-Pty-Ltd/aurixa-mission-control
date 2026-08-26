@@ -6,9 +6,18 @@ import type { Database } from "@/integrations/supabase/types";
 import {
   getAppOctokit,
   listFilesMatchingGlobs,
+  listTreeEntries,
   getFileContent,
   type RepoRef,
 } from "./github-app.server";
+import {
+  assertMirrorPolicy,
+  partitionCascadePaths,
+  reportableHeld,
+  requireExclusions,
+  type HeldPath,
+  type SyncExclusion,
+} from "./cascade/syncExclusions.pure";
 import { isBlockedByApproval } from "./cascade-approvals.server";
 import { validateClonePinsServer } from "./library-validation.server";
 import { validateModuleGlobs } from "@/lib/module-globs";
@@ -138,6 +147,7 @@ export async function executeCascade(
       github_owner: string;
       github_repo: string;
       default_branch: string;
+      sync_scope: string | null;
     } | null;
 
     if (!clone) {
@@ -323,11 +333,31 @@ async function processClone(args: {
     github_owner: string;
     github_repo: string;
     default_branch: string;
+    sync_scope: string | null;
   };
   supabase: SupabaseLike;
   scopeFilter: Record<string, unknown> | null;
 }): Promise<CascadeResultUpdate> {
   const { octokit, primeRef, sourceSha, mode, clone, supabase, scopeFilter } = args;
+
+  const isMirror = clone.sync_scope === "mirror";
+
+  // Read what this clone is allowed to receive BEFORE deciding anything else.
+  //
+  // Fail-closed by construction: `requireExclusions` throws when the query
+  // errored or returned nothing at all, and `processClone`'s caller records the
+  // throw as a failed cascade_result. A cascade that ran without its guard
+  // rails cannot be undone by noticing afterwards -- see the module header.
+  const exclusionRes = await supabase
+    .from("clone_sync_exclusions")
+    .select("pattern, reason, note")
+    .eq("clone_id", clone.id);
+  const exclusions = requireExclusions(
+    clone.id,
+    exclusionRes.data as SyncExclusion[] | null,
+    exclusionRes.error,
+  );
+  if (isMirror) assertMirrorPolicy(clone.id, exclusions);
 
   // Module-sync cascades pin the file_globs to a single module so the push
   // only touches that module's files, not every installed module on the clone.
@@ -401,7 +431,7 @@ async function processClone(args: {
     }
   }
 
-  if (installedGlobs.length === 0) {
+  if (!isMirror && installedGlobs.length === 0) {
     return {
       status: "skipped",
       diff_summary: "No installed modules — nothing to cascade",
@@ -429,7 +459,54 @@ async function processClone(args: {
     );
   }
 
-  const primeFiles = await listFilesMatchingGlobs(octokit, primeRef, installedGlobs);
+  // ── Which paths are candidates ────────────────────────────────────────────
+  //
+  // A module-scoped clone asks the globs of what it installed. A MIRROR asks
+  // git: two recursive tree reads, and a path is a candidate when prime's blob
+  // SHA differs from the clone's or the clone has no such blob. Content is then
+  // fetched only for those, which is what makes a whole-tree cascade affordable
+  // (see `listTreeEntries`).
+  //
+  // Neither scope ever DELETES. A path present in the clone and absent from
+  // prime is left alone: the clone legitimately carries files of its own -- its
+  // isolation spec, its transfer scripts -- and a mirror that pruned them would
+  // remove the very things that make it a clone rather than a copy. Prime-side
+  // deletions are counted and named, never acted on.
+  let candidatePaths: string[];
+  let scopeLabel: string;
+  let onlyInClone = 0;
+  if (isMirror) {
+    const [primeTree, cloneTree] = await Promise.all([
+      listTreeEntries(octokit, primeRef),
+      listTreeEntries(octokit, cloneRef),
+    ]);
+    // A truncated tree read as complete looks exactly like a clone that is
+    // already in sync, which is the most expensive way for this to be wrong.
+    if (primeTree.truncated || cloneTree.truncated) {
+      throw new Error(
+        `Tree listing truncated (prime=${primeTree.truncated}, clone=${cloneTree.truncated}); ` +
+          `refusing to cascade a partial mirror`,
+      );
+    }
+    candidatePaths = [];
+    for (const [path, sha] of primeTree.entries) {
+      if (cloneTree.entries.get(path) !== sha) candidatePaths.push(path);
+    }
+    for (const path of cloneTree.entries.keys()) {
+      if (!primeTree.entries.has(path)) onlyInClone++;
+    }
+    scopeLabel = "mirror";
+  } else {
+    candidatePaths = await listFilesMatchingGlobs(octokit, primeRef, installedGlobs);
+    scopeLabel = "installed modules";
+  }
+
+  // The guard rail. Applied in BOTH scopes: a module glob that grows to cover
+  // `src/integrations/**` would otherwise reach the clone's backend identity
+  // by a different route than the one this was written for.
+  const partition = partitionCascadePaths(candidatePaths, exclusions);
+  const primeFiles = partition.write;
+  const needsReconcile = reportableHeld(partition.held);
 
   if (mode === "notify") {
     const body =
@@ -466,12 +543,15 @@ async function processClone(args: {
   }> = [];
 
   for (const path of primeFiles) {
-    const [primeFile, cloneFile] = await Promise.all([
-      getFileContent(octokit, primeRef, path),
-      getFileContent(octokit, cloneRef, path),
-    ]);
+    const primeFile = await getFileContent(octokit, primeRef, path);
     if (!primeFile) continue;
-    if (cloneFile && cloneFile.content === primeFile.content) continue;
+    // A mirror already knows this path differs -- the blob SHAs said so -- and
+    // re-reading the clone's copy to confirm it would double the request count
+    // of the one scope that cannot afford it.
+    if (!isMirror) {
+      const cloneFile = await getFileContent(octokit, cloneRef, path);
+      if (cloneFile && cloneFile.content === primeFile.content) continue;
+    }
 
     const { data: blob } = await octokit.git.createBlob({
       owner: cloneRef.owner,
@@ -483,9 +563,17 @@ async function processClone(args: {
   }
 
   if (treeEntries.length === 0) {
+    // "Nothing to write" and "nothing differed" are different states, and the
+    // second one is the one an operator can safely ignore. A mirror whose only
+    // differences were all withheld must not report as in sync.
+    const why =
+      partition.held.length > 0 && partition.write.length === 0
+        ? `Nothing to cascade: all ${partition.held.length} differing path(s) are withheld by this clone's exclusion policy`
+        : `Already in sync with prime@${shortSha(sourceSha)}`;
     return {
       status: "skipped",
-      diff_summary: `Already in sync with prime@${shortSha(sourceSha)}`,
+      diff_summary: why,
+      files_changed: 0,
       completed_at: new Date().toISOString(),
     };
   }
@@ -495,7 +583,10 @@ async function processClone(args: {
   const summaryFiles = treeEntries.slice(0, 5).map((t) => t.path);
   const summarySuffix = treeEntries.length > 5 ? ` (+${treeEntries.length - 5} more)` : "";
   const pinSuffix = pinSummary ? ` · ${pinSummary}` : "";
-  const fileSummary = `${summaryFiles.join(", ")}${summarySuffix}${pinSuffix}`;
+  const heldSuffix = partition.held.length > 0 ? ` · ${partition.held.length} withheld` : "";
+  const reconcileSuffix =
+    needsReconcile.length > 0 ? ` · ${needsReconcile.length} need reconciling` : "";
+  const fileSummary = `${summaryFiles.join(", ")}${summarySuffix}${pinSuffix}${heldSuffix}${reconcileSuffix}`;
 
   const { data: cloneCommit } = await octokit.git.getCommit({
     owner: cloneRef.owner,
@@ -512,6 +603,29 @@ async function processClone(args: {
   const message =
     `chore(aurixa): cascade ${treeEntries.length} file(s) from prime@${shortSha(sourceSha)}\n\n` +
     treeEntries.map((t) => `- ${t.path}`).join("\n");
+
+  // What the pull request has to say beyond the file list. `manual_reconcile`
+  // paths are the reason this section exists: withholding them silently is how
+  // a clone stops learning about new routes without anyone noticing.
+  const cascadeBody = (lead: string) =>
+    lead +
+    `\n\nScope: **${scopeLabel}**.\n\n` +
+    `Files synchronized:\n\n` +
+    treeEntries.map((t) => `- \`${t.path}\``).join("\n") +
+    (needsReconcile.length > 0
+      ? `\n\n### Needs a human — ${needsReconcile.length} file(s) changed upstream and were held back\n\n` +
+        `These carry deliberate divergence on this clone, so the cascade will never overwrite them. ` +
+        `Prime has moved; someone has to decide what to carry across.\n\n` +
+        needsReconcile
+          .map((h) => `- \`${h.path}\`${h.note ? ` — ${h.note}` : ""}`)
+          .join("\n")
+      : "") +
+    (partition.held.length - needsReconcile.length > 0
+      ? `\n\n_${partition.held.length - needsReconcile.length} further path(s) are owned by this clone and were withheld without comment._`
+      : "") +
+    (onlyInClone > 0
+      ? `\n\n_${onlyInClone} path(s) exist only in this clone. Nothing was deleted — a cascade never removes files._`
+      : "");
 
   const { data: newCommit } = await octokit.git.createCommit({
     owner: cloneRef.owner,
@@ -554,10 +668,9 @@ async function processClone(args: {
           title: `Aurixa cascade · prime@${shortSha(sourceSha)} → ${treeEntries.length} file(s)`,
           head: branch,
           base: cloneRef.branch,
-          body:
-            `Direct push to \`${cloneRef.branch}\` was blocked — falling back to PR + merge.\n\n` +
-            `Files synchronized:\n\n` +
-            treeEntries.map((t) => `- \`${t.path}\``).join("\n"),
+          body: cascadeBody(
+            `Direct push to \`${cloneRef.branch}\` was blocked — falling back to PR + merge.`,
+          ),
         });
         const { data: merged } = await octokit.pulls.merge({
           owner: cloneRef.owner,
@@ -600,10 +713,9 @@ async function processClone(args: {
     title: `Aurixa cascade · prime@${shortSha(sourceSha)} → ${treeEntries.length} file(s)`,
     head: branch,
     base: cloneRef.branch,
-    body:
-      `Automated cascade from **${primeRef.owner}/${primeRef.repo}@${shortSha(sourceSha)}**.\n\n` +
-      `Files synchronized (scoped to installed modules):\n\n` +
-      treeEntries.map((t) => `- \`${t.path}\``).join("\n"),
+    body: cascadeBody(
+      `Automated cascade from **${primeRef.owner}/${primeRef.repo}@${shortSha(sourceSha)}**.`,
+    ),
   });
 
   return {
