@@ -2522,6 +2522,51 @@ export type Database = {
           },
         ]
       }
+      clone_sync_exclusions: {
+        Row: {
+          clone_id: string
+          created_at: string
+          id: string
+          note: string | null
+          pattern: string
+          reason: string
+          updated_at: string
+        }
+        Insert: {
+          clone_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          pattern: string
+          reason?: string
+          updated_at?: string
+        }
+        Update: {
+          clone_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          pattern?: string
+          reason?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clone_sync_exclusions_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_sync_exclusions_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
+          },
+        ]
+      }
       clones: {
         Row: {
           billing_stripe_customer_id: string | null
@@ -2561,6 +2606,7 @@ export type Database = {
           subdomain: string | null
           subdomain_fqdn: string | null
           subdomain_status: string | null
+          sync_scope: string
           sync_status: Database["public"]["Enums"]["sync_status"]
           tags: string[] | null
           updated_at: string
@@ -2603,6 +2649,7 @@ export type Database = {
           subdomain?: string | null
           subdomain_fqdn?: string | null
           subdomain_status?: string | null
+          sync_scope?: string
           sync_status?: Database["public"]["Enums"]["sync_status"]
           tags?: string[] | null
           updated_at?: string
@@ -2645,6 +2692,7 @@ export type Database = {
           subdomain?: string | null
           subdomain_fqdn?: string | null
           subdomain_status?: string | null
+          sync_scope?: string
           sync_status?: Database["public"]["Enums"]["sync_status"]
           tags?: string[] | null
           updated_at?: string

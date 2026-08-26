@@ -9,6 +9,46 @@ type CascadeMode = Database["public"]["Enums"]["cascade_mode"];
 type CascadeTrigger = Database["public"]["Enums"]["cascade_trigger"];
 type SupabaseLike = SupabaseClient<Database>;
 
+/**
+ * One automatic cascade per prime commit.
+ *
+ * A merged pull request delivers TWO webhooks that both mean "prime moved":
+ * `pull_request.closed` with `merged: true`, and the `push` the merge itself
+ * makes. They carry the same head SHA. Without this, every merge would open two
+ * cascade pull requests on every clone, and the second would conflict with the
+ * first.
+ *
+ * The SHA is what decides, not the event kind, so it does not matter which
+ * delivery GitHub sends first or whether one is lost. A direct push -- this
+ * prime takes them from Lovable constantly -- simply finds no earlier event and
+ * proceeds.
+ *
+ * `uq_cascade_events_commit_sha` is the backstop underneath this for two
+ * deliveries racing; a violation there is read as "already cascaded" rather
+ * than as an error, because it means the other delivery won.
+ */
+export async function findCommitCascadeForSha(
+  supabase: SupabaseLike,
+  sourceSha: string,
+): Promise<{ eventId: string | null; failed: boolean; error?: string }> {
+  const { data, error } = await supabase
+    .from("cascade_events")
+    .select("id")
+    .eq("source_sha", sourceSha)
+    .eq("trigger", "commit")
+    .limit(1)
+    .maybeSingle();
+  // A read that FAILED is not an absence. Reporting "no existing cascade" on a
+  // database fault is how you get the duplicate this function exists to stop.
+  if (error) return { eventId: null, failed: true, error: error.message };
+  return { eventId: data?.id ?? null, failed: false };
+}
+
+function isUniqueViolation(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "23505" || /duplicate key value/i.test(error.message ?? "");
+}
+
 export async function createCascadeForAllClones(args: {
   supabase: SupabaseLike;
   mode: CascadeMode;
@@ -22,8 +62,33 @@ export async function createCascadeForAllClones(args: {
   cloneCount: number;
   requiresApproval: boolean;
   error?: string;
+  /** True when an automatic cascade for this prime SHA already existed. */
+  alreadyExisted?: boolean;
 }> {
   const { supabase, mode, trigger, sourceBranch, sourceSha, initiatedBy, summary } = args;
+
+  // Automatic triggers are deduplicated by prime SHA. Manual ones are not: an
+  // operator re-running the same SHA is how you retry a cascade after fixing an
+  // exclusion, and refusing that would turn a repair into an error.
+  if (trigger === "commit" && sourceSha) {
+    const existing = await findCommitCascadeForSha(supabase, sourceSha);
+    if (existing.failed) {
+      return {
+        eventId: null,
+        cloneCount: 0,
+        requiresApproval: false,
+        error: `Could not check for an existing cascade: ${existing.error}`,
+      };
+    }
+    if (existing.eventId) {
+      return {
+        eventId: existing.eventId,
+        cloneCount: 0,
+        requiresApproval: false,
+        alreadyExisted: true,
+      };
+    }
+  }
 
   const { data: clones, error: cloneErr } = await supabase.from("clones").select("id");
   if (cloneErr)
@@ -49,6 +114,19 @@ export async function createCascadeForAllClones(args: {
     .select()
     .single();
   if (eventErr || !event) {
+    // The other delivery won the race. That is the intended outcome, not a
+    // failure -- report the event it created rather than a duplicate error.
+    if (trigger === "commit" && sourceSha && isUniqueViolation(eventErr)) {
+      const winner = await findCommitCascadeForSha(supabase, sourceSha);
+      if (!winner.failed && winner.eventId) {
+        return {
+          eventId: winner.eventId,
+          cloneCount: 0,
+          requiresApproval: false,
+          alreadyExisted: true,
+        };
+      }
+    }
     return {
       eventId: null,
       cloneCount: 0,

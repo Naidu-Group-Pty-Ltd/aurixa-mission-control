@@ -38,7 +38,7 @@ src/routes/hooks.cascade-drain.tsx 2
 src/routes/hooks.crm-sweep.tsx 1
 src/routes/hooks.deployment-drain.tsx 12
 src/routes/hooks.edge-drain.tsx 14
-src/routes/hooks.github.tsx 1
+src/routes/hooks.github.tsx 0
 src/routes/hooks.handoff-observability-poll.tsx 1
 src/routes/hooks.handoff-parity-refresh.tsx 3
 src/routes/hooks.token-alerts.tsx 1

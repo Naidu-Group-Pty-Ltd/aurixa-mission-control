@@ -54,11 +54,29 @@ const migrationFiles = readdirSync(MIGRATIONS)
 // declaring /hooks/vercel scheduled by a migration that says nothing about it —
 // a guard that reports a contradiction on correct code is one people learn to
 // silence.
+//
+// Comments are stripped first, and that is not tidiness. A migration that
+// EXPLAINS why something exists routinely names a hook path in prose --
+// `20260826040000` opens by describing what `/hooks/github` has been doing for
+// four months -- and scanning the raw body made that sentence declare the hook
+// scheduled. The contradiction then lands on a hook that is a webhook receiver
+// and correctly declared not-scheduled, i.e. exactly the "guard that reports a
+// contradiction on correct code" this file already warns about, one paragraph
+// up. The doubled-hook scan below has always stripped comments; this one now
+// does too, from the same helper, so the two cannot disagree about what counts
+// as code.
+const stripSqlComments = (body) =>
+  body
+    .split("\n")
+    .filter((l) => !l.trimStart().startsWith("--"))
+    .join("\n");
+
 const scheduled = new Set();
 for (const { body } of migrationFiles) {
-  for (const m of body.matchAll(/\/hooks\/([a-z0-9-]+)/g)) scheduled.add(m[1]);
-  if (!body.includes("'/hooks/'")) continue;
-  for (const m of body.matchAll(/'([a-z0-9-]+)'\s*\)/g)) {
+  const code = stripSqlComments(body);
+  for (const m of code.matchAll(/\/hooks\/([a-z0-9-]+)/g)) scheduled.add(m[1]);
+  if (!code.includes("'/hooks/'")) continue;
+  for (const m of code.matchAll(/'([a-z0-9-]+)'\s*\)/g)) {
     if (hooks.includes(m[1])) scheduled.add(m[1]);
   }
 }
@@ -76,10 +94,7 @@ for (const { body } of migrationFiles) {
 // unschedule does not count as driving anything.
 const jobHook = new Map();
 for (const { body } of migrationFiles) {
-  const code = body
-    .split("\n")
-    .filter((l) => !l.trimStart().startsWith("--"))
-    .join("\n");
+  const code = stripSqlComments(body);
   const actions = [];
   for (const m of code.matchAll(/cron\.schedule\s*\(\s*'([^']+)'([\s\S]*?)\)\s*;/g)) {
     const hook = (m[2].match(/\/hooks\/([a-z0-9-]+)/) ?? [])[1];
