@@ -33,8 +33,10 @@
 -- healthy job on this deployment reads the vault INSIDE its command, per run,
 -- so a rotation needs no reschedule. With the lookup inside, there is nothing
 -- left for the schedule to be conditional on, and a missing secret fails the
--- way it should: a 401 in `net._http_response`, which `cron_delivery_health()`
--- already reports. `check:cron-auth` now enforces exactly that, keyed on the
+-- way it should: a 401 in `net._http_response`, which is the only place it can be
+-- read -- `cron_delivery_health()` matches responses through `return_message`,
+-- which pg_cron sets to "1 row" for these commands, so it reports NULL.
+-- `check:cron-auth` now enforces exactly that, keyed on the
 -- /hooks/ path rather than on the word Authorization — which is how a header
 -- hidden behind format(%L) escaped it for eleven jobs.
 --
