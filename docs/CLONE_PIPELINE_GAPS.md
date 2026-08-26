@@ -117,6 +117,49 @@ opposite: its value is that only one deployment holds it.
 The manual clone generated 32 random bytes for each identity secret and
 verified the values differed from the prime's before finishing.
 
+### `deployment config` said "derive"; the code said "skip" — **FIXED**
+
+The three-way split above was implemented, and `ALLOWED_ORIGINS` classified
+`deployment_config`, but that class was implemented as **skip** rather than as
+**derive**: `planCloneSecrets` returned `skipped_deployment_config` and moved
+on. Its own comment explained why that was safe — *"`applyAuthConfig` already
+sets the clone's origins from `cloneOrigins`"* — and that is not true of this
+name. `applyAuthConfig` PATCHes `/config/auth`, which is GoTrue's `site_url`
+and `uri_allow_list`. `ALLOWED_ORIGINS` is an **edge function environment
+variable**, read by `Deno.env.get('ALLOWED_ORIGINS')` in the prime's
+`_shared/auth.ts`. Two different systems, one comment, and nothing ever wrote
+the second.
+
+Unset does not mean "no origins". The prime's CORS helper falls back to a
+hard-coded pair of the **prime's** production hostnames, so every clone answers
+every request with somebody else's origin. Probed against
+`npc-client-dashboard`'s own login endpoint, 26 Aug 2026:
+
+```
+Origin: https://npc.aurixasystems.com.au
+  → access-control-allow-origin: https://command-centre.npcservices.com.au
+    access-control-allow-credentials: true
+```
+
+Identical for the clone's `.vercel.app` host and, of course, for the prime's.
+The browser sees an allow-origin that is not the page's origin and refuses to
+hand the response to the script — so signing in fails with **no server-side
+error**, on a deployment where the credentials are correct and the account is
+healthy. It was reported as "the seed admin credentials aren't working".
+
+`DERIVED_DEPLOYMENT_CONFIG` now maps the names Mission Control can compute;
+`ALLOWED_ORIGINS` is the only member. Everything else in the class still stays
+unset for an operator to fill in, because guessing a webhook URL or a sender
+address is how a clone starts writing into somebody else's account.
+
+Two things deliberately not done. `CORS_STRICT_ALLOWED_ORIGINS` is **not** set:
+failing closed means no origin is trusted for a credentialed response, which
+takes sign-in down completely — worse than the status quo for a clone whose
+origins could not be computed. It is a posture an operator chooses once they
+can see the derived value is right. And nothing back-fills an already-provisioned
+clone: `setCloneSecretValue` exists behind the operator's "set secret value"
+action, and running it is a decision about a live tenant.
+
 ---
 
 ## 3 · SECURITY — the clone repository is left primed to deploy into the prime — **FIXED**

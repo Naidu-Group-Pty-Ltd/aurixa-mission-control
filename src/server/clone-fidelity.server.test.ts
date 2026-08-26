@@ -9,6 +9,7 @@ import {
   resolveRequiredExtensions,
   REQUIRED_EXTENSION_FLOOR,
   planCloneSecrets,
+  cloneAllowedOrigins,
 } from "./backend-provisioning.server";
 
 /**
@@ -149,5 +150,84 @@ describe("planCloneSecrets", () => {
     const names = ["INTERNAL_EDGE_SECRET", "ANTHROPIC_API_KEY", "ALLOWED_ORIGINS", "NOPE"];
     const { results } = planCloneSecrets(names, { ANTHROPIC_API_KEY: "x" }, gen);
     for (const n of names) expect(results.get(n)).toBeDefined();
+  });
+
+  // ── ALLOWED_ORIGINS is derived, not skipped, when we know the clone's hosts ──
+  //
+  // Skipping it was only half right. The prime's value must not be copied, but
+  // leaving the secret unset makes the prime's edge functions fall back to a
+  // hard-coded pair of the PRIME's hostnames — so a clone answered its own
+  // login request with `access-control-allow-origin:
+  // https://command-centre.npcservices.com.au` and the browser refused the
+  // response. Correct credentials, healthy account, no server-side error.
+
+  it("writes THIS clone's origins rather than leaving the secret unset", () => {
+    const { toWrite, results } = planCloneSecrets(
+      ["ALLOWED_ORIGINS"],
+      { ALLOWED_ORIGINS: "https://command-centre.npcservices.com.au" },
+      gen,
+      {
+        siteUrl: "https://npc.aurixasystems.com.au",
+        additionalRedirectUrls: ["https://npc-client-dashboard.vercel.app"],
+      },
+    );
+    expect(results.get("ALLOWED_ORIGINS")?.status).toBe("derived");
+    expect(toWrite).toEqual([
+      {
+        name: "ALLOWED_ORIGINS",
+        value: "https://npc.aurixasystems.com.au,https://npc-client-dashboard.vercel.app",
+      },
+    ]);
+  });
+
+  it("never lets the prime's value reach the clone, origins or no origins", () => {
+    const primeValue = "https://command-centre.npcservices.com.au";
+    for (const origins of [
+      null,
+      { siteUrl: "https://clone.example" },
+      { siteUrl: null, additionalRedirectUrls: [] },
+    ]) {
+      const { toWrite } = planCloneSecrets(["ALLOWED_ORIGINS"], { ALLOWED_ORIGINS: primeValue }, gen, origins);
+      expect(toWrite.some((s) => s.value.includes(primeValue))).toBe(false);
+    }
+  });
+
+  it("still skips when nothing usable can be derived", () => {
+    // Unset beats a guess: the operator fills it in from the clone page.
+    const { toWrite, results } = planCloneSecrets(["ALLOWED_ORIGINS"], {}, gen, {
+      siteUrl: "localhost",
+      additionalRedirectUrls: ["", null, undefined],
+    });
+    expect(toWrite).toHaveLength(0);
+    expect(results.get("ALLOWED_ORIGINS")?.status).toBe("skipped_deployment_config");
+  });
+
+  it("leaves every other deployment_config name alone", () => {
+    // Guessing a webhook URL or a sender address is how a clone starts writing
+    // into somebody else's account. Only names in DERIVED_DEPLOYMENT_CONFIG.
+    const { results } = planCloneSecrets(["CORS_STRICT_ALLOWED_ORIGINS"], {}, gen, {
+      siteUrl: "https://clone.example",
+    });
+    expect(results.get("CORS_STRICT_ALLOWED_ORIGINS")?.status).toBe("skipped_deployment_config");
+  });
+});
+
+describe("cloneAllowedOrigins", () => {
+  it("puts the canonical site first and deduplicates", () => {
+    expect(
+      cloneAllowedOrigins({
+        siteUrl: "https://a.example",
+        additionalRedirectUrls: ["https://b.example", "https://a.example"],
+      }),
+    ).toBe("https://a.example,https://b.example");
+  });
+
+  it("normalises a bare host and strips a path", () => {
+    expect(cloneAllowedOrigins({ siteUrl: "clone.example/login" })).toBe("https://clone.example");
+  });
+
+  it("is null when there is nothing to say", () => {
+    expect(cloneAllowedOrigins(null)).toBeNull();
+    expect(cloneAllowedOrigins({ siteUrl: "localhost" })).toBeNull();
   });
 });
