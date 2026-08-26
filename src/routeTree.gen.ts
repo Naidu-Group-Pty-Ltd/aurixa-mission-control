@@ -39,6 +39,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SecurityIndexRouteImport } from './routes/security.index'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as VoiceOutboundRouteImport } from './routes/voice.outbound'
+import { Route as VoiceCallsRouteImport } from './routes/voice.calls'
+import { Route as VoiceAgentsRouteImport } from './routes/voice.agents'
 import { Route as SupportTicketsRouteImport } from './routes/support.tickets'
 import { Route as SettingsRolesRouteImport } from './routes/settings.roles'
 import { Route as SettingsRoleAuditRouteImport } from './routes/settings.role-audit'
@@ -60,6 +63,8 @@ import { Route as ModulesBuilderRouteImport } from './routes/modules.builder'
 import { Route as ModulesSlugRouteImport } from './routes/modules.$slug'
 import { Route as JoinTokenRouteImport } from './routes/join.$token'
 import { Route as HooksWarmHealthRouteImport } from './routes/hooks.warm-health'
+import { Route as HooksVoiceOutboundDispatchRouteImport } from './routes/hooks.voice-outbound-dispatch'
+import { Route as HooksVoiceCallDrainRouteImport } from './routes/hooks.voice-call-drain'
 import { Route as HooksVercelRouteImport } from './routes/hooks.vercel'
 import { Route as HooksTokenAlertsRouteImport } from './routes/hooks.token-alerts'
 import { Route as HooksSupportRemediationDrainRouteImport } from './routes/hooks.support-remediation-drain'
@@ -88,6 +93,7 @@ import { Route as HandoffsHandoffIdRouteImport } from './routes/handoffs.$handof
 import { Route as FleetEdgeRouteImport } from './routes/fleet.edge'
 import { Route as FleetDeploymentsRouteImport } from './routes/fleet.deployments'
 import { Route as CrmTicketsRouteImport } from './routes/crm.tickets'
+import { Route as CrmJourneyRouteImport } from './routes/crm.journey'
 import { Route as CrmFitRouteImport } from './routes/crm.fit'
 import { Route as CrmDealsRouteImport } from './routes/crm.deals'
 import { Route as ClonesNewRouteImport } from './routes/clones.new'
@@ -107,6 +113,7 @@ import { Route as CrmAccountsAccountIdRouteImport } from './routes/crm.accounts.
 import { Route as ClonesCloneIdSecretsRouteImport } from './routes/clones.$cloneId.secrets'
 import { Route as ClientsHandoffTokenRouteImport } from './routes/clients.handoff.$token'
 import { Route as ApiPublicPurchasesRouteImport } from './routes/api.public.purchases'
+import { Route as ApiPublicVoiceWebhookRouteImport } from './routes/api.public.voice.webhook'
 import { Route as ApiPublicUsageReportRouteImport } from './routes/api.public.usage.report'
 import { Route as ApiPublicTokensReserveRouteImport } from './routes/api.public.tokens.reserve'
 import { Route as ApiPublicTokensPlanChangeRouteImport } from './routes/api.public.tokens.plan-change'
@@ -303,6 +310,21 @@ const CrmIndexRoute = CrmIndexRouteImport.update({
   path: '/crm/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VoiceOutboundRoute = VoiceOutboundRouteImport.update({
+  id: '/voice/outbound',
+  path: '/voice/outbound',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VoiceCallsRoute = VoiceCallsRouteImport.update({
+  id: '/voice/calls',
+  path: '/voice/calls',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VoiceAgentsRoute = VoiceAgentsRouteImport.update({
+  id: '/voice/agents',
+  path: '/voice/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportTicketsRoute = SupportTicketsRouteImport.update({
   id: '/support/tickets',
   path: '/support/tickets',
@@ -408,6 +430,17 @@ const JoinTokenRoute = JoinTokenRouteImport.update({
 const HooksWarmHealthRoute = HooksWarmHealthRouteImport.update({
   id: '/hooks/warm-health',
   path: '/hooks/warm-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HooksVoiceOutboundDispatchRoute =
+  HooksVoiceOutboundDispatchRouteImport.update({
+    id: '/hooks/voice-outbound-dispatch',
+    path: '/hooks/voice-outbound-dispatch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const HooksVoiceCallDrainRoute = HooksVoiceCallDrainRouteImport.update({
+  id: '/hooks/voice-call-drain',
+  path: '/hooks/voice-call-drain',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksVercelRoute = HooksVercelRouteImport.update({
@@ -555,6 +588,11 @@ const CrmTicketsRoute = CrmTicketsRouteImport.update({
   path: '/crm/tickets',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrmJourneyRoute = CrmJourneyRouteImport.update({
+  id: '/crm/journey',
+  path: '/crm/journey',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CrmFitRoute = CrmFitRouteImport.update({
   id: '/crm/fit',
   path: '/crm/fit',
@@ -648,6 +686,11 @@ const ClientsHandoffTokenRoute = ClientsHandoffTokenRouteImport.update({
 const ApiPublicPurchasesRoute = ApiPublicPurchasesRouteImport.update({
   id: '/api/public/purchases',
   path: '/api/public/purchases',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicVoiceWebhookRoute = ApiPublicVoiceWebhookRouteImport.update({
+  id: '/api/public/voice/webhook',
+  path: '/api/public/voice/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicUsageReportRoute = ApiPublicUsageReportRouteImport.update({
@@ -945,6 +988,7 @@ export interface FileRoutesByFullPath {
   '/clones/new': typeof ClonesNewRoute
   '/crm/deals': typeof CrmDealsRoute
   '/crm/fit': typeof CrmFitRoute
+  '/crm/journey': typeof CrmJourneyRoute
   '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/deployments': typeof FleetDeploymentsRoute
   '/fleet/edge': typeof FleetEdgeRoute
@@ -973,6 +1017,8 @@ export interface FileRoutesByFullPath {
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/vercel': typeof HooksVercelRoute
+  '/hooks/voice-call-drain': typeof HooksVoiceCallDrainRoute
+  '/hooks/voice-outbound-dispatch': typeof HooksVoiceOutboundDispatchRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
@@ -994,6 +1040,9 @@ export interface FileRoutesByFullPath {
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
   '/support/tickets': typeof SupportTicketsRoute
+  '/voice/agents': typeof VoiceAgentsRoute
+  '/voice/calls': typeof VoiceCallsRoute
+  '/voice/outbound': typeof VoiceOutboundRoute
   '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1042,6 +1091,7 @@ export interface FileRoutesByFullPath {
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/usage/report': typeof ApiPublicUsageReportRoute
+  '/api/public/voice/webhook': typeof ApiPublicVoiceWebhookRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
   '/api/public/seats/devices/register': typeof ApiPublicSeatsDevicesRegisterRoute
@@ -1089,6 +1139,7 @@ export interface FileRoutesByTo {
   '/clones/new': typeof ClonesNewRoute
   '/crm/deals': typeof CrmDealsRoute
   '/crm/fit': typeof CrmFitRoute
+  '/crm/journey': typeof CrmJourneyRoute
   '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/deployments': typeof FleetDeploymentsRoute
   '/fleet/edge': typeof FleetEdgeRoute
@@ -1117,6 +1168,8 @@ export interface FileRoutesByTo {
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/vercel': typeof HooksVercelRoute
+  '/hooks/voice-call-drain': typeof HooksVoiceCallDrainRoute
+  '/hooks/voice-outbound-dispatch': typeof HooksVoiceOutboundDispatchRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
@@ -1138,6 +1191,9 @@ export interface FileRoutesByTo {
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
   '/support/tickets': typeof SupportTicketsRoute
+  '/voice/agents': typeof VoiceAgentsRoute
+  '/voice/calls': typeof VoiceCallsRoute
+  '/voice/outbound': typeof VoiceOutboundRoute
   '/crm': typeof CrmIndexRoute
   '/security': typeof SecurityIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -1186,6 +1242,7 @@ export interface FileRoutesByTo {
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/usage/report': typeof ApiPublicUsageReportRoute
+  '/api/public/voice/webhook': typeof ApiPublicVoiceWebhookRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
   '/api/public/seats/devices/register': typeof ApiPublicSeatsDevicesRegisterRoute
@@ -1235,6 +1292,7 @@ export interface FileRoutesById {
   '/clones/new': typeof ClonesNewRoute
   '/crm/deals': typeof CrmDealsRoute
   '/crm/fit': typeof CrmFitRoute
+  '/crm/journey': typeof CrmJourneyRoute
   '/crm/tickets': typeof CrmTicketsRoute
   '/fleet/deployments': typeof FleetDeploymentsRoute
   '/fleet/edge': typeof FleetEdgeRoute
@@ -1263,6 +1321,8 @@ export interface FileRoutesById {
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
   '/hooks/token-alerts': typeof HooksTokenAlertsRoute
   '/hooks/vercel': typeof HooksVercelRoute
+  '/hooks/voice-call-drain': typeof HooksVoiceCallDrainRoute
+  '/hooks/voice-outbound-dispatch': typeof HooksVoiceOutboundDispatchRoute
   '/hooks/warm-health': typeof HooksWarmHealthRoute
   '/join/$token': typeof JoinTokenRoute
   '/modules/$slug': typeof ModulesSlugRoute
@@ -1284,6 +1344,9 @@ export interface FileRoutesById {
   '/settings/role-audit': typeof SettingsRoleAuditRoute
   '/settings/roles': typeof SettingsRolesRoute
   '/support/tickets': typeof SupportTicketsRoute
+  '/voice/agents': typeof VoiceAgentsRoute
+  '/voice/calls': typeof VoiceCallsRoute
+  '/voice/outbound': typeof VoiceOutboundRoute
   '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1332,6 +1395,7 @@ export interface FileRoutesById {
   '/api/public/tokens/plan-change': typeof ApiPublicTokensPlanChangeRoute
   '/api/public/tokens/reserve': typeof ApiPublicTokensReserveRoute
   '/api/public/usage/report': typeof ApiPublicUsageReportRoute
+  '/api/public/voice/webhook': typeof ApiPublicVoiceWebhookRoute
   '/api/public/seats/devices/heartbeat': typeof ApiPublicSeatsDevicesHeartbeatRoute
   '/api/public/seats/devices/list': typeof ApiPublicSeatsDevicesListRoute
   '/api/public/seats/devices/register': typeof ApiPublicSeatsDevicesRegisterRoute
@@ -1382,6 +1446,7 @@ export interface FileRouteTypes {
     | '/clones/new'
     | '/crm/deals'
     | '/crm/fit'
+    | '/crm/journey'
     | '/crm/tickets'
     | '/fleet/deployments'
     | '/fleet/edge'
@@ -1410,6 +1475,8 @@ export interface FileRouteTypes {
     | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
     | '/hooks/vercel'
+    | '/hooks/voice-call-drain'
+    | '/hooks/voice-outbound-dispatch'
     | '/hooks/warm-health'
     | '/join/$token'
     | '/modules/$slug'
@@ -1431,6 +1498,9 @@ export interface FileRouteTypes {
     | '/settings/role-audit'
     | '/settings/roles'
     | '/support/tickets'
+    | '/voice/agents'
+    | '/voice/calls'
+    | '/voice/outbound'
     | '/crm/'
     | '/security/'
     | '/settings/'
@@ -1479,6 +1549,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/usage/report'
+    | '/api/public/voice/webhook'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
     | '/api/public/seats/devices/register'
@@ -1526,6 +1597,7 @@ export interface FileRouteTypes {
     | '/clones/new'
     | '/crm/deals'
     | '/crm/fit'
+    | '/crm/journey'
     | '/crm/tickets'
     | '/fleet/deployments'
     | '/fleet/edge'
@@ -1554,6 +1626,8 @@ export interface FileRouteTypes {
     | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
     | '/hooks/vercel'
+    | '/hooks/voice-call-drain'
+    | '/hooks/voice-outbound-dispatch'
     | '/hooks/warm-health'
     | '/join/$token'
     | '/modules/$slug'
@@ -1575,6 +1649,9 @@ export interface FileRouteTypes {
     | '/settings/role-audit'
     | '/settings/roles'
     | '/support/tickets'
+    | '/voice/agents'
+    | '/voice/calls'
+    | '/voice/outbound'
     | '/crm'
     | '/security'
     | '/settings'
@@ -1623,6 +1700,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/usage/report'
+    | '/api/public/voice/webhook'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
     | '/api/public/seats/devices/register'
@@ -1671,6 +1749,7 @@ export interface FileRouteTypes {
     | '/clones/new'
     | '/crm/deals'
     | '/crm/fit'
+    | '/crm/journey'
     | '/crm/tickets'
     | '/fleet/deployments'
     | '/fleet/edge'
@@ -1699,6 +1778,8 @@ export interface FileRouteTypes {
     | '/hooks/support-remediation-drain'
     | '/hooks/token-alerts'
     | '/hooks/vercel'
+    | '/hooks/voice-call-drain'
+    | '/hooks/voice-outbound-dispatch'
     | '/hooks/warm-health'
     | '/join/$token'
     | '/modules/$slug'
@@ -1720,6 +1801,9 @@ export interface FileRouteTypes {
     | '/settings/role-audit'
     | '/settings/roles'
     | '/support/tickets'
+    | '/voice/agents'
+    | '/voice/calls'
+    | '/voice/outbound'
     | '/crm/'
     | '/security/'
     | '/settings/'
@@ -1768,6 +1852,7 @@ export interface FileRouteTypes {
     | '/api/public/tokens/plan-change'
     | '/api/public/tokens/reserve'
     | '/api/public/usage/report'
+    | '/api/public/voice/webhook'
     | '/api/public/seats/devices/heartbeat'
     | '/api/public/seats/devices/list'
     | '/api/public/seats/devices/register'
@@ -1816,6 +1901,7 @@ export interface RootRouteChildren {
   ClonesNewRoute: typeof ClonesNewRoute
   CrmDealsRoute: typeof CrmDealsRoute
   CrmFitRoute: typeof CrmFitRoute
+  CrmJourneyRoute: typeof CrmJourneyRoute
   CrmTicketsRoute: typeof CrmTicketsRoute
   FleetDeploymentsRoute: typeof FleetDeploymentsRoute
   FleetEdgeRoute: typeof FleetEdgeRoute
@@ -1842,11 +1928,16 @@ export interface RootRouteChildren {
   HooksSupportRemediationDrainRoute: typeof HooksSupportRemediationDrainRoute
   HooksTokenAlertsRoute: typeof HooksTokenAlertsRoute
   HooksVercelRoute: typeof HooksVercelRoute
+  HooksVoiceCallDrainRoute: typeof HooksVoiceCallDrainRoute
+  HooksVoiceOutboundDispatchRoute: typeof HooksVoiceOutboundDispatchRoute
   HooksWarmHealthRoute: typeof HooksWarmHealthRoute
   JoinTokenRoute: typeof JoinTokenRoute
   SecurityIntakeRoute: typeof SecurityIntakeRoute
   SecurityScansRoute: typeof SecurityScansRoute
   SupportTicketsRoute: typeof SupportTicketsRoute
+  VoiceAgentsRoute: typeof VoiceAgentsRoute
+  VoiceCallsRoute: typeof VoiceCallsRoute
+  VoiceOutboundRoute: typeof VoiceOutboundRoute
   CrmIndexRoute: typeof CrmIndexRoute
   SecurityIndexRoute: typeof SecurityIndexRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
@@ -1893,6 +1984,7 @@ export interface RootRouteChildren {
   ApiPublicTokensPlanChangeRoute: typeof ApiPublicTokensPlanChangeRoute
   ApiPublicTokensReserveRoute: typeof ApiPublicTokensReserveRoute
   ApiPublicUsageReportRoute: typeof ApiPublicUsageReportRoute
+  ApiPublicVoiceWebhookRoute: typeof ApiPublicVoiceWebhookRoute
   ApiPublicSeatsDevicesHeartbeatRoute: typeof ApiPublicSeatsDevicesHeartbeatRoute
   ApiPublicSeatsDevicesListRoute: typeof ApiPublicSeatsDevicesListRoute
   ApiPublicSeatsDevicesRegisterRoute: typeof ApiPublicSeatsDevicesRegisterRoute
@@ -2111,6 +2203,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/voice/outbound': {
+      id: '/voice/outbound'
+      path: '/voice/outbound'
+      fullPath: '/voice/outbound'
+      preLoaderRoute: typeof VoiceOutboundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/voice/calls': {
+      id: '/voice/calls'
+      path: '/voice/calls'
+      fullPath: '/voice/calls'
+      preLoaderRoute: typeof VoiceCallsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/voice/agents': {
+      id: '/voice/agents'
+      path: '/voice/agents'
+      fullPath: '/voice/agents'
+      preLoaderRoute: typeof VoiceAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support/tickets': {
       id: '/support/tickets'
       path: '/support/tickets'
@@ -2256,6 +2369,20 @@ declare module '@tanstack/react-router' {
       path: '/hooks/warm-health'
       fullPath: '/hooks/warm-health'
       preLoaderRoute: typeof HooksWarmHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/voice-outbound-dispatch': {
+      id: '/hooks/voice-outbound-dispatch'
+      path: '/hooks/voice-outbound-dispatch'
+      fullPath: '/hooks/voice-outbound-dispatch'
+      preLoaderRoute: typeof HooksVoiceOutboundDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/voice-call-drain': {
+      id: '/hooks/voice-call-drain'
+      path: '/hooks/voice-call-drain'
+      fullPath: '/hooks/voice-call-drain'
+      preLoaderRoute: typeof HooksVoiceCallDrainRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/vercel': {
@@ -2454,6 +2581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CrmTicketsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/crm/journey': {
+      id: '/crm/journey'
+      path: '/crm/journey'
+      fullPath: '/crm/journey'
+      preLoaderRoute: typeof CrmJourneyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/crm/fit': {
       id: '/crm/fit'
       path: '/crm/fit'
@@ -2585,6 +2719,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/purchases'
       fullPath: '/api/public/purchases'
       preLoaderRoute: typeof ApiPublicPurchasesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/voice/webhook': {
+      id: '/api/public/voice/webhook'
+      path: '/api/public/voice/webhook'
+      fullPath: '/api/public/voice/webhook'
+      preLoaderRoute: typeof ApiPublicVoiceWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/usage/report': {
@@ -3051,6 +3192,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClonesNewRoute: ClonesNewRoute,
   CrmDealsRoute: CrmDealsRoute,
   CrmFitRoute: CrmFitRoute,
+  CrmJourneyRoute: CrmJourneyRoute,
   CrmTicketsRoute: CrmTicketsRoute,
   FleetDeploymentsRoute: FleetDeploymentsRoute,
   FleetEdgeRoute: FleetEdgeRoute,
@@ -3077,11 +3219,16 @@ const rootRouteChildren: RootRouteChildren = {
   HooksSupportRemediationDrainRoute: HooksSupportRemediationDrainRoute,
   HooksTokenAlertsRoute: HooksTokenAlertsRoute,
   HooksVercelRoute: HooksVercelRoute,
+  HooksVoiceCallDrainRoute: HooksVoiceCallDrainRoute,
+  HooksVoiceOutboundDispatchRoute: HooksVoiceOutboundDispatchRoute,
   HooksWarmHealthRoute: HooksWarmHealthRoute,
   JoinTokenRoute: JoinTokenRoute,
   SecurityIntakeRoute: SecurityIntakeRoute,
   SecurityScansRoute: SecurityScansRoute,
   SupportTicketsRoute: SupportTicketsRoute,
+  VoiceAgentsRoute: VoiceAgentsRoute,
+  VoiceCallsRoute: VoiceCallsRoute,
+  VoiceOutboundRoute: VoiceOutboundRoute,
   CrmIndexRoute: CrmIndexRoute,
   SecurityIndexRoute: SecurityIndexRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
@@ -3129,6 +3276,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTokensPlanChangeRoute: ApiPublicTokensPlanChangeRoute,
   ApiPublicTokensReserveRoute: ApiPublicTokensReserveRoute,
   ApiPublicUsageReportRoute: ApiPublicUsageReportRoute,
+  ApiPublicVoiceWebhookRoute: ApiPublicVoiceWebhookRoute,
   ApiPublicSeatsDevicesHeartbeatRoute: ApiPublicSeatsDevicesHeartbeatRoute,
   ApiPublicSeatsDevicesListRoute: ApiPublicSeatsDevicesListRoute,
   ApiPublicSeatsDevicesRegisterRoute: ApiPublicSeatsDevicesRegisterRoute,
