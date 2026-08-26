@@ -451,6 +451,37 @@ async function onLive(row: DeploymentRow, origin: string | null) {
     });
   }
 
+  // ...and the CORS allow-list, which is a different system from the auth
+  // config above and was the half nobody set.
+  //
+  // `applyAuthConfig` patches GoTrue's `/config/auth`. `ALLOWED_ORIGINS` is an
+  // EDGE FUNCTION environment variable, read by `Deno.env.get` in the prime's
+  // `_shared/auth.ts` — and when it is unset that helper falls back to a
+  // hard-coded pair of the PRIME's hostnames. So a clone answered its own
+  // login request with `access-control-allow-origin:
+  // https://command-centre.npcservices.com.au` and the browser refused the
+  // response: sign-in failing with correct credentials and no server-side
+  // error.
+  //
+  // Here rather than at provisioning because this is the first moment a
+  // clone's real origins exist. `applyCloneAllowedOrigins` resolves its target
+  // through the clone-only guard and records its own outcome, so nothing here
+  // needs to know a project ref.
+  try {
+    const { applyCloneAllowedOrigins } = await import("@/server/cloneAllowedOrigins.server");
+    await applyCloneAllowedOrigins(admin, row.clone_id, { providerSlug: row.provider_slug });
+  } catch (e) {
+    // Defensive only — that function reports its own refusals and does not
+    // throw for them. Same judgement as above: the deployment IS live.
+    await admin.from("deployment_events").insert({
+      clone_id: row.clone_id,
+      provider_slug: row.provider_slug,
+      action: "set_allowed_origins",
+      success: false,
+      error_message: e instanceof Error ? e.message : String(e),
+    });
+  }
+
   await admin.from("notifications").insert({
     kind: "deployment_live",
     severity: "success",
