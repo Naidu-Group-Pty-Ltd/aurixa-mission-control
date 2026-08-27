@@ -107,6 +107,19 @@ export type FleetMigrationResult = {
    * containing rollback scripts reached a tenant database in the first place.
    */
   withheld: number;
+  /**
+   * The withheld set split by reason.
+   *
+   * `withheld: 828` on its own is unreadable in BOTH directions — it can be
+   * waved away as "just the backlog" or panicked over as "the sync does
+   * nothing". Split, it says which: `skewSuspected` is the apply-timestamp
+   * skew `docs/MIGRATION_PIPELINE.md` records and is harmless for a clone
+   * stamped from the prime's ledger, and `neverApplied` is the set an operator
+   * should actually look at.
+   *
+   * Diagnostic only. Neither number can move a migration into `runnable`.
+   */
+  withheldBreakdown: { neverApplied: number; skewSuspected: number };
   /** Set when the run could not start at all. */
   error?: string;
 };
@@ -118,6 +131,7 @@ const EMPTY: FleetMigrationResult = {
   failed: [],
   excluded: 0,
   withheld: 0,
+  withheldBreakdown: { neverApplied: 0, skewSuspected: 0 },
 };
 
 /**
@@ -257,8 +271,9 @@ export async function runFleetMigrationSync(
   });
   if (unusable) return { ...out, error: unusable };
 
-  const { runnable, withheld } = scopeCorpusToPrime(corpus.metas, primeApplied);
+  const { runnable, withheld, breakdown } = scopeCorpusToPrime(corpus.metas, primeApplied);
   out.withheld = withheld.length;
+  out.withheldBreakdown = breakdown;
 
   const ids = backends.map((b) => b.clone_id);
   const { data: clones } = await supabase.from("clones").select("id, name").in("id", ids);
@@ -386,6 +401,15 @@ export async function runFleetMigrationSync(
       failed: out.failed.length,
       excluded: out.excluded,
       withheld: out.withheld,
+      withheld_never_applied: breakdown.neverApplied,
+      withheld_skew_suspected: breakdown.skewSuspected,
+      // The names, capped. A count tells an operator how big the problem is;
+      // the names tell them which migration to go and look at, and that is the
+      // half a dashboard number always loses.
+      withheld_never_applied_sample: withheld
+        .filter((w) => w.reason === "never_applied")
+        .slice(0, 20)
+        .map((w) => w.meta.name),
       prime_backend_ref: primeRef,
       prime_applied: primeApplied.size,
     },

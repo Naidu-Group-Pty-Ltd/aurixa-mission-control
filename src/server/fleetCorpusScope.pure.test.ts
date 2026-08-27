@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { scopeCorpusToPrime, assertPrimeLedgerUsable } from "./fleetCorpusScope.pure";
+import {
+  scopeCorpusToPrime,
+  assertPrimeLedgerUsable,
+  migrationEpochSeconds,
+  SKEW_WINDOW_SECONDS,
+} from "./fleetCorpusScope.pure";
 
 const meta = (id: string, name = `${id}_m.sql`) => ({ id, name });
 
@@ -11,7 +16,7 @@ describe("scopeCorpusToPrime", () => {
       new Set(["20250101000000", "20250103000000"]),
     );
     expect(runnable.map((m) => m.id)).toEqual(["20250101000000", "20250103000000"]);
-    expect(withheld.map((m) => m.id)).toEqual(["20250102000000"]);
+    expect(withheld.map((w) => w.meta.id)).toEqual(["20250102000000"]);
   });
 
   it("preserves corpus order, because replay order is filename order", () => {
@@ -29,7 +34,9 @@ describe("scopeCorpusToPrime", () => {
     const applied = new Set(corpus.slice(0, 17).map((m) => m.id));
     const { runnable, withheld } = scopeCorpusToPrime(corpus, applied);
     expect(runnable.length + withheld.length).toBe(corpus.length);
-    expect(new Set([...runnable, ...withheld].map((m) => m.id)).size).toBe(corpus.length);
+    expect(new Set([...runnable.map((m) => m.id), ...withheld.map((w) => w.meta.id)]).size).toBe(
+      corpus.length,
+    );
   });
 
   it("an empty prime ledger withholds everything rather than passing everything", () => {
@@ -62,7 +69,7 @@ describe("scopeCorpusToPrime", () => {
         primeApplied,
       );
       expect(runnable.map((m) => m.id)).toEqual([REAL.id]);
-      expect(withheld.map((m) => m.name)).toEqual([
+      expect(withheld.map((w) => w.meta.name)).toEqual([
         "20250124120001_rollback_client_data_rls_policies.sql",
         "20250124130001_rollback_financial_data_rls_policies.sql",
         "20260901000000_aml_integration_completion.sql",
@@ -124,5 +131,135 @@ describe("assertPrimeLedgerUsable", () => {
         primeRef: "dduzbchuswwbefdunfct",
       }),
     ).toMatch(/Refusing to sync/);
+  });
+});
+
+describe("migrationEpochSeconds", () => {
+  it("parses a 14-digit version as UTC", () => {
+    expect(migrationEpochSeconds("20250831091525")).toBe(
+      Date.UTC(2025, 7, 31, 9, 15, 25) / 1000,
+    );
+  });
+
+  it("measures the real skew observed on this prime", () => {
+    // 20250831091525 (repo) vs 20250831091523 (prime ledger)
+    const repo = migrationEpochSeconds("20250831091525")!;
+    const ledger = migrationEpochSeconds("20250831091523")!;
+    expect(repo - ledger).toBe(2);
+  });
+
+  it("returns null rather than a guess for an id it cannot parse", () => {
+    // Not zero: an unparsed id defaulting to the epoch would sit fourteen
+    // hundred years from every ledger entry and read as never_applied — right
+    // answer, wrong reason, and wrong the moment an id shape changes.
+    for (const bad of ["", "2025", "not-a-version", "202508310915250", "20251331091525"]) {
+      expect(migrationEpochSeconds(bad), bad).toBeNull();
+    }
+  });
+});
+
+describe("the withheld breakdown", () => {
+  // The exact pairs measured on the prime: the repo filename and the version
+  // Lovable actually stamped when it applied the file.
+  const SKEWED = [
+    { repo: "20250831091525", ledger: "20250831091523" },
+    { repo: "20250902092314", ledger: "20250902092312" },
+    { repo: "20251029030456", ledger: "20251029030453" },
+  ];
+
+  it("calls a near-miss skew_suspected and names the entry it is near", () => {
+    const { withheld, breakdown } = scopeCorpusToPrime(
+      SKEWED.map((p) => meta(p.repo)),
+      new Set(SKEWED.map((p) => p.ledger)),
+    );
+    expect(breakdown).toEqual({ neverApplied: 0, skewSuspected: 3 });
+    expect(withheld.map((w) => w.nearestPrimeVersion)).toEqual(SKEWED.map((p) => p.ledger));
+    expect(withheld.map((w) => w.skewSeconds)).toEqual([-2, -2, -3]);
+  });
+
+  it("calls a migration with nothing near it never_applied", () => {
+    // The nine January 2025 files: the prime's earliest ledger entry is
+    // August 2025, so nothing is remotely near them.
+    const { withheld, breakdown } = scopeCorpusToPrime(
+      [meta("20250124120001"), meta("20250124130001")],
+      new Set(["20250827053832", "20260820000000"]),
+    );
+    expect(breakdown).toEqual({ neverApplied: 2, skewSuspected: 0 });
+    expect(withheld.every((w) => w.reason === "never_applied")).toBe(true);
+    expect(withheld.every((w) => w.nearestPrimeVersion === undefined)).toBe(true);
+  });
+
+  /**
+   * The assertion the whole design turns on. The classification is a report,
+   * not a matching rule: a migration one second away from a ledger entry is
+   * still withheld, because "obviously the same migration" is a guess about
+   * somebody else's timestamping and a tenant's database is on the other side
+   * of it.
+   */
+  it("NEVER promotes a skew_suspected migration to runnable", () => {
+    const { runnable, withheld } = scopeCorpusToPrime(
+      [meta("20250831091525")],
+      new Set(["20250831091524"]), // one second away
+    );
+    expect(runnable).toEqual([]);
+    expect(withheld).toHaveLength(1);
+    expect(withheld[0].reason).toBe("skew_suspected");
+    expect(withheld[0].skewSeconds).toBe(-1);
+  });
+
+  it("holds the window exactly — inside is suspected, outside is never_applied", () => {
+    const base = "20250831091500";
+    const at = scopeCorpusToPrime(
+      [meta(base)],
+      new Set(["20250831091510"]), // exactly SKEW_WINDOW_SECONDS away
+    );
+    expect(SKEW_WINDOW_SECONDS).toBe(10);
+    expect(at.withheld[0].reason).toBe("skew_suspected");
+
+    const past = scopeCorpusToPrime([meta(base)], new Set(["20250831091511"]));
+    expect(past.withheld[0].reason).toBe("never_applied");
+  });
+
+  it("picks the nearest entry when the ledger has one on each side", () => {
+    const { withheld } = scopeCorpusToPrime(
+      [meta("20250831091510")],
+      new Set(["20250831091505", "20250831091512"]),
+    );
+    expect(withheld[0].nearestPrimeVersion).toBe("20250831091512");
+    expect(withheld[0].skewSeconds).toBe(2);
+  });
+
+  it("counts the breakdown to exactly the withheld total", () => {
+    const corpus = [
+      meta("20250831091525"), // skew
+      meta("20250124120001"), // never
+      meta("20260820000000"), // runnable
+      meta("20260901000000"), // never (future-dated)
+    ];
+    const { runnable, withheld, breakdown } = scopeCorpusToPrime(
+      corpus,
+      new Set(["20250831091523", "20260820000000"]),
+    );
+    expect(runnable).toHaveLength(1);
+    expect(breakdown.neverApplied + breakdown.skewSuspected).toBe(withheld.length);
+    expect(breakdown).toEqual({ neverApplied: 2, skewSuspected: 1 });
+  });
+
+  it("does not crash on a ledger holding versions it cannot parse", () => {
+    const { withheld, breakdown } = scopeCorpusToPrime(
+      [meta("20250831091525")],
+      new Set(["not-a-version", "20250831091523"]),
+    );
+    expect(breakdown.skewSuspected).toBe(1);
+    expect(withheld[0].nearestPrimeVersion).toBe("20250831091523");
+  });
+
+  it("classifies an unparsable REPO id as never_applied rather than guessing", () => {
+    const { withheld, breakdown } = scopeCorpusToPrime(
+      [{ id: "weird-id", name: "weird-id_m.sql" }],
+      new Set(["20250831091523"]),
+    );
+    expect(breakdown).toEqual({ neverApplied: 1, skewSuspected: 0 });
+    expect(withheld[0].reason).toBe("never_applied");
   });
 });

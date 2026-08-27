@@ -248,3 +248,53 @@ read as "the fleet is in step" while three clones sit outside it.
   like contention for months while it had never once succeeded;
 - a clone that threw before any verdict → the claim is released and the status
   is left alone, because guessing a schema verdict is worse than retrying.
+
+## Reading `withheld`
+
+The fleet sync's corpus is the prime **repo**, narrowed to what the prime's
+**database** has applied. What that narrowing removes is reported as `withheld`,
+and on this deployment the first honest run reported:
+
+```json
+{"success":true,"processed":1,"advanced":0,"upToDate":1,"failed":[],"withheld":828}
+```
+
+828 of 962 files, which is alarming until you look at *why*. The repo filenames
+and the ledger versions are offset by **seconds**:
+
+```
+repo    20250831091525   20250902092314   20251029030456
+ledger  20250831091523   20250902092312   20251029030453
+```
+
+That is this document's own two-namespace problem seen from the other side:
+Lovable stamps the ledger with the moment it *applied* a file, not with the
+version in the filename. Measured on the oldest 42 repo versions — **0 exact
+matches, 25 within ten seconds, 17 genuinely never applied.**
+
+So `withheld` is split by reason:
+
+| reason | means | what to do |
+| --- | --- | --- |
+| `skew_suspected` | a ledger entry exists within 10s | nothing — the prime ran it, under a different timestamp |
+| `never_applied` | nothing near it | look at these |
+
+The window is measured, not picked: observed skews are 2–3 seconds.
+
+**The classification never promotes.** `runnable` is decided by exact ledger
+membership and by nothing else; the skew test runs only over migrations that
+have *already* been withheld, and its output reaches a report and an audit row.
+Closing that loop is tempting — if `…091525` is "obviously" `…091523`, why not
+run it? Because "obviously" is a guess about somebody else's timestamping, and a
+tenant's database is on the other side of the guess. This corpus contains two
+`rollback_*` scripts whose stated purpose is to undo a security fix; a matching
+rule loose enough to bridge three seconds is loose enough to bridge onto one of
+those. A test asserts a migration one second from a ledger entry is still
+withheld.
+
+**A `skew_suspected` count is not a clean bill of health.** It is harmless for a
+clone stamped from the prime's ledger, because the effects are already present.
+It is *not* harmless for a clone built by replaying migrations from scratch —
+that clone would come up short by exactly these files, and there is no key that
+recovers them: the ledger's `name` column is empty for Lovable-applied rows and
+holds a bare UUID for others.
