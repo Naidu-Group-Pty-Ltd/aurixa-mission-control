@@ -922,6 +922,90 @@ export type Database = {
         }
         Relationships: []
       }
+      client_agreements: {
+        Row: {
+          account_id: string | null
+          client_email: string
+          client_name: string
+          client_org: string | null
+          commencement_date: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          docusign_envelope_id: string | null
+          docusign_sent_at: string | null
+          docusign_signed_at: string | null
+          docusign_status: string | null
+          docusign_voided_at: string | null
+          id: string
+          metadata: Json
+          notes: string | null
+          service_tier: string | null
+          status: string
+          updated_at: string
+          void_reason: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          client_email: string
+          client_name: string
+          client_org?: string | null
+          commencement_date?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          docusign_envelope_id?: string | null
+          docusign_sent_at?: string | null
+          docusign_signed_at?: string | null
+          docusign_status?: string | null
+          docusign_voided_at?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          service_tier?: string | null
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          client_email?: string
+          client_name?: string
+          client_org?: string | null
+          commencement_date?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          docusign_envelope_id?: string | null
+          docusign_sent_at?: string | null
+          docusign_signed_at?: string | null
+          docusign_status?: string | null
+          docusign_voided_at?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          service_tier?: string | null
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agreements_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agreements_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_supabase_accounts: {
         Row: {
           clone_id: string | null
@@ -11518,6 +11602,8 @@ export type Database = {
         | "voice_call_flagged"
         | "voice_outbound_failed"
         | "voice_blacklist_hit"
+        | "agreement_signed"
+        | "agreement_declined"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -12001,6 +12087,8 @@ export const Constants = {
         "voice_call_flagged",
         "voice_outbound_failed",
         "voice_blacklist_hit",
+        "agreement_signed",
+        "agreement_declined",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],

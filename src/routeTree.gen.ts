@@ -35,6 +35,7 @@ import { Route as BrandingRouteImport } from './routes/branding'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuditLogRouteImport } from './routes/audit-log'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
+import { Route as AgreementsRouteImport } from './routes/agreements'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SecurityIndexRouteImport } from './routes/security.index'
@@ -295,6 +296,11 @@ const AuditLogRoute = AuditLogRouteImport.update({
 const ApprovalsRoute = ApprovalsRouteImport.update({
   id: '/approvals',
   path: '/approvals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgreementsRoute = AgreementsRouteImport.update({
+  id: '/agreements',
+  path: '/agreements',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -993,6 +999,7 @@ const ApiPublicSeatsDevicesHeartbeatRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agreements': typeof AgreementsRoute
   '/approvals': typeof ApprovalsRoute
   '/audit-log': typeof AuditLogRoute
   '/auth': typeof AuthRoute
@@ -1152,6 +1159,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agreements': typeof AgreementsRoute
   '/approvals': typeof ApprovalsRoute
   '/audit-log': typeof AuditLogRoute
   '/auth': typeof AuthRoute
@@ -1311,6 +1319,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agreements': typeof AgreementsRoute
   '/approvals': typeof ApprovalsRoute
   '/audit-log': typeof AuditLogRoute
   '/auth': typeof AuthRoute
@@ -1472,6 +1481,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agreements'
     | '/approvals'
     | '/audit-log'
     | '/auth'
@@ -1631,6 +1641,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agreements'
     | '/approvals'
     | '/audit-log'
     | '/auth'
@@ -1789,6 +1800,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/agreements'
     | '/approvals'
     | '/audit-log'
     | '/auth'
@@ -1949,6 +1961,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgreementsRoute: typeof AgreementsRoute
   ApprovalsRoute: typeof ApprovalsRoute
   AuditLogRoute: typeof AuditLogRoute
   AuthRoute: typeof AuthRoute
@@ -2267,6 +2280,13 @@ declare module '@tanstack/react-router' {
       path: '/approvals'
       fullPath: '/approvals'
       preLoaderRoute: typeof ApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agreements': {
+      id: '/agreements'
+      path: '/agreements'
+      fullPath: '/agreements'
+      preLoaderRoute: typeof AgreementsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -3296,6 +3316,7 @@ const ApiPublicStripeWebhookRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgreementsRoute: AgreementsRoute,
   ApprovalsRoute: ApprovalsRoute,
   AuditLogRoute: AuditLogRoute,
   AuthRoute: AuthRoute,

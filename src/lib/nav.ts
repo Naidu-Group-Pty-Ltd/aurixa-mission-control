@@ -24,6 +24,7 @@ import {
   Cloud,
   Crown,
   Coins,
+  FileSignature,
   Gauge,
   GitFork,
   Handshake,
@@ -276,6 +277,12 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "tracker pipeline stages kanban follow up appointments voice triggers",
       },
       { to: "/leads", label: "Leads", icon: UserPlus, keywords: "waitlist inbound capture" },
+      {
+        to: "/agreements",
+        label: "Agreements",
+        icon: FileSignature,
+        keywords: "sla service level agreement docusign contract sign envelope signature",
+      },
     ],
   },
   {
