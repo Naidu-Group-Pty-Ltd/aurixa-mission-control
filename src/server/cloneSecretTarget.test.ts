@@ -160,3 +160,68 @@ describe("the writer never takes a project ref from its caller", () => {
     expect(src).toMatch(/ALLOWED_ORIGINS_SECRET = "ALLOWED_ORIGINS"/);
   });
 });
+
+describe("the hostname comes from the ALLOCATED subdomain, never the slug", () => {
+  // `reserveCloneSubdomain` does not simply use the slug. It runs it through
+  // `normaliseLabel` (lossy), honours an operator-supplied `preferred`
+  // instead, and appends a numeric suffix when the name is taken or reserved.
+  //
+  // The collision case is the dangerous one: a clone slugged `npc` whose
+  // allocated subdomain is `npc-2` would, under the old rule, derive
+  // `https://npc.aurixasystems.com.au` — ANOTHER TENANT'S HOSTNAME — into its
+  // ALLOWED_ORIGINS, trusting that origin for credentialed responses while
+  // omitting the host it is actually served on.
+  //
+  // `clone-provisioning.functions.ts` records the same fallback being removed
+  // from the deployment drain. It survived in the provisioning block that
+  // became `resolveCloneOrigins`.
+  const src = readFileSync(join(process.cwd(), "src/server/cloneAllowedOrigins.server.ts"), "utf8");
+
+  it("selects the allocated subdomain columns", () => {
+    expect(src).toMatch(/\.select\("slug, subdomain, subdomain_fqdn, deploy_url/);
+  });
+
+  it("prefers the stored FQDN, then the allocated subdomain", () => {
+    expect(src).toMatch(/row\?\.subdomain_fqdn\s*\?\?[\s\S]{0,80}cloneFqdn\(\s*row\?\.subdomain,/);
+  });
+
+  it("never derives a hostname from the slug", () => {
+    // Guessing a hostname before allocation is how you trust somebody else's.
+    expect(src).not.toMatch(/cloneFqdn\(\s*row\?\.slug/);
+    expect(src).not.toMatch(/plannedFqdn/);
+  });
+});
+
+describe("the reconciler", () => {
+  const src = readFileSync(join(process.cwd(), "src/server/cloneAllowedOrigins.server.ts"), "utf8");
+  const hook = readFileSync(
+    join(process.cwd(), "src/routes/hooks.allowed-origins-reconcile.tsx"),
+    "utf8",
+  );
+
+  it("takes its candidates from clone_backends, which cannot hold the prime", () => {
+    expect(src).toMatch(/reconcileAllowedOrigins[\s\S]{0,400}from\("clone_backends"\)/);
+  });
+
+  it("treats a failed candidate read as a fault, not an empty fleet", () => {
+    // On the one job whose purpose is noticing drift, "0 clones, nothing to do"
+    // would make a database fault look like a healthy fleet.
+    expect(src).toMatch(/Could not list clone backends/);
+  });
+
+  it("skips the Management API when the derived value is unchanged", () => {
+    expect(src).toMatch(/if \(lastWritten === value\)/);
+    expect(src).toMatch(/changed: false/);
+  });
+
+  it("does not treat an unreadable last-write as never-written", () => {
+    // Returning null there would re-write every clone on every tick during a
+    // database fault.
+    expect(src).toMatch(/Could not read the last ALLOWED_ORIGINS write/);
+  });
+
+  it("requires cron auth and answers 200 with refusals in the body", () => {
+    expect(hook).toMatch(/verifyCronAuth\(request\)/);
+    expect(hook).toMatch(/success: true, \.\.\.result/);
+  });
+});

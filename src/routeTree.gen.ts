@@ -82,6 +82,7 @@ import { Route as HooksCascadeDrainRouteImport } from './routes/hooks.cascade-dr
 import { Route as HooksBrandDriftRouteImport } from './routes/hooks.brand-drift'
 import { Route as HooksBackendProvisioningDrainRouteImport } from './routes/hooks.backend-provisioning-drain'
 import { Route as HooksApiUsageSettleRouteImport } from './routes/hooks.api-usage-settle'
+import { Route as HooksAllowedOriginsReconcileRouteImport } from './routes/hooks.allowed-origins-reconcile'
 import { Route as HooksAirtableSyncRouteImport } from './routes/hooks.airtable-sync'
 import { Route as HandoffsNewRouteImport } from './routes/handoffs.new'
 import { Route as HandoffsHandoffIdRouteImport } from './routes/handoffs.$handoffId'
@@ -525,6 +526,12 @@ const HooksApiUsageSettleRoute = HooksApiUsageSettleRouteImport.update({
   path: '/hooks/api-usage-settle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HooksAllowedOriginsReconcileRoute =
+  HooksAllowedOriginsReconcileRouteImport.update({
+    id: '/hooks/allowed-origins-reconcile',
+    path: '/hooks/allowed-origins-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const HooksAirtableSyncRoute = HooksAirtableSyncRouteImport.update({
   id: '/hooks/airtable-sync',
   path: '/hooks/airtable-sync',
@@ -951,6 +958,7 @@ export interface FileRoutesByFullPath {
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
   '/hooks/airtable-sync': typeof HooksAirtableSyncRoute
+  '/hooks/allowed-origins-reconcile': typeof HooksAllowedOriginsReconcileRoute
   '/hooks/api-usage-settle': typeof HooksApiUsageSettleRoute
   '/hooks/backend-provisioning-drain': typeof HooksBackendProvisioningDrainRoute
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
@@ -1095,6 +1103,7 @@ export interface FileRoutesByTo {
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
   '/hooks/airtable-sync': typeof HooksAirtableSyncRoute
+  '/hooks/allowed-origins-reconcile': typeof HooksAllowedOriginsReconcileRoute
   '/hooks/api-usage-settle': typeof HooksApiUsageSettleRoute
   '/hooks/backend-provisioning-drain': typeof HooksBackendProvisioningDrainRoute
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
@@ -1241,6 +1250,7 @@ export interface FileRoutesById {
   '/handoffs/$handoffId': typeof HandoffsHandoffIdRoute
   '/handoffs/new': typeof HandoffsNewRoute
   '/hooks/airtable-sync': typeof HooksAirtableSyncRoute
+  '/hooks/allowed-origins-reconcile': typeof HooksAllowedOriginsReconcileRoute
   '/hooks/api-usage-settle': typeof HooksApiUsageSettleRoute
   '/hooks/backend-provisioning-drain': typeof HooksBackendProvisioningDrainRoute
   '/hooks/brand-drift': typeof HooksBrandDriftRoute
@@ -1388,6 +1398,7 @@ export interface FileRouteTypes {
     | '/handoffs/$handoffId'
     | '/handoffs/new'
     | '/hooks/airtable-sync'
+    | '/hooks/allowed-origins-reconcile'
     | '/hooks/api-usage-settle'
     | '/hooks/backend-provisioning-drain'
     | '/hooks/brand-drift'
@@ -1532,6 +1543,7 @@ export interface FileRouteTypes {
     | '/handoffs/$handoffId'
     | '/handoffs/new'
     | '/hooks/airtable-sync'
+    | '/hooks/allowed-origins-reconcile'
     | '/hooks/api-usage-settle'
     | '/hooks/backend-provisioning-drain'
     | '/hooks/brand-drift'
@@ -1677,6 +1689,7 @@ export interface FileRouteTypes {
     | '/handoffs/$handoffId'
     | '/handoffs/new'
     | '/hooks/airtable-sync'
+    | '/hooks/allowed-origins-reconcile'
     | '/hooks/api-usage-settle'
     | '/hooks/backend-provisioning-drain'
     | '/hooks/brand-drift'
@@ -1820,6 +1833,7 @@ export interface RootRouteChildren {
   FleetDeploymentsRoute: typeof FleetDeploymentsRoute
   FleetEdgeRoute: typeof FleetEdgeRoute
   HooksAirtableSyncRoute: typeof HooksAirtableSyncRoute
+  HooksAllowedOriginsReconcileRoute: typeof HooksAllowedOriginsReconcileRoute
   HooksApiUsageSettleRoute: typeof HooksApiUsageSettleRoute
   HooksBackendProvisioningDrainRoute: typeof HooksBackendProvisioningDrainRoute
   HooksBrandDriftRoute: typeof HooksBrandDriftRoute
@@ -2410,6 +2424,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/api-usage-settle'
       fullPath: '/hooks/api-usage-settle'
       preLoaderRoute: typeof HooksApiUsageSettleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/allowed-origins-reconcile': {
+      id: '/hooks/allowed-origins-reconcile'
+      path: '/hooks/allowed-origins-reconcile'
+      fullPath: '/hooks/allowed-origins-reconcile'
+      preLoaderRoute: typeof HooksAllowedOriginsReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/airtable-sync': {
@@ -3055,6 +3076,7 @@ const rootRouteChildren: RootRouteChildren = {
   FleetDeploymentsRoute: FleetDeploymentsRoute,
   FleetEdgeRoute: FleetEdgeRoute,
   HooksAirtableSyncRoute: HooksAirtableSyncRoute,
+  HooksAllowedOriginsReconcileRoute: HooksAllowedOriginsReconcileRoute,
   HooksApiUsageSettleRoute: HooksApiUsageSettleRoute,
   HooksBackendProvisioningDrainRoute: HooksBackendProvisioningDrainRoute,
   HooksBrandDriftRoute: HooksBrandDriftRoute,

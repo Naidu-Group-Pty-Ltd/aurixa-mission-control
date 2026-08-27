@@ -131,7 +131,7 @@ export async function resolveCloneSecretTarget(
 export async function resolveCloneOrigins(supabase: Db, cloneId: string): Promise<CloneOrigins> {
   const { data: cloneRow } = await supabase
     .from("clones")
-    .select("slug, deploy_url, lovable_project_url")
+    .select("slug, subdomain, subdomain_fqdn, deploy_url, lovable_project_url")
     .eq("id", cloneId)
     .maybeSingle();
   const [{ data: cfRow }, { data: deploymentRow }, { data: hostingCfg }] = await Promise.all([
@@ -160,13 +160,41 @@ export async function resolveCloneOrigins(supabase: Db, cloneId: string): Promis
   });
   const row = cloneRow as {
     slug?: string | null;
+    subdomain?: string | null;
+    subdomain_fqdn?: string | null;
     deploy_url?: string | null;
     lovable_project_url?: string | null;
   } | null;
-  const plannedFqdn = cloneFqdn(
-    row?.slug,
-    (hostingCfg as { primary_domain?: string | null } | null)?.primary_domain,
-  );
+
+  // The ALLOCATED name, never the slug.
+  //
+  // This block came out of `backend-provisioning.functions.ts`, where it read
+  // `cloneFqdn(cloneRow?.slug, …)`. `slug` is not the clone's hostname and is
+  // not reliably even close to it: `reserveCloneSubdomain` runs the slug
+  // through `normaliseLabel` (lossy), honours an operator-supplied `preferred`
+  // instead, and appends a numeric suffix when the name is taken or reserved.
+  //
+  // The collision case is the dangerous one. A clone whose slug is `npc` but
+  // whose allocated subdomain is `npc-2` would derive
+  // `https://npc.aurixasystems.com.au` — ANOTHER TENANT'S HOSTNAME — into its
+  // ALLOWED_ORIGINS, trusting that origin for credentialed responses, while
+  // omitting the host it is actually served on.
+  //
+  // `clone-provisioning.functions.ts` records the same defect being removed
+  // from the deployment drain: "The drain used to fall back to `clone.slug`
+  // when no subdomain was recorded, which silently bypassed `reserved_slugs` —
+  // a clone slugged `admin` would have taken `admin.aurixasystems.com.au`."
+  // The fallback survived here.
+  //
+  // There is deliberately NO slug fallback now. Before allocation a clone has
+  // no planned hostname, and guessing one is how you end up trusting somebody
+  // else's.
+  const allocatedFqdn =
+    row?.subdomain_fqdn ??
+    cloneFqdn(
+      row?.subdomain,
+      (hostingCfg as { primary_domain?: string | null } | null)?.primary_domain,
+    );
 
   return {
     siteUrl: row?.deploy_url ?? deploymentOrigin ?? row?.lovable_project_url ?? null,
@@ -178,14 +206,45 @@ export async function resolveCloneOrigins(supabase: Db, cloneId: string): Promis
       (cfRow as { zone_name?: string | null } | null)?.zone_name
         ? `https://${(cfRow as { zone_name: string }).zone_name}`
         : null,
-      plannedFqdn ? `https://${plannedFqdn}` : null,
+      allocatedFqdn ? `https://${allocatedFqdn}` : null,
     ],
   };
 }
 
 export type ApplyAllowedOriginsResult =
-  | { ok: true; cloneId: string; projectRef: string; value: string }
+  | { ok: true; cloneId: string; projectRef: string; value: string; changed: boolean }
   | { ok: false; cloneId: string; reason: CloneSecretRefusal | "no_origins" | "write_failed"; error: string };
+
+/**
+ * What Mission Control last WROTE into this clone's `ALLOWED_ORIGINS`.
+ *
+ * Read from the event this module records after every successful write, so
+ * there is one record of the fact rather than a cache beside it.
+ *
+ * This answers "does it still need setting", not "what is the secret now". The
+ * two differ if an operator edits the value in the Supabase dashboard, and the
+ * reconciler deliberately leaves that alone: it only re-writes when its OWN
+ * derivation has moved. A scheduler that stomps a value a person set by hand is
+ * worse than one that is occasionally behind.
+ */
+async function lastWrittenValue(supabase: Db, cloneId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("deployment_events")
+    .select("result")
+    .eq("clone_id", cloneId)
+    .eq("action", "set_allowed_origins")
+    .eq("success", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  // A read that FAILED is not "never written". Returning null here would make
+  // the reconciler re-write on every tick during a database fault, which is a
+  // Management API call per clone per run against a project that is fine.
+  if (error) throw new Error(`Could not read the last ALLOWED_ORIGINS write: ${error.message}`);
+  const result = (data as { result?: { allowed_origins?: unknown } | null } | null)?.result;
+  const v = result?.allowed_origins;
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
 
 /**
  * Derive and write `ALLOWED_ORIGINS` for one clone.
@@ -199,7 +258,17 @@ export type ApplyAllowedOriginsResult =
 export async function applyCloneAllowedOrigins(
   supabase: Db,
   cloneId: string,
-  opts?: { actorUserId?: string | null; providerSlug?: string | null },
+  opts?: {
+    actorUserId?: string | null;
+    providerSlug?: string | null;
+    /**
+     * Write even when the derived value matches what was last written.
+     * The operator's button passes this: "nothing changed" is not what
+     * somebody who just pressed a button wants to be told, and a person
+     * pressing it is usually repairing something they cannot see.
+     */
+    force?: boolean;
+  },
 ): Promise<ApplyAllowedOriginsResult> {
   let target: CloneSecretTarget;
   try {
@@ -222,6 +291,22 @@ export async function applyCloneAllowedOrigins(
       "no Lovable URL and no allocated subdomain. Leaving ALLOWED_ORIGINS unset.";
     await recordEvent(supabase, cloneId, opts?.providerSlug, false, error, null, opts?.actorUserId);
     return { ok: false, cloneId, reason: "no_origins", error };
+  }
+
+  if (!opts?.force) {
+    let lastWritten: string | null;
+    try {
+      lastWritten = await lastWrittenValue(supabase, cloneId);
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      return { ok: false, cloneId, reason: "unreadable", error };
+    }
+    if (lastWritten === value) {
+      // Already correct, by our own last write. No Management API call, no
+      // event row: a reconciler that logs "no change" on every clone every
+      // fifteen minutes buries the runs that did something.
+      return { ok: true, cloneId, projectRef: target.projectRef, value, changed: false };
+    }
   }
 
   const { setCloneSecretValue } = await import("./backend-provisioning.server");
@@ -268,7 +353,7 @@ export async function applyCloneAllowedOrigins(
   );
 
   return res.ok
-    ? { ok: true, cloneId, projectRef: target.projectRef, value }
+    ? { ok: true, cloneId, projectRef: target.projectRef, value, changed: true }
     : { ok: false, cloneId, reason: "write_failed", error: res.error };
 }
 
@@ -306,4 +391,71 @@ async function recordEvent(
       error: error.message,
     });
   }
+}
+
+
+/**
+ * Keep every clone's `ALLOWED_ORIGINS` equal to its own origins.
+ *
+ * ## Why a sweep rather than only the two event points
+ *
+ * Provisioning derives it and `onLive` completes it, and between them they
+ * cover a clone's first hour. They do not cover the rest of its life. The
+ * origins move afterwards, for ordinary reasons:
+ *
+ *   - a custom domain is attached to a clone that has been live for a month;
+ *   - a subdomain is re-allocated, or detached and re-attached;
+ *   - a redeploy changes the provider origin;
+ *   - the platform's `primary_domain` changes, which moves every clone at once.
+ *
+ * Each of those silently invalidates a value nothing re-derives, and the
+ * symptom is the one this whole area exists because of: sign-in failing CORS
+ * on a deployment where the credentials are correct and nothing logs an error.
+ *
+ * It is also what makes the existing fleet self-heal. Every clone provisioned
+ * before any of this existed has the secret unset; the first run sets it,
+ * without anybody remembering to press anything.
+ *
+ * ## Cheap on the runs that find nothing
+ *
+ * A clone whose derived value matches what Mission Control last wrote costs one
+ * indexed read and no Management API call, and records no event. Only a clone
+ * whose origins actually moved is written and logged, so the timeline shows
+ * changes rather than heartbeats.
+ *
+ * One clone's refusal never stops the others: `applyCloneAllowedOrigins`
+ * reports rather than throws, and each result is counted separately.
+ */
+export type ReconcileResult = {
+  considered: number;
+  changed: number;
+  unchanged: number;
+  refused: Array<{ cloneId: string; reason: string; error: string }>;
+};
+
+export async function reconcileAllowedOrigins(supabase: Db): Promise<ReconcileResult> {
+  const { data, error } = await supabase
+    .from("clone_backends")
+    .select("clone_id")
+    .not("supabase_project_ref", "is", null);
+  // A candidate list that could not be READ is not an empty candidate list.
+  // Reporting "0 clones, nothing to do" would make a database fault look like
+  // a healthy fleet, on the one job whose whole purpose is noticing drift.
+  if (error) throw new Error(`Could not list clone backends: ${error.message}`);
+
+  const cloneIds = (data ?? [])
+    .map((r) => (r as { clone_id: string | null }).clone_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+  const out: ReconcileResult = { considered: cloneIds.length, changed: 0, unchanged: 0, refused: [] };
+  for (const cloneId of cloneIds) {
+    const res = await applyCloneAllowedOrigins(supabase, cloneId);
+    if (res.ok) {
+      if (res.changed) out.changed++;
+      else out.unchanged++;
+    } else {
+      out.refused.push({ cloneId: res.cloneId, reason: res.reason, error: res.error });
+    }
+  }
+  return out;
 }

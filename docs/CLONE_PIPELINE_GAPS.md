@@ -171,11 +171,66 @@ half-configured deployments rather than one):
 | --- | --- | --- |
 | provisioning | `planCloneSecrets` | the shell is written once; `derived` rather than `skipped_deployment_config` |
 | deployment reaches `live` | `hooks.deployment-drain`'s `onLive` | the first instant a clone's real origins exist; already re-applies the auth config from the same facts |
-| operator asks | `backfillCloneAllowedOrigins` | every clone that went live before either of the above existed |
+| every 15 minutes | `hooks.allowed-origins-reconcile` | the rest of a clone's life, and the existing fleet |
+| operator asks | `backfillCloneAllowedOrigins` | now, on this clone, because somebody is looking at it |
 
 The back-fill takes an optional `cloneId`: given one it does that clone, omitted
 it sweeps every clone with a provisioned backend. There is a **Derive
 ALLOWED_ORIGINS** button on the clone's secrets page.
+
+### Why the first two moments are not enough
+
+Between them, provisioning and `onLive` cover a clone's first hour. They do not
+cover the rest of its life, and the origins move afterwards for ordinary
+reasons: a custom domain attached to a clone that has been live for a month, a
+re-allocated subdomain, a redeploy that changes the provider origin, a change to
+the platform's `primary_domain` that moves every clone at once. Each silently
+invalidates a value nothing re-derives.
+
+`allowed-origins-reconcile-15min` is the safety net, and it is also what makes
+the existing fleet self-heal — every clone provisioned before any of this
+existed has the secret unset, and the first run sets it without anybody
+pressing anything.
+
+Fifteen minutes rather than one: nothing here is queue-draining, there is no
+backlog and no user waiting on the next tick, and the two paths that matter most
+already set it inline. A clone whose derived value matches what Mission Control
+last wrote costs one indexed read, no Management API call and no event row — so
+the timeline shows changes rather than heartbeats, and a run that finds nothing
+is nearly free.
+
+It compares against what **Mission Control last wrote**, read from the
+`set_allowed_origins` event it records after every successful write. That is
+deliberately not the same question as "what is the secret now": if an operator
+edits the value in the Supabase dashboard, the reconciler leaves it alone and
+only re-writes when its own derivation moves. A scheduler that stomps a value a
+person set by hand is worse than one that is occasionally behind. The operator's
+button passes `force`, because somebody pressing it is usually repairing
+something they cannot see.
+
+### The hostname comes from the allocated subdomain, never the slug
+
+`resolveCloneOrigins` derived the clone's custom hostname as
+`cloneFqdn(clone.slug, primary_domain)`. That is wrong in three ways, because
+`reserveCloneSubdomain` does not simply use the slug: it runs it through
+`normaliseLabel` (lossy), honours an operator-supplied `preferred` instead, and
+appends a numeric suffix when the name is taken or in `reserved_slugs`.
+
+The collision case is the dangerous one. A clone slugged `npc` whose allocated
+subdomain is `npc-2` would derive `https://npc.aurixasystems.com.au` — **another
+tenant's hostname** — into its own `ALLOWED_ORIGINS`, trusting that origin for
+credentialed responses, while omitting the host it is actually served on.
+
+`clone-provisioning.functions.ts` records this exact fallback being removed from
+the deployment drain: *"The drain used to fall back to `clone.slug` when no
+subdomain was recorded, which silently bypassed `reserved_slugs` — a clone
+slugged `admin` would have taken `admin.aurixasystems.com.au`."* It survived in
+the provisioning block that became `resolveCloneOrigins`, which then acquired
+two more callers.
+
+It is `subdomain_fqdn ?? cloneFqdn(subdomain, primary_domain)` now, with **no
+slug fallback at all**. Before allocation a clone has no planned hostname, and
+guessing one is how you end up trusting somebody else's.
 
 ### It can only ever touch a clone
 

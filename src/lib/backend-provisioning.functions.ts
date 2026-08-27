@@ -700,7 +700,13 @@ export const backfillCloneAllowedOrigins = createServerFn({ method: "POST" })
 
     const results: ApplyAllowedOriginsResult[] = [];
     for (const cloneId of cloneIds) {
-      results.push(await applyCloneAllowedOrigins(supabase, cloneId, { actorUserId: userId }));
+      // `force`: a person pressing a button is usually repairing something they
+      // cannot see, and "no change — it already matched what we last wrote" is
+      // the least useful thing to tell them. The scheduled reconciler is the
+      // path that skips unchanged values.
+      results.push(
+        await applyCloneAllowedOrigins(supabase, cloneId, { actorUserId: userId, force: true }),
+      );
     }
 
     const applied = results.filter((r) => r.ok).length;
