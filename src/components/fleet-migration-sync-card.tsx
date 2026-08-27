@@ -196,6 +196,24 @@ export function FleetMigrationSyncCard() {
                   {lastResult.withheld} withheld (not applied on the prime)
                 </Badge>
               )}
+              {/*
+                Split, because the total is unreadable in both directions. The
+                skew-suspected half is the apply-timestamp mismatch between a
+                repo filename and what Lovable stamped when it applied the
+                file — harmless for a clone stamped from the prime's ledger.
+                The never-applied half is the set worth looking at, so it is the
+                one drawn in warning ink.
+              */}
+              {lastResult.withheldBreakdown.neverApplied > 0 && (
+                <Badge variant="outline" className="bg-warning/10 text-warning text-[10px]">
+                  {lastResult.withheldBreakdown.neverApplied} never applied on the prime
+                </Badge>
+              )}
+              {lastResult.withheldBreakdown.skewSuspected > 0 && (
+                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                  {lastResult.withheldBreakdown.skewSuspected} likely apply-timestamp skew
+                </Badge>
+              )}
             </div>
             {lastResult.failed.map((r) => (
               <div key={r.cloneId} className="flex items-start justify-between border p-2 text-xs">
