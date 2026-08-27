@@ -72,6 +72,7 @@ import { Route as HooksTokenAlertsRouteImport } from './routes/hooks.token-alert
 import { Route as HooksSupportRemediationDrainRouteImport } from './routes/hooks.support-remediation-drain'
 import { Route as HooksRunSchedulesRouteImport } from './routes/hooks.run-schedules'
 import { Route as HooksReferenceDataSyncRouteImport } from './routes/hooks.reference-data-sync'
+import { Route as HooksMigrationDriftRouteImport } from './routes/hooks.migration-drift'
 import { Route as HooksHandoffParityRefreshRouteImport } from './routes/hooks.handoff-parity-refresh'
 import { Route as HooksHandoffObservabilityPollRouteImport } from './routes/hooks.handoff-observability-poll'
 import { Route as HooksGithubRouteImport } from './routes/hooks.github'
@@ -485,6 +486,11 @@ const HooksRunSchedulesRoute = HooksRunSchedulesRouteImport.update({
 const HooksReferenceDataSyncRoute = HooksReferenceDataSyncRouteImport.update({
   id: '/hooks/reference-data-sync',
   path: '/hooks/reference-data-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HooksMigrationDriftRoute = HooksMigrationDriftRouteImport.update({
+  id: '/hooks/migration-drift',
+  path: '/hooks/migration-drift',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksHandoffParityRefreshRoute =
@@ -1067,6 +1073,7 @@ export interface FileRoutesByFullPath {
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
+  '/hooks/migration-drift': typeof HooksMigrationDriftRoute
   '/hooks/reference-data-sync': typeof HooksReferenceDataSyncRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
@@ -1226,6 +1233,7 @@ export interface FileRoutesByTo {
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
+  '/hooks/migration-drift': typeof HooksMigrationDriftRoute
   '/hooks/reference-data-sync': typeof HooksReferenceDataSyncRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
@@ -1387,6 +1395,7 @@ export interface FileRoutesById {
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
+  '/hooks/migration-drift': typeof HooksMigrationDriftRoute
   '/hooks/reference-data-sync': typeof HooksReferenceDataSyncRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
@@ -1549,6 +1558,7 @@ export interface FileRouteTypes {
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
+    | '/hooks/migration-drift'
     | '/hooks/reference-data-sync'
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
@@ -1708,6 +1718,7 @@ export interface FileRouteTypes {
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
+    | '/hooks/migration-drift'
     | '/hooks/reference-data-sync'
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
@@ -1868,6 +1879,7 @@ export interface FileRouteTypes {
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
+    | '/hooks/migration-drift'
     | '/hooks/reference-data-sync'
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
@@ -2026,6 +2038,7 @@ export interface RootRouteChildren {
   HooksGithubRoute: typeof HooksGithubRoute
   HooksHandoffObservabilityPollRoute: typeof HooksHandoffObservabilityPollRoute
   HooksHandoffParityRefreshRoute: typeof HooksHandoffParityRefreshRoute
+  HooksMigrationDriftRoute: typeof HooksMigrationDriftRoute
   HooksReferenceDataSyncRoute: typeof HooksReferenceDataSyncRoute
   HooksRunSchedulesRoute: typeof HooksRunSchedulesRoute
   HooksSupportRemediationDrainRoute: typeof HooksSupportRemediationDrainRoute
@@ -2539,6 +2552,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/reference-data-sync'
       fullPath: '/hooks/reference-data-sync'
       preLoaderRoute: typeof HooksReferenceDataSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/migration-drift': {
+      id: '/hooks/migration-drift'
+      path: '/hooks/migration-drift'
+      fullPath: '/hooks/migration-drift'
+      preLoaderRoute: typeof HooksMigrationDriftRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/handoff-parity-refresh': {
@@ -3381,6 +3401,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksGithubRoute: HooksGithubRoute,
   HooksHandoffObservabilityPollRoute: HooksHandoffObservabilityPollRoute,
   HooksHandoffParityRefreshRoute: HooksHandoffParityRefreshRoute,
+  HooksMigrationDriftRoute: HooksMigrationDriftRoute,
   HooksReferenceDataSyncRoute: HooksReferenceDataSyncRoute,
   HooksRunSchedulesRoute: HooksRunSchedulesRoute,
   HooksSupportRemediationDrainRoute: HooksSupportRemediationDrainRoute,

@@ -35,7 +35,8 @@ export function brokeredPreviewStorage() {
     new Promise((resolve) => {
       const requestId = newId();
       let done = false;
-      let timer: ReturnType<typeof setTimeout>;
+      // Initialised so the later assignment is a reassignment (prefer-const).
+      let timer: ReturnType<typeof setTimeout> | undefined = undefined;
       const finish = (r: { ok: boolean; value?: string | null } | null) => {
         if (done) return;
         done = true;

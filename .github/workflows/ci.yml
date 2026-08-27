@@ -105,6 +105,21 @@ jobs:
       - name: Discarded Supabase errors
         run: npm run check:discarded-errors
 
+      # `supabase_migrations.schema_migrations` cannot say whether a migration
+      # applied on this deployment -- 40 of 211 repo versions appear in it and
+      # 103 of its rows match no repo file, because Lovable stamps its own apply
+      # timestamps. So each new migration declares its own effect, and an
+      # undeclared or unparseable claim fails here rather than leaving the
+      # hourly drift alarm reporting on a corpus it cannot see.
+      - name: Migrations declare a checkable effect
+        run: npm run check:migration-assertions
+
+      # The alarm runs in a Worker with no filesystem, so the claims travel as
+      # generated code. A generated file allowed to go stale keeps reporting on
+      # a corpus that has moved -- and reports it healthy.
+      - name: Migration assertion manifest is current
+        run: npm run migrations:assertions:check
+
       - name: Typecheck
         run: npm run typecheck
 
