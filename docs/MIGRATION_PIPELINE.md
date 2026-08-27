@@ -146,3 +146,105 @@ merge and never apply, both silent:
 It is deliberately static. Whether a migration has been *applied* is a question
 only the database can answer, and this project's ledger cannot answer it
 honestly — which is the whole reason this document exists.
+
+
+---
+
+# The fleet: how a clone's DATABASE gets the prime's migrations
+
+Everything above is about **Mission Control's own** schema — one project, and a
+GitHub Actions workflow is the right shape for it because a red ✗ on the merge
+commit is the loudest signal available.
+
+The fleet is a different problem, and it was the bigger one.
+
+## The gap
+
+When the prime gains a migration, the cascade copies the **file** into every
+clone's repository automatically. Nothing applied it to the clone's
+**database**.
+
+`fleetMigrationSync` has existed and worked the whole time. Its only caller was
+a button on an admin page. So a fleet stayed in step with the prime exactly as
+often as somebody remembered to press it — the same shape as every other defect
+this programme has turned up: a capability that ships, reports green, and is
+never invoked.
+
+That is the ceiling on how many clones this platform can carry. One clone is a
+click. Ten is a chore nobody does on the day it matters. The schema drifts, the
+clone's edge functions start naming columns it does not have, and the symptom
+arrives as PostgREST `42703`s inside a tenant's application rather than as
+anything anyone here would recognise as a missed migration.
+
+## Why Mission Control drives it, and not each clone's CI
+
+The obvious alternative is to put the apply-on-merge workflow in every clone
+repository too. It does not scale, for three concrete reasons:
+
+- **N copies of the most dangerous credential.** The Management API token
+  reaches every project in the organisation. Per-repo CI means it is configured
+  in N repositories, each with its own project ref, and each ref is a chance to
+  name the wrong tenant.
+- **Clone repositories are mirrors.** The cascade overwrites them.
+  `apply-migration.yml` is already in `DEFAULT_MIRROR_EXCLUSIONS` for exactly
+  that reason, so a workflow living there is a file the cascade must be told to
+  leave alone — one more thing to remember per clone.
+- **Only Mission Control knows the fleet.** A clone's repository does not know
+  which Supabase project it belongs to. `clone_backends` does.
+
+Mission Control already holds one token that reaches every project, the project
+ref for every clone, an idempotent applier (`applyPrimeMigrations`, which unions
+both ledgers on the clone and skips what is applied), and a worker system. The
+scalable answer is to use them.
+
+| | Mission Control's own schema | the fleet |
+| --- | --- | --- |
+| targets | 1 project | N projects |
+| driver | GitHub Actions on merge | `/hooks/fleet-migration-sync`, every 30 min |
+| credential | one repo secret | the token Mission Control already has |
+| failure is visible as | a red check on the commit | an operator notification, per clone |
+
+## What the worker does
+
+`runFleetMigrationSync` — one engine, two callers. The admin button and the cron
+job both go through it, so they can never become two implementations of "sync
+the fleet".
+
+Each run:
+
+1. **Reclaims stale claims.** `worker_started_at` is the claim, and reusing it is
+   safe rather than lucky: the backend-provisioning drain claims `pending` and
+   reclaims `pending`/`provisioning`/`migrating`/`seeding_admin`. It never looks
+   at a `ready` row, which is the only status this touches.
+2. **Counts what is not eligible**, before taking a batch.
+3. **Takes a bounded slice** — five clones, ordered by how far behind they are,
+   nulls first. A fleet-wide loop in one invocation is the shape that timed out
+   the first mirror cascade at exactly 60,000 ms.
+4. **Reads the prime's migrations once**, not per clone.
+5. Per clone: **claim → apply → record → release**. The claim filter carries
+   `worker_started_at is null`, so two overlapping runs cannot both take the same
+   clone. pg_cron does not serialise its own job, and applying one migration
+   twice concurrently is how a clone gets marked `failed` by a duplicate-object
+   error it never really had.
+
+## A clone falling out of the fleet is now loud
+
+When a migration fails on a clone, its backend goes to `failed` — which takes it
+out of the eligible set, so the next run will not see it. That is the right
+behaviour and the wrong silence: without something saying so, the clone simply
+stops receiving schema changes and nothing anywhere reports it.
+
+Two things make it visible now. An operator notification names the clone, the
+migration and the consequence in plain terms. And every run reports `excluded` —
+the count of backends outside the eligible query — so "5 processed" can never be
+read as "the fleet is in step" while three clones sit outside it.
+
+## Three reads that must not be misread as emptiness
+
+- a candidate list that could not be read → the run reports an error, never
+  "0 clones, nothing to do";
+- a claim that **errored** → recorded as a failure, never treated as a lost
+  race. Conflating those is what left the screening consumer's claim looking
+  like contention for months while it had never once succeeded;
+- a clone that threw before any verdict → the claim is released and the status
+  is left alone, because guessing a schema verdict is worse than retrying.

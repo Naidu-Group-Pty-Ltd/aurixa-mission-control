@@ -313,115 +313,27 @@ export const restampCloneMigrationLedger = createServerFn({ method: "POST" })
  * ready clone backends. The prime repo is snapshotted once and replayed
  * against every backend; each backend's ledger decides what it still needs.
  */
+/**
+ * Fleet migration sync, on an operator's request.
+ *
+ * A thin wrapper. The engine is `runFleetMigrationSync` in
+ * `fleet-migration.server.ts`, shared with the scheduled worker at
+ * `/hooks/fleet-migration-sync` — this button and that cron job were never
+ * allowed to become two implementations of "sync the fleet", which is how a
+ * button and a scheduler come to disagree about what a clone is owed.
+ *
+ * The button's own contribution is the actor: an operator pressing it is
+ * recorded as having done so, and the scheduler is recorded as the scheduler.
+ */
 export const fleetMigrationSync = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .handler(
-    async ({
-      context,
-    }): Promise<
-      | {
-          ok: true;
-          results: { cloneId: string; cloneName: string; applied: number; failures: string[] }[];
-        }
-      | { ok: false; error: string }
-    > => {
-      const { supabase, userId } = context;
-
-      const source = await resolvePrimeSource(supabase);
-      if (!source) {
-        return { ok: false, error: "Prime not configured — set the prime repo in Settings first" };
-      }
-
-      // Get all ready backends
-      const { data: backends } = await supabase
-        .from("clone_backends")
-        .select("clone_id, supabase_project_ref, migration_version, status")
-        .eq("status", "ready")
-        .not("supabase_project_ref", "is", null);
-
-      if (!backends || backends.length === 0) {
-        return { ok: true, results: [] };
-      }
-
-      let migrations;
-      let sourceSha;
-      try {
-        ({ migrations, sourceSha } = await fetchPrimeMigrations(getAppOctokit(), source));
-      } catch (e) {
-        return {
-          ok: false,
-          error: e instanceof Error ? e.message : "Failed to read prime repo migrations",
-        };
-      }
-
-      // Get clone names
-      const cloneIds = backends.map((b) => b.clone_id);
-      const { data: clones } = await supabase.from("clones").select("id, name").in("id", cloneIds);
-      const cloneNameMap = new Map(clones?.map((c) => [c.id, c.name]) ?? []);
-
-      const results: { cloneId: string; cloneName: string; applied: number; failures: string[] }[] =
-        [];
-
-      for (const backend of backends) {
-        try {
-          const { results: migResults, latestApplied } = await applyPrimeMigrations(
-            backend.supabase_project_ref!,
-            migrations,
-          );
-
-          const successes = migResults.filter((r) => r.success && !r.skipped);
-          const failures = migResults.filter((r) => !r.success);
-
-          if (successes.length === 0 && failures.length === 0) continue; // already up to date
-
-          await supabase
-            .from("clone_backends")
-            .update({
-              migration_version: latestApplied,
-              source_repo: `${source.owner}/${source.repo}`,
-              source_ref: source.branch,
-              source_sha: sourceSha,
-              migrations_applied: migResults,
-              status: failures.length > 0 ? ("failed" as const) : ("ready" as const),
-              status_detail:
-                failures.length > 0
-                  ? `Migration failed at ${failures[0].name}`
-                  : `Synced to ${latestApplied}`,
-              error_message: failures.length > 0 ? failures[0].error : null,
-            })
-            .eq("clone_id", backend.clone_id);
-
-          results.push({
-            cloneId: backend.clone_id,
-            cloneName: cloneNameMap.get(backend.clone_id) ?? "Unknown",
-            applied: successes.length,
-            failures: failures.map((f) => `${f.name}: ${f.error}`),
-          });
-        } catch (e) {
-          results.push({
-            cloneId: backend.clone_id,
-            cloneName: cloneNameMap.get(backend.clone_id) ?? "Unknown",
-            applied: 0,
-            failures: [e instanceof Error ? e.message : "Unknown error"],
-          });
-        }
-      }
-
-      // Audit log
-      await supabase.from("audit_log").insert({
-        action: "fleet.migrations_synced",
-        entity_type: "fleet",
-        entity_id: null,
-        actor_user_id: userId,
-        metadata: {
-          source_repo: `${source.owner}/${source.repo}`,
-          source_sha: sourceSha,
-          clones_processed: results.length,
-          total_applied: results.reduce((s, r) => s + r.applied, 0),
-          total_failures: results.reduce((s, r) => s + r.failures.length, 0),
-        },
-      });
-
-      return { ok: true, results };
-    },
-  );
+  .handler(async ({ context }) => {
+    const { runFleetMigrationSync } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/fleet-migration.server"
+    );
+    const result = await runFleetMigrationSync(context.supabase, {
+      actorUserId: context.userId,
+    });
+    if (result.error) return { ok: false as const, error: result.error };
+    return { ok: true as const, ...result };
+  });

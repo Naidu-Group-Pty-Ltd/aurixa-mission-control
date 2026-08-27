@@ -14,7 +14,7 @@ type FleetResult = Extract<Awaited<ReturnType<typeof fleetMigrationSync>>, { ok:
 export function FleetMigrationSyncCard() {
   const [registry, setRegistry] = useState<Registry | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [lastResult, setLastResult] = useState<FleetResult["results"] | null>(null);
+  const [lastResult, setLastResult] = useState<FleetResult | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchRegistry = useServerFn(getMigrationRegistry);
@@ -40,17 +40,17 @@ export function FleetMigrationSyncCard() {
     try {
       const result = await syncFleet();
       if ("ok" in result && result.ok) {
-        setLastResult(result.results);
-        const totalApplied = result.results.reduce((s, r) => s + r.applied, 0);
-        const totalFailed = result.results.reduce((s, r) => s + r.failures.length, 0);
-        if (totalFailed > 0) {
-          toast.warning(`Applied ${totalApplied} migrations across fleet, ${totalFailed} failures`);
-        } else if (totalApplied > 0) {
-          toast.success(
-            `Applied ${totalApplied} migration(s) across ${result.results.length} clone(s)`,
+        setLastResult(result);
+        if (result.failed.length > 0) {
+          toast.warning(
+            `${result.advanced} clone(s) advanced, ${result.failed.length} fell out of sync`,
           );
+        } else if (result.advanced > 0) {
+          toast.success(`${result.advanced} clone(s) advanced to the prime's latest migration`);
+        } else if (result.processed > 0) {
+          toast.info(`${result.upToDate} clone(s) already level with the prime`);
         } else {
-          toast.info("All clone backends are already up to date");
+          toast.info("No clone backend was eligible this run");
         }
       } else if ("error" in result) {
         toast.error(result.error);
@@ -153,29 +153,41 @@ export function FleetMigrationSyncCard() {
         </Button>
 
         {/* Last sync results */}
-        {lastResult && lastResult.length > 0 && (
-          <div className="space-y-1 border-t pt-3">
+        {lastResult && (
+          <div className="space-y-2 border-t pt-3">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Last sync results
+              Last sync
             </span>
-            {lastResult.map((r) => (
-              <div key={r.cloneId} className="flex items-center justify-between border p-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="outline" className="text-[10px]">
+                {lastResult.processed} processed
+              </Badge>
+              {lastResult.advanced > 0 && (
+                <Badge variant="outline" className="bg-success/10 text-success text-[10px]">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> {lastResult.advanced} advanced
+                </Badge>
+              )}
+              {lastResult.upToDate > 0 && (
+                <Badge variant="outline" className="text-[10px]">
+                  {lastResult.upToDate} already level
+                </Badge>
+              )}
+              {/*
+                Excluded backends are shown even when the count is zero-ish
+                elsewhere: a clone leaves the eligible set the moment a
+                migration fails on it, and "5 processed" while three sit
+                outside the query is the quiet half of this whole failure.
+              */}
+              {lastResult.excluded > 0 && (
+                <Badge variant="outline" className="bg-warning/10 text-warning text-[10px]">
+                  <AlertTriangle className="mr-1 h-3 w-3" /> {lastResult.excluded} not eligible
+                </Badge>
+              )}
+            </div>
+            {lastResult.failed.map((r) => (
+              <div key={r.cloneId} className="flex items-start justify-between border p-2 text-xs">
                 <span className="font-mono">{r.cloneName}</span>
-                <div className="flex items-center gap-2">
-                  {r.applied > 0 && (
-                    <Badge variant="outline" className="bg-success/10 text-success text-[10px]">
-                      <CheckCircle2 className="mr-1 h-3 w-3" /> {r.applied} applied
-                    </Badge>
-                  )}
-                  {r.failures.length > 0 && (
-                    <Badge
-                      variant="outline"
-                      className="bg-destructive/10 text-destructive text-[10px]"
-                    >
-                      <AlertTriangle className="mr-1 h-3 w-3" /> {r.failures.length} failed
-                    </Badge>
-                  )}
-                </div>
+                <span className="ml-2 text-right text-destructive">{r.error}</span>
               </div>
             ))}
           </div>
