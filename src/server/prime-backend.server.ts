@@ -304,7 +304,14 @@ export function decodeBase64Utf8(b64: string): string {
 
 // ─── GitHub fetching ─────────────────────────────────────────────────
 
-type TreeBlob = { path: string; sha: string };
+/**
+ * `size` is the blob's byte length as GitHub's tree reports it. It is optional
+ * because the `getContent` fallback below does not always carry one, and a
+ * size we do not know must never be mistaken for a size of zero — the ceiling
+ * in `openPrimeMigrationCorpus` treats an unknown size as "fetch and find
+ * out" rather than as "safely small".
+ */
+type TreeBlob = { path: string; sha: string; size?: number };
 
 async function listSupabaseBlobs(
   octokit: Octokit,
@@ -327,7 +334,11 @@ async function listSupabaseBlobs(
   let blobs = (tree.tree ?? [])
     .filter((n) => n.type === "blob" && typeof n.path === "string" && typeof n.sha === "string")
     .filter((n) => (n.path as string).startsWith("supabase/"))
-    .map((n) => ({ path: n.path as string, sha: n.sha as string }));
+    .map((n) => ({
+      path: n.path as string,
+      sha: n.sha as string,
+      ...(typeof n.size === "number" ? { size: n.size } : {}),
+    }));
 
   // Very large repos can return a truncated tree; re-list just supabase/ then.
   if (tree.truncated) {
@@ -356,9 +367,19 @@ async function listDirRecursive(octokit: Octokit, ref: RepoRef, dir: string): Pr
       throw e;
     }
     if (!Array.isArray(entries)) continue;
-    for (const entry of entries as Array<{ type: string; path: string; sha: string }>) {
+    for (const entry of entries as Array<{
+      type: string;
+      path: string;
+      sha: string;
+      size?: number;
+    }>) {
       if (entry.type === "dir") stack.push(entry.path);
-      else if (entry.type === "file") out.push({ path: entry.path, sha: entry.sha });
+      else if (entry.type === "file")
+        out.push({
+          path: entry.path,
+          sha: entry.sha,
+          ...(typeof entry.size === "number" ? { size: entry.size } : {}),
+        });
     }
   }
   return out;
@@ -483,15 +504,19 @@ export async function resolvePrimeBackendRef(supabase: PrimeConfigClient): Promi
   return ref;
 }
 
-function migrationMetasFromBlobs(blobs: TreeBlob[]): Array<PrimeMigrationMeta & { sha: string }> {
+function migrationMetasFromBlobs(
+  blobs: TreeBlob[],
+): Array<PrimeMigrationMeta & { sha: string; size?: number }> {
   return blobs
     .filter((b) => b.path.startsWith(MIGRATIONS_PREFIX) && b.path.endsWith(".sql"))
     .map((b) => {
       const name = b.path.slice(MIGRATIONS_PREFIX.length);
       const id = migrationIdFromFilename(name);
-      return id ? { id, name, path: b.path, sha: b.sha } : null;
+      return id
+        ? { id, name, path: b.path, sha: b.sha, ...(b.size === undefined ? {} : { size: b.size }) }
+        : null;
     })
-    .filter((m): m is PrimeMigrationMeta & { sha: string } => m !== null)
+    .filter((m): m is PrimeMigrationMeta & { sha: string; size?: number } => m !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -513,20 +538,110 @@ export async function fetchPrimeMigrationList(
 }
 
 /**
- * The prime's migrations with full SQL bodies — the schema-only subset of the
- * snapshot, for syncing existing clone backends without touching functions.
+ * The prime's migrations as METADATA, with bodies fetched on demand.
+ *
+ * ## Why this exists
+ *
+ * This replaces `fetchPrimeMigrations`, which materialised every migration
+ * body before its caller could look at a single clone. On this prime that is
+ * 962 files and 158 MB, four of which are generated template-library seeds of
+ * 36-41 MB each — so the fleet sync spent 59.8 s in GitHub round trips and was
+ * cut off by pg_net's 60 s timeout having claimed nothing, written nothing,
+ * and recorded no audit row. It failed that way on every run, and on the admin
+ * button before it: `clone_backends.migration_version` was still null and no
+ * `fleet.migrations_synced` row had ever been written.
+ *
+ * That function is DELETED rather than left for callers that "only need a few"
+ * — every one of its three callers believed that, and every one of them
+ * downloaded all 158 MB. A dormant eager reader is one import away from
+ * putting the 60 s wall back.
+ *
+ * The corpus is not the expensive part — the BODIES are, and a clone in step
+ * with the prime needs none of them. Listing is two API calls (a branch read
+ * and one recursive tree); a body costs a round trip only when a clone is
+ * actually missing that version. That is what makes the "cheap when the fleet
+ * is level" claim true rather than aspirational: a level clone now costs one
+ * ledger query and zero blob fetches.
+ *
+ * ## The ceiling is a refusal, not a truncation
+ *
+ * A 41 MB migration cannot be applied through the Management API's query
+ * endpoint, and decoding four of them at once would exhaust the isolate before
+ * the request that carries them is ever built. So an oversized body is refused
+ * BY NAME, with its size, rather than being silently skipped — a migration
+ * that cannot be delivered has to surface as a blocked clone an operator can
+ * see, not as a sync that reports success while the schema drifts.
+ *
+ * An UNKNOWN size is not a small one. GitHub's `getContent` fallback does not
+ * always report one, so a blob with no size is fetched and measured after the
+ * fact rather than waved through.
  */
-export async function fetchPrimeMigrations(
+export const MAX_MIGRATION_BYTES = 8 * 1024 * 1024;
+
+export type PrimeMigrationCorpus = {
+  /** Every migration the prime declares, ordered by filename. No bodies. */
+  metas: ReadonlyArray<PrimeMigrationMeta>;
+  /** Commit the listing was taken at. */
+  sourceSha: string;
+  /**
+   * Fetch one migration's SQL. Memoised, so a batch of clones missing the same
+   * version pays for it once. Throws — naming the migration and its size — when
+   * the body is past `MAX_MIGRATION_BYTES`.
+   */
+  loadSql: (id: string) => Promise<string>;
+};
+
+export async function openPrimeMigrationCorpus(
   octokit: Octokit,
   ref: RepoRef,
-): Promise<{ migrations: PrimeMigration[]; sourceSha: string }> {
+  opts?: { maxBytes?: number },
+): Promise<PrimeMigrationCorpus> {
+  const maxBytes = opts?.maxBytes ?? MAX_MIGRATION_BYTES;
   const { blobs, commitSha } = await listSupabaseBlobs(octokit, ref);
-  const migrations: PrimeMigration[] = [];
-  for (const meta of migrationMetasFromBlobs(blobs)) {
-    const sql = decodeBase64Utf8(await fetchBlobBase64(octokit, ref, meta.sha));
-    migrations.push({ id: meta.id, name: meta.name, path: meta.path, sql });
-  }
-  return { migrations, sourceSha: commitSha };
+  const entries = migrationMetasFromBlobs(blobs);
+  const byId = new Map(entries.map((m) => [m.id, m]));
+  const cache = new Map<string, Promise<string>>();
+
+  const loadSql = (id: string): Promise<string> => {
+    const hit = cache.get(id);
+    if (hit) return hit;
+    const meta = byId.get(id);
+    if (!meta) {
+      return Promise.reject(new Error(`Migration ${id} is not in the prime corpus at ${commitSha}`));
+    }
+    const pending = (async () => {
+      // Refuse before the round trip when the tree already told us the size.
+      if (typeof meta.size === "number" && meta.size > maxBytes) {
+        throw oversized(meta.name, meta.size, maxBytes);
+      }
+      const sql = decodeBase64Utf8(await fetchBlobBase64(octokit, ref, meta.sha));
+      // And after it when the tree did not.
+      const bytes = new TextEncoder().encode(sql).length;
+      if (bytes > maxBytes) throw oversized(meta.name, bytes, maxBytes);
+      return sql;
+    })();
+    // A rejected fetch must not be cached as the answer: the next clone in the
+    // batch would inherit a failure that may have been transient, and every
+    // later run would too.
+    pending.catch(() => cache.delete(id));
+    cache.set(id, pending);
+    return pending;
+  };
+
+  return {
+    metas: entries.map(({ id, name, path }) => ({ id, name, path })),
+    sourceSha: commitSha,
+    loadSql,
+  };
+}
+
+function oversized(name: string, bytes: number, maxBytes: number): Error {
+  return new Error(
+    `Migration ${name} is ${(bytes / 1_048_576).toFixed(1)} MB, past the ` +
+      `${(maxBytes / 1_048_576).toFixed(0)} MB ceiling for a single Management API statement. ` +
+      "Apply it to this clone by hand (psql or the SQL editor), record its version in " +
+      "supabase_migrations.schema_migrations, then re-run the sync.",
+  );
 }
 
 /**

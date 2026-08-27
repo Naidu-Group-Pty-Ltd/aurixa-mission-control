@@ -486,13 +486,18 @@ async function executeSqlMigration(
     return { status: "skipped" };
   }
 
-  const { resolvePrimeSource, fetchPrimeMigrations } =
+  const { resolvePrimeSource, openPrimeMigrationCorpus } =
     await import("@/server/prime-backend.server");
   const { getAppOctokit } = await import("@/server/github-app.server");
   const source = await resolvePrimeSource(admin);
   if (!source) return parkRun(run, ["prime source repo is not configured"]);
 
-  const { migrations } = await fetchPrimeMigrations(getAppOctokit(), source);
+  // Metadata only. The destructiveness gate below needs real SQL, but only for
+  // the migrations this clone is MISSING — and a clone already at the prime's
+  // head is missing none, so it now costs two API calls instead of downloading
+  // a 158 MB corpus to discover there was nothing to do.
+  const corpus = await openPrimeMigrationCorpus(getAppOctokit(), source);
+  const migrations = corpus.metas;
 
   const { runSqlOnProject, applyPrimeMigrations } =
     await import("@/server/backend-provisioning.server");
@@ -522,7 +527,20 @@ async function executeSqlMigration(
   if (!approvedByHuman) {
     const offending: Array<{ migration: string; reasons: string[] }> = [];
     for (const m of pending) {
-      const assessment = assessSqlDestructiveness(m.sql);
+      // A body that cannot be fetched — oversized, or a GitHub fault — parks
+      // the run rather than passing the gate unexamined. An unread migration
+      // is not a migration judged non-destructive.
+      let sql: string;
+      try {
+        sql = await corpus.loadSql(m.id);
+      } catch (e) {
+        offending.push({
+          migration: m.name,
+          reasons: [e instanceof Error ? e.message : "could not be read from the prime repo"],
+        });
+        continue;
+      }
+      const assessment = assessSqlDestructiveness(sql);
       if (assessment.destructive) {
         offending.push({ migration: m.name, reasons: assessment.findings.map((f) => f.reason) });
       }
@@ -538,6 +556,8 @@ async function executeSqlMigration(
   const { results, latestApplied } = await applyPrimeMigrations(
     backend.supabase_project_ref,
     pending,
+    undefined,
+    (m) => corpus.loadSql(m.id),
   );
   const failed = (results ?? []).filter((r: any) => r.status === "failed");
   if (failed.length > 0) {

@@ -1436,8 +1436,18 @@ export type PrimeMigrationResult = {
  */
 export async function applyPrimeMigrations(
   projectRef: string,
-  migrations: Array<{ id: string; name: string; sql: string }>,
+  migrations: ReadonlyArray<{ id: string; name: string; sql?: string }>,
   onStatusUpdate?: (status: string, detail: string) => Promise<void>,
+  /**
+   * Resolve a migration's SQL when the caller did not materialise it.
+   *
+   * The fleet sync passes metadata only and this resolver, so a body is
+   * fetched from GitHub exactly when a clone turns out to be missing that
+   * version — never for the ones it already has. Callers that already hold the
+   * SQL (provisioning replays a snapshot it just downloaded) pass it on the
+   * item and never reach this.
+   */
+  loadSql?: (m: { id: string; name: string }) => Promise<string>,
 ): Promise<{ results: PrimeMigrationResult[]; latestApplied: string | null }> {
   await runSqlOnProject(projectRef, TRACKING_TABLE_SQL);
 
@@ -1488,7 +1498,16 @@ export async function applyPrimeMigrations(
     }
     await onStatusUpdate?.("migrating", `Applying migration ${i + 1}/${ordered.length}: ${m.name}`);
     try {
-      await runSqlOnProject(projectRef, m.sql);
+      // Resolved here, inside the loop and after the `applied` check above, so
+      // a clone that is level pays for no bodies at all. A migration with
+      // neither an inline body nor a resolver is a programming error rather
+      // than a migration failure, but it is reported through the same channel
+      // so it lands in `migrations_applied` where an operator will see it.
+      const sql = m.sql ?? (loadSql ? await loadSql({ id: m.id, name: m.name }) : undefined);
+      if (sql === undefined) {
+        throw new Error(`No SQL available for migration ${m.name} and no loader was provided`);
+      }
+      await runSqlOnProject(projectRef, sql);
       // Record in BOTH ledgers: canonical Supabase table is the source of
       // truth going forward, aurixa is kept as a mirror so older tooling /
       // health checks keep working. (Issue #14.)

@@ -45,7 +45,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { getAppOctokit } from "./github-app.server";
-import { fetchPrimeMigrations, resolvePrimeSource } from "./prime-backend.server";
+import { openPrimeMigrationCorpus, resolvePrimeSource } from "./prime-backend.server";
 import { applyPrimeMigrations } from "./backend-provisioning.server";
 import { notifyOperators, writeAuditLog } from "./audit.server";
 
@@ -55,11 +55,16 @@ type Db = SupabaseClient<Database>;
  * How many clones one run will touch.
  *
  * Each clone is a round trip per unapplied migration against its own project,
- * and the corpus is 200+ files. A fleet-wide loop in a single invocation is the
+ * and the corpus is 962 files. A fleet-wide loop in a single invocation is the
  * shape that timed out the first mirror cascade at exactly 60,000 ms, so this
  * takes a bounded slice and lets the next tick take the rest. Clones are
  * ordered by how far behind they are, so the one that has waited longest goes
  * first rather than whichever the planner happened to return.
+ *
+ * The batch bounds the APPLY work. It never bounded the read: the corpus was
+ * downloaded in full before the first clone was claimed, which is why this job
+ * hit the same 60,000 ms wall with `batchSize` of 5 and of 1 alike. That is
+ * fixed in `openPrimeMigrationCorpus`, not here.
  */
 const DEFAULT_BATCH = 5;
 
@@ -172,18 +177,30 @@ export async function runFleetMigrationSync(
   const out: FleetMigrationResult = { ...EMPTY, failed: [], excluded: excludedCount ?? 0 };
   if (!backends || backends.length === 0) return out;
 
-  // Read the prime's migrations ONCE. Per clone would be N GitHub round trips
-  // for identical bytes, and the corpus is the largest thing this run moves.
-  let migrations: Array<{ id: string; name: string; sql: string }>;
-  let sourceSha: string;
+  // List the prime's migrations ONCE, as metadata, and let the bodies arrive on
+  // demand.
+  //
+  // Materialising them here is what made this job impossible to finish: the
+  // corpus is 962 files and 158 MB — four generated template-library seeds are
+  // 36-41 MB each — so the run spent 59.8 s in GitHub round trips and pg_net
+  // cut it off at 60 s having claimed nothing and written nothing. It failed
+  // that way every time, and on the admin button before it.
+  //
+  // The bodies were never the shared cost they looked like. A clone in step
+  // with the prime needs NONE of them, and two clones behind by the same
+  // migration share one fetch through the corpus's own memo. Listing is two
+  // API calls; a body costs a round trip only when some clone is actually
+  // missing that version.
+  let corpus: Awaited<ReturnType<typeof openPrimeMigrationCorpus>>;
   try {
-    ({ migrations, sourceSha } = await fetchPrimeMigrations(getAppOctokit(), source));
+    corpus = await openPrimeMigrationCorpus(getAppOctokit(), source);
   } catch (e) {
     return {
       ...out,
       error: e instanceof Error ? e.message : "Failed to read prime repo migrations",
     };
   }
+  const sourceSha = corpus.sourceSha;
 
   const ids = backends.map((b) => b.clone_id);
   const { data: clones } = await supabase.from("clones").select("id, name").in("id", ids);
@@ -216,7 +233,9 @@ export async function runFleetMigrationSync(
     try {
       const { results, latestApplied } = await applyPrimeMigrations(
         backend.supabase_project_ref!,
-        migrations,
+        corpus.metas,
+        undefined,
+        (m) => corpus.loadSql(m.id),
       );
       const successes = results.filter((r) => r.success && !r.skipped);
       const failures = results.filter((r) => !r.success);
