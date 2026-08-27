@@ -126,6 +126,26 @@ All twelve are updates to the existing MC fleet on the Aurixa VAPI account —
 same assistant ids, new names, prompts and tools; the pre-existing NPC
 assistants stay untouched.
 
+## The knowledge base every agent carries
+
+Each of the twelve assistants has a VAPI `query` tool named
+`aurixa_knowledge`, backed by one uploaded document — **Aurixa Systems —
+Voice Agent Knowledge Base** — built by
+`scripts/voice/build-knowledge-doc.mjs` (run it with the `docx` npm package
+available; it emits the `.docx` to upload via `POST /file`). The document is
+reference only: company background, the three access stages with their real
+timings, the capability list, the pricing shape (never negotiation ammunition),
+security posture, support tiers, and ten quick answers. The system prompts
+gained one closing KNOWLEDGE BASE paragraph telling the agent to consult the
+tool for factual questions, answer in its own spoken words, never read the
+document aloud or mention it, and defer to a team follow-up for anything
+uncovered — the paragraph explicitly cannot override the agent's role or
+rules, so the never-claim-approval posture stands.
+
+To revise the knowledge base: edit the script, rebuild, upload the new file,
+and repoint the query tool's `fileIds` on each assistant (PATCH merges the
+whole `model` object — always GET and merge, never send a partial model).
+
 ## Booking window change
 
 `voice-tools.server.ts` moves from the NPC window to the strategic-review
