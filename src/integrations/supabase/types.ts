@@ -7276,6 +7276,96 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_calls: {
+        Row: {
+          account_id: string | null
+          answered_at: string | null
+          contact_id: string | null
+          created_at: string
+          customer_name: string | null
+          direction: string
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          metadata: Json
+          notes: string | null
+          operator_identity: string | null
+          operator_user_id: string | null
+          parent_call_sid: string | null
+          phone_number: string
+          recording_duration_seconds: number | null
+          recording_sid: string | null
+          recording_url: string | null
+          started_at: string
+          status: string
+          twilio_call_sid: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          answered_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          direction: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          operator_identity?: string | null
+          operator_user_id?: string | null
+          parent_call_sid?: string | null
+          phone_number: string
+          recording_duration_seconds?: number | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          answered_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          direction?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          operator_identity?: string | null
+          operator_user_id?: string | null
+          parent_call_sid?: string | null
+          phone_number?: string
+          recording_duration_seconds?: number | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_calls_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phone_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_hosting_config: {
         Row: {
           auto_deploy: boolean
@@ -9347,6 +9437,39 @@ export type Database = {
           },
         ]
       }
+      telephony_registrations: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          identity: string
+          last_seen_at: string
+          ring_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          identity: string
+          last_seen_at?: string
+          ring_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          identity?: string
+          last_seen_at?: string
+          ring_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
           billing_exempt: boolean
@@ -11366,6 +11489,7 @@ export type Database = {
         | "device_limit_reached"
         | "device_registered"
         | "device_released"
+        | "phone_missed_call"
         | "lead_captured"
         | "purchase_completed"
         | "crm_sla_breach"
@@ -11848,6 +11972,7 @@ export const Constants = {
         "device_limit_reached",
         "device_registered",
         "device_released",
+        "phone_missed_call",
         "lead_captured",
         "purchase_completed",
         "crm_sla_breach",

@@ -39,6 +39,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SecurityIndexRouteImport } from './routes/security.index'
 import { Route as CrmIndexRouteImport } from './routes/crm.index'
+import { Route as VoicePhoneRouteImport } from './routes/voice.phone'
 import { Route as VoiceOutboundRouteImport } from './routes/voice.outbound'
 import { Route as VoiceCallsRouteImport } from './routes/voice.calls'
 import { Route as VoiceAgentsRouteImport } from './routes/voice.agents'
@@ -125,6 +126,9 @@ import { Route as ApiPublicTokensFeedbackPromptRouteImport } from './routes/api.
 import { Route as ApiPublicTokensCommitRouteImport } from './routes/api.public.tokens.commit'
 import { Route as ApiPublicTokensCancelRouteImport } from './routes/api.public.tokens.cancel'
 import { Route as ApiPublicTokensBalanceRouteImport } from './routes/api.public.tokens.balance'
+import { Route as ApiPublicTelephonyVoiceRouteImport } from './routes/api.public.telephony.voice'
+import { Route as ApiPublicTelephonyStatusRouteImport } from './routes/api.public.telephony.status'
+import { Route as ApiPublicTelephonyIncomingRouteImport } from './routes/api.public.telephony.incoming'
 import { Route as ApiPublicSupportTicketsRouteImport } from './routes/api.public.support.tickets'
 import { Route as ApiPublicSupportAssistantActivityRouteImport } from './routes/api.public.support.assistant-activity'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api.public.stripe.webhook'
@@ -311,6 +315,11 @@ const SecurityIndexRoute = SecurityIndexRouteImport.update({
 const CrmIndexRoute = CrmIndexRouteImport.update({
   id: '/crm/',
   path: '/crm/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VoicePhoneRoute = VoicePhoneRouteImport.update({
+  id: '/voice/phone',
+  path: '/voice/phone',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VoiceOutboundRoute = VoiceOutboundRouteImport.update({
@@ -754,6 +763,23 @@ const ApiPublicTokensBalanceRoute = ApiPublicTokensBalanceRouteImport.update({
   path: '/api/public/tokens/balance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTelephonyVoiceRoute = ApiPublicTelephonyVoiceRouteImport.update({
+  id: '/api/public/telephony/voice',
+  path: '/api/public/telephony/voice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTelephonyStatusRoute =
+  ApiPublicTelephonyStatusRouteImport.update({
+    id: '/api/public/telephony/status',
+    path: '/api/public/telephony/status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTelephonyIncomingRoute =
+  ApiPublicTelephonyIncomingRouteImport.update({
+    id: '/api/public/telephony/incoming',
+    path: '/api/public/telephony/incoming',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSupportTicketsRoute = ApiPublicSupportTicketsRouteImport.update({
   id: '/api/public/support/tickets',
   path: '/api/public/support/tickets',
@@ -1065,6 +1091,7 @@ export interface FileRoutesByFullPath {
   '/voice/agents': typeof VoiceAgentsRoute
   '/voice/calls': typeof VoiceCallsRoute
   '/voice/outbound': typeof VoiceOutboundRoute
+  '/voice/phone': typeof VoicePhoneRoute
   '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1105,6 +1132,9 @@ export interface FileRoutesByFullPath {
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
   '/api/public/support/assistant-activity': typeof ApiPublicSupportAssistantActivityRoute
   '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
+  '/api/public/telephony/incoming': typeof ApiPublicTelephonyIncomingRoute
+  '/api/public/telephony/status': typeof ApiPublicTelephonyStatusRoute
+  '/api/public/telephony/voice': typeof ApiPublicTelephonyVoiceRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
@@ -1219,6 +1249,7 @@ export interface FileRoutesByTo {
   '/voice/agents': typeof VoiceAgentsRoute
   '/voice/calls': typeof VoiceCallsRoute
   '/voice/outbound': typeof VoiceOutboundRoute
+  '/voice/phone': typeof VoicePhoneRoute
   '/crm': typeof CrmIndexRoute
   '/security': typeof SecurityIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -1259,6 +1290,9 @@ export interface FileRoutesByTo {
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
   '/api/public/support/assistant-activity': typeof ApiPublicSupportAssistantActivityRoute
   '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
+  '/api/public/telephony/incoming': typeof ApiPublicTelephonyIncomingRoute
+  '/api/public/telephony/status': typeof ApiPublicTelephonyStatusRoute
+  '/api/public/telephony/voice': typeof ApiPublicTelephonyVoiceRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
@@ -1375,6 +1409,7 @@ export interface FileRoutesById {
   '/voice/agents': typeof VoiceAgentsRoute
   '/voice/calls': typeof VoiceCallsRoute
   '/voice/outbound': typeof VoiceOutboundRoute
+  '/voice/phone': typeof VoicePhoneRoute
   '/crm/': typeof CrmIndexRoute
   '/security/': typeof SecurityIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1415,6 +1450,9 @@ export interface FileRoutesById {
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRouteWithChildren
   '/api/public/support/assistant-activity': typeof ApiPublicSupportAssistantActivityRoute
   '/api/public/support/tickets': typeof ApiPublicSupportTicketsRoute
+  '/api/public/telephony/incoming': typeof ApiPublicTelephonyIncomingRoute
+  '/api/public/telephony/status': typeof ApiPublicTelephonyStatusRoute
+  '/api/public/telephony/voice': typeof ApiPublicTelephonyVoiceRoute
   '/api/public/tokens/balance': typeof ApiPublicTokensBalanceRoute
   '/api/public/tokens/cancel': typeof ApiPublicTokensCancelRoute
   '/api/public/tokens/commit': typeof ApiPublicTokensCommitRoute
@@ -1532,6 +1570,7 @@ export interface FileRouteTypes {
     | '/voice/agents'
     | '/voice/calls'
     | '/voice/outbound'
+    | '/voice/phone'
     | '/crm/'
     | '/security/'
     | '/settings/'
@@ -1572,6 +1611,9 @@ export interface FileRouteTypes {
     | '/api/public/stripe/webhook'
     | '/api/public/support/assistant-activity'
     | '/api/public/support/tickets'
+    | '/api/public/telephony/incoming'
+    | '/api/public/telephony/status'
+    | '/api/public/telephony/voice'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
@@ -1686,6 +1728,7 @@ export interface FileRouteTypes {
     | '/voice/agents'
     | '/voice/calls'
     | '/voice/outbound'
+    | '/voice/phone'
     | '/crm'
     | '/security'
     | '/settings'
@@ -1726,6 +1769,9 @@ export interface FileRouteTypes {
     | '/api/public/stripe/webhook'
     | '/api/public/support/assistant-activity'
     | '/api/public/support/tickets'
+    | '/api/public/telephony/incoming'
+    | '/api/public/telephony/status'
+    | '/api/public/telephony/voice'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
@@ -1841,6 +1887,7 @@ export interface FileRouteTypes {
     | '/voice/agents'
     | '/voice/calls'
     | '/voice/outbound'
+    | '/voice/phone'
     | '/crm/'
     | '/security/'
     | '/settings/'
@@ -1881,6 +1928,9 @@ export interface FileRouteTypes {
     | '/api/public/stripe/webhook'
     | '/api/public/support/assistant-activity'
     | '/api/public/support/tickets'
+    | '/api/public/telephony/incoming'
+    | '/api/public/telephony/status'
+    | '/api/public/telephony/voice'
     | '/api/public/tokens/balance'
     | '/api/public/tokens/cancel'
     | '/api/public/tokens/commit'
@@ -1978,6 +2028,7 @@ export interface RootRouteChildren {
   VoiceAgentsRoute: typeof VoiceAgentsRoute
   VoiceCallsRoute: typeof VoiceCallsRoute
   VoiceOutboundRoute: typeof VoiceOutboundRoute
+  VoicePhoneRoute: typeof VoicePhoneRoute
   CrmIndexRoute: typeof CrmIndexRoute
   SecurityIndexRoute: typeof SecurityIndexRoute
   ApiPublicPurchasesRoute: typeof ApiPublicPurchasesRoute
@@ -2016,6 +2067,9 @@ export interface RootRouteChildren {
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRouteWithChildren
   ApiPublicSupportAssistantActivityRoute: typeof ApiPublicSupportAssistantActivityRoute
   ApiPublicSupportTicketsRoute: typeof ApiPublicSupportTicketsRoute
+  ApiPublicTelephonyIncomingRoute: typeof ApiPublicTelephonyIncomingRoute
+  ApiPublicTelephonyStatusRoute: typeof ApiPublicTelephonyStatusRoute
+  ApiPublicTelephonyVoiceRoute: typeof ApiPublicTelephonyVoiceRoute
   ApiPublicTokensBalanceRoute: typeof ApiPublicTokensBalanceRoute
   ApiPublicTokensCancelRoute: typeof ApiPublicTokensCancelRoute
   ApiPublicTokensCommitRoute: typeof ApiPublicTokensCommitRoute
@@ -2241,6 +2295,13 @@ declare module '@tanstack/react-router' {
       path: '/crm'
       fullPath: '/crm/'
       preLoaderRoute: typeof CrmIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/voice/phone': {
+      id: '/voice/phone'
+      path: '/voice/phone'
+      fullPath: '/voice/phone'
+      preLoaderRoute: typeof VoicePhoneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/voice/outbound': {
@@ -2845,6 +2906,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTokensBalanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/telephony/voice': {
+      id: '/api/public/telephony/voice'
+      path: '/api/public/telephony/voice'
+      fullPath: '/api/public/telephony/voice'
+      preLoaderRoute: typeof ApiPublicTelephonyVoiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/telephony/status': {
+      id: '/api/public/telephony/status'
+      path: '/api/public/telephony/status'
+      fullPath: '/api/public/telephony/status'
+      preLoaderRoute: typeof ApiPublicTelephonyStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/telephony/incoming': {
+      id: '/api/public/telephony/incoming'
+      path: '/api/public/telephony/incoming'
+      fullPath: '/api/public/telephony/incoming'
+      preLoaderRoute: typeof ApiPublicTelephonyIncomingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/support/tickets': {
       id: '/api/public/support/tickets'
       path: '/api/public/support/tickets'
@@ -3293,6 +3375,7 @@ const rootRouteChildren: RootRouteChildren = {
   VoiceAgentsRoute: VoiceAgentsRoute,
   VoiceCallsRoute: VoiceCallsRoute,
   VoiceOutboundRoute: VoiceOutboundRoute,
+  VoicePhoneRoute: VoicePhoneRoute,
   CrmIndexRoute: CrmIndexRoute,
   SecurityIndexRoute: SecurityIndexRoute,
   ApiPublicPurchasesRoute: ApiPublicPurchasesRoute,
@@ -3332,6 +3415,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSupportAssistantActivityRoute:
     ApiPublicSupportAssistantActivityRoute,
   ApiPublicSupportTicketsRoute: ApiPublicSupportTicketsRoute,
+  ApiPublicTelephonyIncomingRoute: ApiPublicTelephonyIncomingRoute,
+  ApiPublicTelephonyStatusRoute: ApiPublicTelephonyStatusRoute,
+  ApiPublicTelephonyVoiceRoute: ApiPublicTelephonyVoiceRoute,
   ApiPublicTokensBalanceRoute: ApiPublicTokensBalanceRoute,
   ApiPublicTokensCancelRoute: ApiPublicTokensCancelRoute,
   ApiPublicTokensCommitRoute: ApiPublicTokensCommitRoute,
