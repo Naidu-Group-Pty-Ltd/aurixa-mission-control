@@ -419,3 +419,48 @@ describe("runMigrationDrift", () => {
     ).rejects.toThrow(/SUPABASE_SERVICE_ROLE_KEY/);
   });
 });
+
+/**
+ * The one path every other test skips.
+ *
+ * Each test above injects `fetchImpl`, so the DEFAULT -- the global `fetch` --
+ * was never exercised, and that is exactly where the bug was. In a Cloudflare
+ * Worker the global `fetch` is bound to the global scope: storing it on an
+ * object and calling it as `rest.fetchImpl(...)` sets `this` to that object and
+ * the runtime throws "Illegal invocation". The alarm found this in itself on
+ * its first live run, and recorded that message against both `table:` claims.
+ *
+ * This double reproduces the rule: a plain (non-arrow) function called as a
+ * method receives the object as `this`, and called free receives `undefined`.
+ */
+describe("the default fetch", () => {
+  it("survives being stored on an object, the way a Worker requires", async () => {
+    const original = globalThis.fetch;
+    const calls: string[] = [];
+    function workerFetch(this: unknown, input: RequestInfo | URL): Promise<Response> {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Illegal invocation: function called with incorrect `this` reference.");
+      }
+      calls.push(String(input));
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        json: async () => ({}),
+      } as unknown as Response);
+    }
+    globalThis.fetch = workerFetch as unknown as typeof fetch;
+    try {
+      const result = await runMigrationDrift(fakeSupabase(), {
+        claims: claims(TABLE_CLAIM),
+        supabaseUrl: URL_BASE,
+        serviceRoleKey: KEY,
+      });
+      expect(result.summary.errors).toBe(0);
+      expect(result.summary.satisfied).toBe(1);
+      expect(calls).toHaveLength(1);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});

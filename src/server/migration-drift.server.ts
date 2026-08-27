@@ -146,6 +146,24 @@ type Rest = {
   readonly fetchImpl: typeof fetch;
 };
 
+/**
+ * The global `fetch`, wrapped so it is always called as a FREE function.
+ *
+ * In a Cloudflare Worker `fetch` is bound to the global scope. Storing the bare
+ * global on an object and calling it as `rest.fetchImpl(...)` sets `this` to
+ * that object, and the runtime answers:
+ *
+ *     Illegal invocation: function called with incorrect `this` reference.
+ *
+ * This alarm found that in itself, on its first live run: both `table:` claims
+ * came back `error` with exactly that message while both `cron:` claims (which
+ * go through supabase-js, not this) came back satisfied. Every test injects
+ * `fetchImpl`, so the default was the one path nothing exercised -- which is
+ * why `defaults to a global fetch that survives being stored on an object`
+ * exists below it.
+ */
+const globalFetch: typeof fetch = (input, init) => fetch(input, init);
+
 function restHeaders(rest: Rest, extra?: Record<string, string>): Record<string, string> {
   return {
     apikey: rest.key,
@@ -297,7 +315,11 @@ export async function runMigrationDrift(
       "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY - the drift alarm reads the schema over PostgREST.",
     );
   }
-  const rest: Rest = { url: url.replace(/\/+$/, ""), key, fetchImpl: opts.fetchImpl ?? fetch };
+  const rest: Rest = {
+    url: url.replace(/\/+$/, ""),
+    key,
+    fetchImpl: opts.fetchImpl ?? globalFetch,
+  };
 
   // Flatten to one row per claim, keeping which migration made it.
   const flat = claims.flatMap((c) =>
