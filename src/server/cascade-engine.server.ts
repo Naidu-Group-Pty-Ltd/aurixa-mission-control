@@ -12,6 +12,9 @@ import {
 } from "./github-app.server";
 import {
   assertMirrorPolicy,
+  backendIdentityHold,
+  backendRefsIn,
+  isShippedPath,
   partitionCascadePaths,
   reportableHeld,
   requireExclusions,
@@ -360,6 +363,22 @@ async function processClone(args: {
   );
   if (isMirror) assertMirrorPolicy(clone.id, exclusions);
 
+  // This clone's own Supabase project, for `backendIdentityHold` below.
+  //
+  // Read through the safe view, and read leniently on purpose: a clone with no
+  // registered backend is an ordinary state (nothing has been provisioned yet),
+  // and it must not stop a cascade. What it does is make every project ref
+  // unresolvable rather than benign — see that function's header. So a missing
+  // row and a failed read land in the same place, which is the strict one.
+  const backendRes = await supabase
+    .from("clone_backends_safe")
+    .select("supabase_project_ref")
+    .eq("clone_id", clone.id)
+    .maybeSingle();
+  const ownProjectRef =
+    (backendRes.data as { supabase_project_ref: string | null } | null)?.supabase_project_ref ??
+    null;
+
   // Module-sync cascades pin the file_globs to a single module so the push
   // only touches that module's files, not every installed module on the clone.
   // Always run overrides through validateModuleGlobs — the pinning caller
@@ -558,35 +577,92 @@ async function processClone(args: {
   // Eight at a time is chosen against GitHub's secondary rate limits rather
   // than for maximum speed: the work is IO, not CPU, and the same 144 calls
   // finish inside the budget with room to spare.
-  const prepared = await mapWithConcurrency(primeFiles, 8, async (path) => {
-    const primeFile = await getFileContent(octokit, primeRef, path);
-    if (!primeFile) return null;
-    // A mirror already knows this path differs -- the blob SHAs said so -- and
-    // re-reading the clone's copy to confirm it would double the request count
-    // of the one scope that cannot afford it.
-    if (!isMirror) {
-      const cloneFile = await getFileContent(octokit, cloneRef, path);
-      if (cloneFile && cloneFile.content === primeFile.content) return null;
-    }
+  type Prepared =
+    | { kind: "blob"; path: string; mode: "100644"; type: "blob"; sha: string }
+    | { kind: "held"; held: HeldPath };
 
-    const { data: blob } = await octokit.git.createBlob({
-      owner: cloneRef.owner,
-      repo: cloneRef.repo,
-      content: Buffer.from(primeFile.content, "utf8").toString("base64"),
-      encoding: "base64",
-    });
-    return { path, mode: "100644" as const, type: "blob" as const, sha: blob.sha };
-  });
+  const prepared = await mapWithConcurrency<string, Prepared | null>(
+    primeFiles,
+    8,
+    async (path) => {
+      const primeFile = await getFileContent(octokit, primeRef, path);
+      if (!primeFile) return null;
+
+      // A mirror already knows this path differs -- the blob SHAs said so -- and
+      // re-reading the clone's copy to confirm it would double the request count
+      // of the one scope that cannot afford it.
+      let cloneFile = null as Awaited<ReturnType<typeof getFileContent>> | null;
+      let cloneFileRead = false;
+      if (!isMirror) {
+        cloneFile = await getFileContent(octokit, cloneRef, path);
+        cloneFileRead = true;
+        if (cloneFile && cloneFile.content === primeFile.content) return null;
+      }
+
+      // The content rule. Path exclusions protect what somebody remembered to
+      // list; this protects the property itself.
+      //
+      // Cheap by construction. The clone's copy is only fetched when prime's
+      // content actually names a Supabase project inside a path this clone
+      // ships -- one file out of 71 on the first mirror run -- so the extra
+      // read costs nothing on the paths that are not about identity, which is
+      // nearly all of them.
+      if (isShippedPath(path) && backendRefsIn(primeFile.content).some((r) => r !== ownProjectRef)) {
+        if (!cloneFileRead) {
+          cloneFile = await getFileContent(octokit, cloneRef, path);
+          cloneFileRead = true;
+        }
+        const hold = backendIdentityHold({
+          path,
+          primeContent: primeFile.content,
+          cloneContent: cloneFile ? cloneFile.content : null,
+          ownRef: ownProjectRef,
+        });
+        if (hold) return { kind: "held", held: hold };
+      }
+
+      const { data: blob } = await octokit.git.createBlob({
+        owner: cloneRef.owner,
+        repo: cloneRef.repo,
+        content: Buffer.from(primeFile.content, "utf8").toString("base64"),
+        encoding: "base64",
+      });
+      return {
+        kind: "blob",
+        path,
+        mode: "100644" as const,
+        type: "blob" as const,
+        sha: blob.sha,
+      };
+    },
+  );
   for (const entry of prepared) {
-    if (entry) treeEntries.push(entry);
+    if (!entry) continue;
+    if (entry.kind === "held") {
+      // Recorded in the same partition the path rules feed, so a content hold
+      // reaches the pull request body, the withheld count and the "nothing to
+      // cascade" reason by exactly the route a listed path does.
+      partition.held.push(entry.held);
+      needsReconcile.push(entry.held);
+      continue;
+    }
+    treeEntries.push({ path: entry.path, mode: entry.mode, type: entry.type, sha: entry.sha });
   }
 
   if (treeEntries.length === 0) {
     // "Nothing to write" and "nothing differed" are different states, and the
     // second one is the one an operator can safely ignore. A mirror whose only
     // differences were all withheld must not report as in sync.
+    //
+    // The test is `held > 0`, not `write.length === 0`. A content hold
+    // (`backendIdentityHold`) is decided while the blob is being prepared, so
+    // its path is still in `partition.write` — it passed the path rules — and
+    // keying on that count would report a cascade that withheld every one of
+    // its files as "already in sync". We are inside `treeEntries.length === 0`,
+    // so nothing was written by definition; anything withheld therefore
+    // accounts for every path that reached a decision.
     const why =
-      partition.held.length > 0 && partition.write.length === 0
+      partition.held.length > 0
         ? `Nothing to cascade: all ${partition.held.length} differing path(s) are withheld by this clone's exclusion policy`
         : `Already in sync with prime@${shortSha(sourceSha)}`;
     return {
@@ -691,18 +767,65 @@ async function processClone(args: {
             `Direct push to \`${cloneRef.branch}\` was blocked — falling back to PR + merge.`,
           ),
         });
+        // Ask GitHub to merge it WHEN THE CHECKS PASS, rather than now.
+        //
+        // This used to call `pulls.merge` immediately. On a clone with branch
+        // protection that is refused, which is the only reason it never landed
+        // a broken tree — protection was doing the work the cascade thought it
+        // was doing itself. Where protection is absent it merged a tree nothing
+        // had built.
+        //
+        // That is not hypothetical. On 26 Aug 2026 a mirror cascade carried
+        // prime's `package.json` and `package-lock.json` at a commit where the
+        // pair fails `npm ci` (27 missing `esbuild@0.28.2` entries — the prime
+        // reverted it a few commits later). Six of eight checks went red and
+        // the clone's `main` could not install or deploy. That one was merged
+        // by a person; on `auto_merge` it would have been merged by this
+        // function, on every clone, every time prime merges.
+        //
+        // `MERGE`, never `SQUASH`. A squash rewrites the cascade commit that
+        // names the prime SHA it came from, which is the one durable record of
+        // what a clone has received.
+        let autoMergeArmed = false;
+        try {
+          await octokit.graphql(
+            `mutation($id: ID!) {
+               enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: MERGE }) {
+                 pullRequest { autoMergeRequest { enabledAt } }
+               }
+             }`,
+            { id: pr.node_id },
+          );
+          autoMergeArmed = true;
+        } catch {
+          // Auto-merge is a repository setting and can be off, and GitHub
+          // refuses to arm it on a pull request with nothing to wait for.
+          // Fall through: with no required checks there is nothing this would
+          // have protected anyway.
+        }
+
+        if (autoMergeArmed) {
+          return {
+            status: "pr_opened",
+            pr_url: pr.html_url,
+            diff_summary: `Queued for auto-merge once checks pass (direct push blocked): ${fileSummary}`,
+            files_changed: treeEntries.length,
+            completed_at: new Date().toISOString(),
+          };
+        }
+
         const { data: merged } = await octokit.pulls.merge({
           owner: cloneRef.owner,
           repo: cloneRef.repo,
           pull_number: pr.number,
-          merge_method: "squash",
+          merge_method: "merge",
           commit_title: `Aurixa cascade prime@${shortSha(sourceSha)} (#${pr.number})`,
         });
         return {
           status: "succeeded",
           commit_sha: merged.sha?.slice(0, 7) ?? null,
           pr_url: pr.html_url,
-          diff_summary: `Auto-merged via PR (direct push blocked): ${fileSummary}`,
+          diff_summary: `Auto-merged via PR (direct push blocked, auto-merge unavailable): ${fileSummary}`,
           files_changed: treeEntries.length,
           completed_at: new Date().toISOString(),
         };

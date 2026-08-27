@@ -719,6 +719,73 @@ export type CloneOrigins = {
   additionalRedirectUrls?: (string | null | undefined)[];
 };
 
+/**
+ * The value `ALLOWED_ORIGINS` must carry on THIS clone.
+ *
+ * ## Why this exists
+ *
+ * `ALLOWED_ORIGINS` is classified `deployment_config`, which is right — the
+ * prime's value names the prime's own hostnames and copying it onto a clone is
+ * the whole defect this classification exists to prevent. But `planCloneSecrets`
+ * then said, in a comment, that `applyAuthConfig` "already sets the clone's
+ * origins from `cloneOrigins`", and that is not true of this name.
+ * `applyAuthConfig` PATCHes `/config/auth`, which is GoTrue's `site_url` and
+ * `uri_allow_list`. `ALLOWED_ORIGINS` is an EDGE FUNCTION environment variable,
+ * read by `Deno.env.get('ALLOWED_ORIGINS')` in the prime's `_shared/auth.ts`.
+ * Two different systems, one comment, and nothing ever wrote the second.
+ *
+ * ## What that cost, measured on the live clone
+ *
+ * The prime's CORS helper falls back, when the variable is unset, to a
+ * hard-coded pair of the PRIME's production hostnames. So every clone answers
+ * every request with somebody else's origin. Probed against
+ * `npc-client-dashboard`'s own login endpoint on 26 Aug 2026:
+ *
+ *     Origin: https://npc.aurixasystems.com.au
+ *       → access-control-allow-origin: https://command-centre.npcservices.com.au
+ *         access-control-allow-credentials: true
+ *
+ * Identical for the clone's `.vercel.app` host. The browser sees an
+ * allow-origin that is not the page's origin and refuses to hand the response
+ * to the script — so signing in fails with no server-side error, on a
+ * deployment where the credentials are correct and the account is healthy.
+ * That was reported as "the seed admin credentials aren't working".
+ *
+ * ## Deliberately not also setting `CORS_STRICT_ALLOWED_ORIGINS`
+ *
+ * The prime's helper offers a flag that makes the unset case fail closed. It is
+ * left to the operator. Failing closed here means no origin is trusted for a
+ * credentialed response, which takes sign-in down completely — a worse outcome
+ * than the status quo for a clone whose origins this could not compute. Getting
+ * the value right is the fix; the flag is a posture the operator chooses once
+ * they can see it is right.
+ *
+ * Returns null when nothing usable can be derived, which leaves the secret
+ * unset and reported as `skipped_deployment_config` exactly as before.
+ */
+export function cloneAllowedOrigins(origins: CloneOrigins | null | undefined): string | null {
+  const entries = [origins?.siteUrl ?? null, ...(origins?.additionalRedirectUrls ?? [])]
+    .map(normalizeOriginEntry)
+    .filter((v): v is string => v !== null);
+  if (entries.length === 0) return null;
+  // Deduplicated, and in the order given: the canonical site URL first, so a
+  // reader of the secret can tell which host is the real one.
+  return Array.from(new Set(entries)).join(",");
+}
+
+/**
+ * Deployment-config secrets whose value Mission Control can compute for a
+ * clone. Everything else in that class stays unset and is filled in by an
+ * operator from the clone page — guessing a webhook URL or a sender address is
+ * how a clone starts writing into somebody else's account.
+ */
+const DERIVED_DEPLOYMENT_CONFIG: Record<
+  string,
+  (origins: CloneOrigins | null | undefined) => string | null
+> = {
+  ALLOWED_ORIGINS: cloneAllowedOrigins,
+};
+
 /** Normalize a URL/host into a redirect entry. Returns null if unusable. */
 function normalizeOriginEntry(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -1790,7 +1857,9 @@ export type SecretShellStatus =
   /** Platform-managed (SUPABASE_*); Supabase injects its own. */
   | "skipped_platform"
   /** Names the prime's own domain; the clone supplies its own. */
-  | "skipped_deployment_config";
+  | "skipped_deployment_config"
+  /** Deployment config Mission Control can compute for THIS clone. */
+  | "derived";
 
 export type SecretShellResult = {
   name: string;
@@ -1823,8 +1892,14 @@ export type SecretShellResult = {
  *   `INTERNAL_EDGE_SECRET` makes a request signed for one deployment valid on
  *   the other; see IDENTITY_SECRETS.
  * - **deployment_config** is skipped, because the prime's value names the
- *   prime's own domain. `applyAuthConfig` already sets the clone's origins
- *   from `cloneOrigins`; an operator fills the rest in from the clone page.
+ *   prime's own domain — EXCEPT the handful in `DERIVED_DEPLOYMENT_CONFIG`,
+ *   whose value Mission Control can compute for this clone from `origins`.
+ *   `ALLOWED_ORIGINS` is one: this comment used to claim `applyAuthConfig`
+ *   covered it, and `applyAuthConfig` patches GoTrue's `/config/auth` while
+ *   `ALLOWED_ORIGINS` is an edge-function environment variable. Nothing wrote
+ *   it, every clone fell back to the prime's hostnames, and sign-in on a clone
+ *   failed CORS with the credentials correct. An operator fills the rest in
+ *   from the clone page.
  * - **platform** never reaches this function (extractSecretNames drops it),
  *   but is refused here too so a hand-built name list cannot slip one past.
  * - **vendor** credentials are inherited — that is the forwarded-key model.
@@ -1833,6 +1908,7 @@ export function planCloneSecrets(
   names: string[],
   inheritedValues: Record<string, string>,
   generate: () => string,
+  origins?: CloneOrigins | null,
 ): { toWrite: { name: string; value: string }[]; results: Map<string, SecretShellResult> } {
   const toWrite: { name: string; value: string }[] = [];
   const results = new Map<string, SecretShellResult>();
@@ -1850,7 +1926,15 @@ export function planCloneSecrets(
       continue;
     }
     if (kind === "deployment_config") {
-      results.set(name, { name, status: "skipped_deployment_config", success: true });
+      const derive = DERIVED_DEPLOYMENT_CONFIG[name];
+      const derived = derive ? derive(origins) : null;
+      if (derived) {
+        toWrite.push({ name, value: derived });
+        results.set(name, { name, status: "derived", success: true });
+      } else {
+        // Nothing usable to compute — leave it unset rather than write a guess.
+        results.set(name, { name, status: "skipped_deployment_config", success: true });
+      }
       continue;
     }
 
@@ -1870,11 +1954,15 @@ export async function syncCloneSecrets(
   projectRef: string,
   names: string[],
   inheritedValues: Record<string, string>,
+  origins?: CloneOrigins | null,
 ): Promise<SecretShellResult[]> {
   if (names.length === 0) return [];
 
-  const { toWrite, results } = planCloneSecrets(names, inheritedValues, () =>
-    crypto.randomBytes(32).toString("hex"),
+  const { toWrite, results } = planCloneSecrets(
+    names,
+    inheritedValues,
+    () => crypto.randomBytes(32).toString("hex"),
+    origins ?? null,
   );
 
   if (toWrite.length > 0) {
@@ -2645,6 +2733,9 @@ export async function provisionCloneBackend(
     projectRef,
     snapshot.secretNames,
     input.inheritedSecrets ?? {},
+    // The same origins `applyAuthConfig` was given at step 5c. Passing them
+    // here is what makes ALLOWED_ORIGINS this clone's own rather than unset.
+    input.cloneOrigins ?? null,
   );
 
   // Step 7: Seed admin

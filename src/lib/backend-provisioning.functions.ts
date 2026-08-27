@@ -2,6 +2,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireAdmin } from "@/integrations/supabase/role-middleware";
+// Type-only: erased at build, so the server module never reaches the client bundle.
+import type { ApplyAllowedOriginsResult } from "@/server/cloneAllowedOrigins.server";
 
 /**
  * Backend provisioning server functions.
@@ -105,48 +107,23 @@ async function runBackendProvisioning(
     // when it has any. The deployment worker re-applies this on reaching `live`
     // (see hooks.deployment-drain), because at THIS point in the pipeline the
     // honest answer is still usually "we do not know yet".
+    // One assembly, three callers. This block used to live here and nowhere
+    // else, so the deployment drain and the operator back-fill each had to
+    // arrive at "this clone's origins" independently — and a CORS allow-list
+    // that disagrees with the auth redirect allow-list is two half-configured
+    // deployments rather than one.
+    const { resolveCloneOrigins } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/cloneAllowedOrigins.server"
+    );
+    const cloneOrigins = await resolveCloneOrigins(supabase, input.cloneId);
+
+    // The repository coordinates are a separate question from the origins and
+    // are read separately now that the origins have their own resolver.
     const { data: cloneRow } = await supabase
       .from("clones")
-      .select("slug, deploy_url, lovable_project_url, github_owner, github_repo, default_branch")
+      .select("github_owner, github_repo, default_branch")
       .eq("id", input.cloneId)
       .maybeSingle();
-    const [{ data: cfRow }, { data: deploymentRow }, { data: hostingCfg }] = await Promise.all([
-      supabase
-        .from("cloudflare_clone_config")
-        .select("zone_name")
-        .eq("clone_id", input.cloneId)
-        .maybeSingle(),
-      supabase
-        .from("clone_deployments")
-        .select("domain, provider_origin, status")
-        .eq("clone_id", input.cloneId)
-        .maybeSingle(),
-      supabase
-        .from("platform_hosting_config")
-        .select("primary_domain")
-        .eq("singleton", true)
-        .maybeSingle(),
-    ]);
-
-    const { cloneFqdn, resolveCloneOrigin } = await import("@/server/hosting/dnsTarget.pure");
-    const deploymentOrigin = resolveCloneOrigin({
-      domain: deploymentRow?.domain,
-      providerOrigin: deploymentRow?.provider_origin,
-      deploymentStatus: deploymentRow?.status,
-    });
-    const plannedFqdn = cloneFqdn(cloneRow?.slug, hostingCfg?.primary_domain);
-
-    const cloneOrigins = {
-      siteUrl: cloneRow?.deploy_url ?? deploymentOrigin ?? cloneRow?.lovable_project_url ?? null,
-      additionalRedirectUrls: [
-        cloneRow?.deploy_url ?? null,
-        deploymentOrigin,
-        deploymentRow?.provider_origin ?? null,
-        cloneRow?.lovable_project_url ?? null,
-        cfRow?.zone_name ? `https://${cfRow.zone_name}` : null,
-        plannedFqdn ? `https://${plannedFqdn}` : null,
-      ],
-    };
 
     // Resolve which secret names are safe to forward from the prime env into
     // this clone (empty shells cause 500s at first function invocation).
@@ -667,6 +644,85 @@ export const setCloneBackendSecret = createServerFn({ method: "POST" })
       metadata: { name: data.name, ok: res.ok, error: res.ok ? null : res.error },
     });
     return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+  });
+
+/**
+ * Back-fill `ALLOWED_ORIGINS` onto clones that are already running.
+ *
+ * Provisioning derives it now and the deployment drain sets it when a clone
+ * goes live, but neither reaches a clone that went live BEFORE either existed —
+ * which is every clone this platform has produced. Those are sitting with the
+ * secret unset, so the prime's CORS helper falls back to the PRIME's hostnames
+ * and sign-in fails on the clone's own domain with correct credentials.
+ *
+ * Scope:
+ *   - `cloneId` given  → that clone alone.
+ *   - omitted          → every clone with a provisioned backend.
+ *
+ * **This can only ever touch clones.** The project ref is not an input and
+ * cannot be supplied: `applyCloneAllowedOrigins` obtains it from
+ * `resolveCloneSecretTarget`, which refuses the prime's project, refuses
+ * Mission Control's own, and refuses when it cannot tell which is which. The
+ * sweep's own candidate list comes from `clone_backends`, whose `clone_id` is
+ * `NOT NULL` — the prime has no row there at all; its ref lives in
+ * `prime_config`.
+ *
+ * One clone's refusal never stops the others: each is reported in the result
+ * and recorded on its own deployment timeline.
+ */
+export const backfillCloneAllowedOrigins = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((input: { cloneId?: string | null } | undefined) => ({
+    cloneId: input?.cloneId?.trim() || null,
+  }))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    let cloneIds: string[];
+    if (data.cloneId) {
+      cloneIds = [data.cloneId];
+    } else {
+      const { data: rows, error } = await supabase
+        .from("clone_backends")
+        .select("clone_id")
+        .not("supabase_project_ref", "is", null);
+      // A candidate list that could not be READ is not an empty candidate
+      // list — reporting "0 clones, all done" would be the worst answer here.
+      if (error) return { ok: false as const, error: error.message };
+      cloneIds = (rows ?? [])
+        .map((r) => (r as { clone_id: string | null }).clone_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+    }
+
+    const { applyCloneAllowedOrigins } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/cloneAllowedOrigins.server"
+    );
+
+    const results: ApplyAllowedOriginsResult[] = [];
+    for (const cloneId of cloneIds) {
+      results.push(await applyCloneAllowedOrigins(supabase, cloneId, { actorUserId: userId }));
+    }
+
+    const applied = results.filter((r) => r.ok).length;
+    const { writeAuditLog } = await import(
+      /* @vite-ignore */ "@/lib/_server-shims/audit.server"
+    );
+    await writeAuditLog({
+      action: "clone_backend.allowed_origins_backfill",
+      entityType: "clone",
+      entityId: data.cloneId,
+      actorUserId: userId,
+      metadata: {
+        scope: data.cloneId ? "single" : "all",
+        considered: cloneIds.length,
+        applied,
+        refused: results
+          .filter((r) => !r.ok)
+          .map((r) => ({ clone_id: r.cloneId, reason: "reason" in r ? r.reason : null })),
+      },
+    });
+
+    return { ok: true as const, considered: cloneIds.length, applied, results };
   });
 
 /** List the operator-managed prime→clone secret forwarding whitelist. Admin-only. */

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -11171,6 +11171,25 @@ export type Database = {
         | "feedback"
         | "dispute"
         | "churn"
+      crm_appointment_kind:
+        | "discovery"
+        | "strategy_phone"
+        | "strategy_zoom"
+        | "ifc_phone"
+        | "ifc_zoom"
+        | "other"
+        | "strategic_review"
+        | "discovery_session"
+        | "guided_demo"
+        | "enterprise_consultation"
+        | "kickoff"
+      crm_appointment_status:
+        | "scheduled"
+        | "confirmed"
+        | "completed"
+        | "no_show"
+        | "canceled"
+        | "rescheduled"
       crm_churn_reason:
         | "price"
         | "missing_capability"
@@ -11638,6 +11657,27 @@ export const Constants = {
         "feedback",
         "dispute",
         "churn",
+      ],
+      crm_appointment_kind: [
+        "discovery",
+        "strategy_phone",
+        "strategy_zoom",
+        "ifc_phone",
+        "ifc_zoom",
+        "other",
+        "strategic_review",
+        "discovery_session",
+        "guided_demo",
+        "enterprise_consultation",
+        "kickoff",
+      ],
+      crm_appointment_status: [
+        "scheduled",
+        "confirmed",
+        "completed",
+        "no_show",
+        "canceled",
+        "rescheduled",
       ],
       crm_churn_reason: [
         "price",
