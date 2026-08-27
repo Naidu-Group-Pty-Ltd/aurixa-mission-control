@@ -45,8 +45,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { getAppOctokit } from "./github-app.server";
-import { openPrimeMigrationCorpus, resolvePrimeSource } from "./prime-backend.server";
-import { applyPrimeMigrations } from "./backend-provisioning.server";
+import {
+  openPrimeMigrationCorpus,
+  resolvePrimeSource,
+  resolvePrimeBackendRef,
+} from "./prime-backend.server";
+import { applyPrimeMigrations, runSqlOnProject } from "./backend-provisioning.server";
+import { scopeCorpusToPrime, assertPrimeLedgerUsable } from "./fleetCorpusScope.pure";
 import { notifyOperators, writeAuditLog } from "./audit.server";
 
 type Db = SupabaseClient<Database>;
@@ -95,6 +100,13 @@ export type FleetMigrationResult = {
    * this module exists to end.
    */
   excluded: number;
+  /**
+   * Repo migrations the prime has NOT applied, and which were therefore not
+   * offered to any clone. Reported rather than silently filtered — a run that
+   * says "962 files, 4 applied" with no account of the rest is how a corpus
+   * containing rollback scripts reached a tenant database in the first place.
+   */
+  withheld: number;
   /** Set when the run could not start at all. */
   error?: string;
 };
@@ -105,6 +117,7 @@ const EMPTY: FleetMigrationResult = {
   upToDate: 0,
   failed: [],
   excluded: 0,
+  withheld: 0,
 };
 
 /**
@@ -202,6 +215,51 @@ export async function runFleetMigrationSync(
   }
   const sourceSha = corpus.sourceSha;
 
+  // Narrow the repo corpus to what the prime's DATABASE has actually applied.
+  //
+  // See `fleetCorpusScope.pure.ts`. Briefly: the repo holds 906 versions and
+  // the prime's ledger 864, and sending a clone the difference does not bring
+  // it level with the prime — it takes the clone PAST the prime. The run that
+  // proved it applied two `rollback_*` scripts to a tenant database and put 23
+  // permissive `USING (true)` policies on its client and financial tables.
+  let primeApplied: Set<string>;
+  let primeRef: string;
+  try {
+    primeRef = await resolvePrimeBackendRef(supabase);
+    const rows = (await runSqlOnProject(
+      primeRef,
+      `select version from supabase_migrations.schema_migrations`,
+    )) as Array<{ version?: unknown }>;
+    primeApplied = new Set(
+      (Array.isArray(rows) ? rows : [])
+        .map((r) => r?.version)
+        .filter((v): v is string => typeof v === "string"),
+    );
+  } catch (e) {
+    // Fails closed. A ledger that could not be read is not a prime that has
+    // applied nothing, and degrading to "use the whole repo" is the behaviour
+    // this scoping exists to prevent.
+    return {
+      ...out,
+      error:
+        assertPrimeLedgerUsable({
+          failed: true,
+          errorMessage: e instanceof Error ? e.message : String(e),
+          appliedCount: 0,
+          primeRef: "unresolved",
+        }) ?? "Could not read the prime backend's migration ledger",
+    };
+  }
+  const unusable = assertPrimeLedgerUsable({
+    failed: false,
+    appliedCount: primeApplied.size,
+    primeRef,
+  });
+  if (unusable) return { ...out, error: unusable };
+
+  const { runnable, withheld } = scopeCorpusToPrime(corpus.metas, primeApplied);
+  out.withheld = withheld.length;
+
   const ids = backends.map((b) => b.clone_id);
   const { data: clones } = await supabase.from("clones").select("id, name").in("id", ids);
   const nameOf = new Map((clones ?? []).map((c) => [c.id, c.name]));
@@ -233,7 +291,7 @@ export async function runFleetMigrationSync(
     try {
       const { results, latestApplied } = await applyPrimeMigrations(
         backend.supabase_project_ref!,
-        corpus.metas,
+        runnable,
         undefined,
         (m) => corpus.loadSql(m.id),
       );
@@ -327,6 +385,9 @@ export async function runFleetMigrationSync(
       up_to_date: out.upToDate,
       failed: out.failed.length,
       excluded: out.excluded,
+      withheld: out.withheld,
+      prime_backend_ref: primeRef,
+      prime_applied: primeApplied.size,
     },
   });
 
