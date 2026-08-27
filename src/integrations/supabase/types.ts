@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -3416,6 +3416,92 @@ export type Database = {
           },
         ]
       }
+      crm_appointments: {
+        Row: {
+          account_id: string
+          booked_by_call_id: string | null
+          contact_id: string | null
+          created_at: string
+          ends_at: string | null
+          id: string
+          journey_id: string | null
+          kind: Database["public"]["Enums"]["crm_appointment_kind"]
+          metadata: Json
+          notes: string | null
+          source: string
+          starts_at: string
+          status: Database["public"]["Enums"]["crm_appointment_status"]
+          timezone: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          booked_by_call_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          journey_id?: string | null
+          kind?: Database["public"]["Enums"]["crm_appointment_kind"]
+          metadata?: Json
+          notes?: string | null
+          source?: string
+          starts_at: string
+          status?: Database["public"]["Enums"]["crm_appointment_status"]
+          timezone?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          booked_by_call_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          journey_id?: string | null
+          kind?: Database["public"]["Enums"]["crm_appointment_kind"]
+          metadata?: Json
+          notes?: string | null
+          source?: string
+          starts_at?: string
+          status?: Database["public"]["Enums"]["crm_appointment_status"]
+          timezone?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_appointments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_appointments_booked_by_call_id_fkey"
+            columns: ["booked_by_call_id"]
+            isOneToOne: false
+            referencedRelation: "voice_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_appointments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_appointments_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "crm_client_journeys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_churn_events: {
         Row: {
           account_id: string
@@ -3491,6 +3577,79 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "crm_contracts"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_client_journeys: {
+        Row: {
+          account_id: string
+          calls_total: number
+          contact_id: string
+          created_at: string
+          do_not_call: boolean
+          entered_stage_at: string
+          follow_up_at: string | null
+          id: string
+          last_call_at: string | null
+          last_call_outcome: string | null
+          metadata: Json
+          notes: string | null
+          stage_key: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          calls_total?: number
+          contact_id: string
+          created_at?: string
+          do_not_call?: boolean
+          entered_stage_at?: string
+          follow_up_at?: string | null
+          id?: string
+          last_call_at?: string | null
+          last_call_outcome?: string | null
+          metadata?: Json
+          notes?: string | null
+          stage_key?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          calls_total?: number
+          contact_id?: string
+          created_at?: string
+          do_not_call?: boolean
+          entered_stage_at?: string
+          follow_up_at?: string | null
+          id?: string
+          last_call_at?: string | null
+          last_call_outcome?: string | null
+          metadata?: Json
+          notes?: string | null
+          stage_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_client_journeys_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_client_journeys_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_client_journeys_stage_key_fkey"
+            columns: ["stage_key"]
+            isOneToOne: false
+            referencedRelation: "crm_journey_stages"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -4239,6 +4398,96 @@ export type Database = {
           updated_at?: string
           veto_below?: number | null
           weight?: number
+        }
+        Relationships: []
+      }
+      crm_journey_events: {
+        Row: {
+          actor_user_id: string | null
+          call_id: string | null
+          created_at: string
+          from_stage: string | null
+          id: string
+          journey_id: string
+          metadata: Json
+          reason: string | null
+          source: string
+          to_stage: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          call_id?: string | null
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          journey_id: string
+          metadata?: Json
+          reason?: string | null
+          source?: string
+          to_stage?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          call_id?: string | null
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          journey_id?: string
+          metadata?: Json
+          reason?: string | null
+          source?: string
+          to_stage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_journey_events_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "voice_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_journey_events_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "crm_client_journeys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_journey_stages: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          is_terminal: boolean
+          key: string
+          name: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_terminal?: boolean
+          key: string
+          name: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_terminal?: boolean
+          key?: string
+          name?: string
+          position?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -9532,6 +9781,743 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_agents: {
+        Row: {
+          config: Json
+          created_at: string
+          description: string | null
+          direction: string
+          id: string
+          is_active: boolean
+          metadata: Json
+          name: string
+          role: string | null
+          squad_id: string | null
+          squad_position: number | null
+          updated_at: string
+          vapi_assistant_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          direction?: string
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          name: string
+          role?: string | null
+          squad_id?: string | null
+          squad_position?: number | null
+          updated_at?: string
+          vapi_assistant_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          description?: string | null
+          direction?: string
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          name?: string
+          role?: string | null
+          squad_id?: string | null
+          squad_position?: number | null
+          updated_at?: string
+          vapi_assistant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_agents_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "voice_squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_alert_history: {
+        Row: {
+          call_id: string | null
+          id: string
+          is_positive: boolean
+          is_read: boolean
+          message: string
+          rule_id: string | null
+          rule_name: string
+          triggered_at: string
+        }
+        Insert: {
+          call_id?: string | null
+          id?: string
+          is_positive?: boolean
+          is_read?: boolean
+          message: string
+          rule_id?: string | null
+          rule_name: string
+          triggered_at?: string
+        }
+        Update: {
+          call_id?: string | null
+          id?: string
+          is_positive?: boolean
+          is_read?: boolean
+          message?: string
+          rule_id?: string | null
+          rule_name?: string
+          triggered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_alert_history_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "voice_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_alert_history_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "voice_alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_alert_rules: {
+        Row: {
+          condition_type: string
+          condition_value: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          is_positive: boolean
+          name: string
+          notify_operators: boolean
+          updated_at: string
+        }
+        Insert: {
+          condition_type: string
+          condition_value: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          is_positive?: boolean
+          name: string
+          notify_operators?: boolean
+          updated_at?: string
+        }
+        Update: {
+          condition_type?: string
+          condition_value?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          is_positive?: boolean
+          name?: string
+          notify_operators?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      voice_blacklist: {
+        Row: {
+          announce_message: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          hit_count: number
+          id: string
+          is_active: boolean
+          kill_mode: string
+          last_hit_at: string | null
+          normalized_number: string
+          notes: string | null
+          phone_number: string
+          updated_at: string
+        }
+        Insert: {
+          announce_message?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          hit_count?: number
+          id?: string
+          is_active?: boolean
+          kill_mode?: string
+          last_hit_at?: string | null
+          normalized_number: string
+          notes?: string | null
+          phone_number: string
+          updated_at?: string
+        }
+        Update: {
+          announce_message?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          hit_count?: number
+          id?: string
+          is_active?: boolean
+          kill_mode?: string
+          last_hit_at?: string | null
+          normalized_number?: string
+          notes?: string | null
+          phone_number?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      voice_call_context: {
+        Row: {
+          account_id: string | null
+          caller_phone: string | null
+          caller_reason: string | null
+          confirmed_intent: string | null
+          contact_created: boolean
+          contact_found: boolean
+          contact_id: string | null
+          contact_state: string
+          created_at: string
+          first_name: string | null
+          full_name: string | null
+          handoff_ready: boolean
+          id: string
+          metadata: Json
+          normalized_phone: string | null
+          source: string | null
+          updated_at: string
+          vapi_call_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          caller_phone?: string | null
+          caller_reason?: string | null
+          confirmed_intent?: string | null
+          contact_created?: boolean
+          contact_found?: boolean
+          contact_id?: string | null
+          contact_state?: string
+          created_at?: string
+          first_name?: string | null
+          full_name?: string | null
+          handoff_ready?: boolean
+          id?: string
+          metadata?: Json
+          normalized_phone?: string | null
+          source?: string | null
+          updated_at?: string
+          vapi_call_id: string
+        }
+        Update: {
+          account_id?: string | null
+          caller_phone?: string | null
+          caller_reason?: string | null
+          confirmed_intent?: string | null
+          contact_created?: boolean
+          contact_found?: boolean
+          contact_id?: string | null
+          contact_state?: string
+          created_at?: string
+          first_name?: string | null
+          full_name?: string | null
+          handoff_ready?: boolean
+          id?: string
+          metadata?: Json
+          normalized_phone?: string | null
+          source?: string | null
+          updated_at?: string
+          vapi_call_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_call_context_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_call_context_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_call_events: {
+        Row: {
+          attempts: number
+          event_type: string
+          id: string
+          last_error: string | null
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          vapi_call_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          event_type: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          vapi_call_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          vapi_call_id?: string | null
+        }
+        Relationships: []
+      }
+      voice_call_tags: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      voice_calls: {
+        Row: {
+          account_id: string | null
+          action_items: string[] | null
+          agent_id: string | null
+          agent_name: string | null
+          ai_recommendations: string[] | null
+          artifact_messages: Json | null
+          assistants_involved: Json
+          call_direction:
+            | Database["public"]["Enums"]["voice_call_direction"]
+            | null
+          call_intent: string | null
+          call_outcome: string | null
+          call_status: string | null
+          contact_id: string | null
+          cost: number | null
+          created_at: string
+          customer_name: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          escalation_severity: number | null
+          handoff_sequence: Json
+          id: string
+          is_squad_call: boolean
+          key_topics: string[] | null
+          metadata: Json
+          negative_sentiment_moment: Json | null
+          phone_number: string | null
+          recording_url: string | null
+          recovery_priority: number | null
+          resolution_notes: string | null
+          resolution_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          root_cause_category: string | null
+          sentiment: string | null
+          squad_id: string | null
+          squad_name: string | null
+          started_at: string | null
+          structured_data_multi: Json
+          summary: string | null
+          tags: string[]
+          transcript: string | null
+          updated_at: string
+          vapi_call_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          action_items?: string[] | null
+          agent_id?: string | null
+          agent_name?: string | null
+          ai_recommendations?: string[] | null
+          artifact_messages?: Json | null
+          assistants_involved?: Json
+          call_direction?:
+            | Database["public"]["Enums"]["voice_call_direction"]
+            | null
+          call_intent?: string | null
+          call_outcome?: string | null
+          call_status?: string | null
+          contact_id?: string | null
+          cost?: number | null
+          created_at?: string
+          customer_name?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          escalation_severity?: number | null
+          handoff_sequence?: Json
+          id?: string
+          is_squad_call?: boolean
+          key_topics?: string[] | null
+          metadata?: Json
+          negative_sentiment_moment?: Json | null
+          phone_number?: string | null
+          recording_url?: string | null
+          recovery_priority?: number | null
+          resolution_notes?: string | null
+          resolution_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          root_cause_category?: string | null
+          sentiment?: string | null
+          squad_id?: string | null
+          squad_name?: string | null
+          started_at?: string | null
+          structured_data_multi?: Json
+          summary?: string | null
+          tags?: string[]
+          transcript?: string | null
+          updated_at?: string
+          vapi_call_id: string
+        }
+        Update: {
+          account_id?: string | null
+          action_items?: string[] | null
+          agent_id?: string | null
+          agent_name?: string | null
+          ai_recommendations?: string[] | null
+          artifact_messages?: Json | null
+          assistants_involved?: Json
+          call_direction?:
+            | Database["public"]["Enums"]["voice_call_direction"]
+            | null
+          call_intent?: string | null
+          call_outcome?: string | null
+          call_status?: string | null
+          contact_id?: string | null
+          cost?: number | null
+          created_at?: string
+          customer_name?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          escalation_severity?: number | null
+          handoff_sequence?: Json
+          id?: string
+          is_squad_call?: boolean
+          key_topics?: string[] | null
+          metadata?: Json
+          negative_sentiment_moment?: Json | null
+          phone_number?: string | null
+          recording_url?: string | null
+          recovery_priority?: number | null
+          resolution_notes?: string | null
+          resolution_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          root_cause_category?: string | null
+          sentiment?: string | null
+          squad_id?: string | null
+          squad_name?: string | null
+          started_at?: string | null
+          structured_data_multi?: Json
+          summary?: string | null
+          tags?: string[]
+          transcript?: string | null
+          updated_at?: string
+          vapi_call_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_calls_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_campaign_rules: {
+        Row: {
+          anchor_offset_seconds: number
+          created_at: string
+          delay_seconds: number
+          expiry_seconds: number | null
+          id: string
+          is_enabled: boolean
+          label: string
+          max_attempts: number
+          quiet_hours: Json
+          retry_delay_seconds: number
+          schedule_anchor: string
+          trigger_type: Database["public"]["Enums"]["voice_trigger_type"]
+          updated_at: string
+          vapi_assistant_id: string | null
+          vapi_phone_number_id: string | null
+          variable_defaults: Json
+        }
+        Insert: {
+          anchor_offset_seconds?: number
+          created_at?: string
+          delay_seconds?: number
+          expiry_seconds?: number | null
+          id?: string
+          is_enabled?: boolean
+          label: string
+          max_attempts?: number
+          quiet_hours?: Json
+          retry_delay_seconds?: number
+          schedule_anchor?: string
+          trigger_type: Database["public"]["Enums"]["voice_trigger_type"]
+          updated_at?: string
+          vapi_assistant_id?: string | null
+          vapi_phone_number_id?: string | null
+          variable_defaults?: Json
+        }
+        Update: {
+          anchor_offset_seconds?: number
+          created_at?: string
+          delay_seconds?: number
+          expiry_seconds?: number | null
+          id?: string
+          is_enabled?: boolean
+          label?: string
+          max_attempts?: number
+          quiet_hours?: Json
+          retry_delay_seconds?: number
+          schedule_anchor?: string
+          trigger_type?: Database["public"]["Enums"]["voice_trigger_type"]
+          updated_at?: string
+          vapi_assistant_id?: string | null
+          vapi_phone_number_id?: string | null
+          variable_defaults?: Json
+        }
+        Relationships: []
+      }
+      voice_outbound_jobs: {
+        Row: {
+          account_id: string | null
+          appointment_id: string | null
+          attempts: number
+          campaign_rule_id: string | null
+          completed_at: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          dedupe_key: string | null
+          dispatched_at: string | null
+          expires_at: string | null
+          id: string
+          journey_id: string | null
+          last_error: string | null
+          max_attempts: number
+          metadata: Json
+          phone: string
+          scheduled_at: string
+          status: Database["public"]["Enums"]["voice_outbound_status"]
+          trigger_type: Database["public"]["Enums"]["voice_trigger_type"]
+          updated_at: string
+          vapi_assistant_id: string
+          vapi_call_id: string | null
+          vapi_phone_number_id: string | null
+          variable_values: Json
+        }
+        Insert: {
+          account_id?: string | null
+          appointment_id?: string | null
+          attempts?: number
+          campaign_rule_id?: string | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          dedupe_key?: string | null
+          dispatched_at?: string | null
+          expires_at?: string | null
+          id?: string
+          journey_id?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          metadata?: Json
+          phone: string
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["voice_outbound_status"]
+          trigger_type: Database["public"]["Enums"]["voice_trigger_type"]
+          updated_at?: string
+          vapi_assistant_id: string
+          vapi_call_id?: string | null
+          vapi_phone_number_id?: string | null
+          variable_values?: Json
+        }
+        Update: {
+          account_id?: string | null
+          appointment_id?: string | null
+          attempts?: number
+          campaign_rule_id?: string | null
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          dedupe_key?: string | null
+          dispatched_at?: string | null
+          expires_at?: string | null
+          id?: string
+          journey_id?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          metadata?: Json
+          phone?: string
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["voice_outbound_status"]
+          trigger_type?: Database["public"]["Enums"]["voice_trigger_type"]
+          updated_at?: string
+          vapi_assistant_id?: string
+          vapi_call_id?: string | null
+          vapi_phone_number_id?: string | null
+          variable_values?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_outbound_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_outbound_jobs_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "crm_appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_outbound_jobs_campaign_rule_id_fkey"
+            columns: ["campaign_rule_id"]
+            isOneToOne: false
+            referencedRelation: "voice_campaign_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_outbound_jobs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_outbound_jobs_journey_id_fkey"
+            columns: ["journey_id"]
+            isOneToOne: false
+            referencedRelation: "crm_client_journeys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_phone_numbers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          metadata: Json
+          notes: string | null
+          phone_number: string | null
+          provider: string | null
+          route_ref: string | null
+          routes_to: string | null
+          sip_uri: string | null
+          updated_at: string
+          vapi_phone_number_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          metadata?: Json
+          notes?: string | null
+          phone_number?: string | null
+          provider?: string | null
+          route_ref?: string | null
+          routes_to?: string | null
+          sip_uri?: string | null
+          updated_at?: string
+          vapi_phone_number_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          metadata?: Json
+          notes?: string | null
+          phone_number?: string | null
+          provider?: string | null
+          route_ref?: string | null
+          routes_to?: string | null
+          sip_uri?: string | null
+          updated_at?: string
+          vapi_phone_number_id?: string
+        }
+        Relationships: []
+      }
+      voice_squads: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          metadata: Json
+          name: string
+          updated_at: string
+          vapi_squad_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          name: string
+          updated_at?: string
+          vapi_squad_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          name?: string
+          updated_at?: string
+          vapi_squad_id?: string | null
+        }
+        Relationships: []
+      }
       waitlist_leads: {
         Row: {
           account_id: string | null
@@ -10191,6 +11177,20 @@ export type Database = {
         | "feedback"
         | "dispute"
         | "churn"
+      crm_appointment_kind:
+        | "discovery"
+        | "strategy_phone"
+        | "strategy_zoom"
+        | "ifc_phone"
+        | "ifc_zoom"
+        | "other"
+      crm_appointment_status:
+        | "scheduled"
+        | "confirmed"
+        | "completed"
+        | "no_show"
+        | "canceled"
+        | "rescheduled"
       crm_churn_reason:
         | "price"
         | "missing_capability"
@@ -10342,6 +11342,9 @@ export type Database = {
         | "deployment_failed"
         | "deployment_domain_pending"
         | "deployment_build_failed"
+        | "voice_call_flagged"
+        | "voice_outbound_failed"
+        | "voice_blacklist_hit"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -10400,6 +11403,26 @@ export type Database = {
       sync_status: "in_sync" | "behind" | "cascading" | "failed" | "unknown"
       tenant_status: "active" | "past_due" | "canceled"
       ticket_priority: "P0" | "P1" | "P2" | "P3" | "P4"
+      voice_call_direction: "inbound" | "outbound"
+      voice_outbound_status:
+        | "pending"
+        | "dispatching"
+        | "dispatched"
+        | "completed"
+        | "failed"
+        | "canceled"
+        | "expired"
+      voice_trigger_type:
+        | "opt_in_follow_up"
+        | "quiz_follow_up"
+        | "nurture"
+        | "discovery_reminder"
+        | "discovery_no_show"
+        | "strategy_confirmation"
+        | "strategy_no_show"
+        | "ifc_confirmation"
+        | "ifc_no_show"
+        | "manual"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -10610,6 +11633,22 @@ export const Constants = {
         "dispute",
         "churn",
       ],
+      crm_appointment_kind: [
+        "discovery",
+        "strategy_phone",
+        "strategy_zoom",
+        "ifc_phone",
+        "ifc_zoom",
+        "other",
+      ],
+      crm_appointment_status: [
+        "scheduled",
+        "confirmed",
+        "completed",
+        "no_show",
+        "canceled",
+        "rescheduled",
+      ],
       crm_churn_reason: [
         "price",
         "missing_capability",
@@ -10773,6 +11812,9 @@ export const Constants = {
         "deployment_failed",
         "deployment_domain_pending",
         "deployment_build_failed",
+        "voice_call_flagged",
+        "voice_outbound_failed",
+        "voice_blacklist_hit",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],
@@ -10838,6 +11880,28 @@ export const Constants = {
       sync_status: ["in_sync", "behind", "cascading", "failed", "unknown"],
       tenant_status: ["active", "past_due", "canceled"],
       ticket_priority: ["P0", "P1", "P2", "P3", "P4"],
+      voice_call_direction: ["inbound", "outbound"],
+      voice_outbound_status: [
+        "pending",
+        "dispatching",
+        "dispatched",
+        "completed",
+        "failed",
+        "canceled",
+        "expired",
+      ],
+      voice_trigger_type: [
+        "opt_in_follow_up",
+        "quiz_follow_up",
+        "nurture",
+        "discovery_reminder",
+        "discovery_no_show",
+        "strategy_confirmation",
+        "strategy_no_show",
+        "ifc_confirmation",
+        "ifc_no_show",
+        "manual",
+      ],
     },
   },
 } as const
