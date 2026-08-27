@@ -1325,13 +1325,13 @@ export type Database = {
           queued_admin_password_enc: string | null
           queued_at: string | null
           queued_module_ids: string[] | null
+          reference_sync_started_at: string | null
           region: string
           repo_retarget: Json | null
           secret_shells: Json
           service_role_key: string | null
           source_ref: string | null
           source_repo: string | null
-          reference_sync_started_at: string | null
           source_sha: string | null
           status: Database["public"]["Enums"]["clone_backend_status"]
           status_detail: string | null
@@ -1359,13 +1359,13 @@ export type Database = {
           queued_admin_password_enc?: string | null
           queued_at?: string | null
           queued_module_ids?: string[] | null
+          reference_sync_started_at?: string | null
           region?: string
           repo_retarget?: Json | null
           secret_shells?: Json
           service_role_key?: string | null
           source_ref?: string | null
           source_repo?: string | null
-          reference_sync_started_at?: string | null
           source_sha?: string | null
           status?: Database["public"]["Enums"]["clone_backend_status"]
           status_detail?: string | null
@@ -1393,13 +1393,13 @@ export type Database = {
           queued_admin_password_enc?: string | null
           queued_at?: string | null
           queued_module_ids?: string[] | null
+          reference_sync_started_at?: string | null
           region?: string
           repo_retarget?: Json | null
           secret_shells?: Json
           service_role_key?: string | null
           source_ref?: string | null
           source_repo?: string | null
-          reference_sync_started_at?: string | null
           source_sha?: string | null
           status?: Database["public"]["Enums"]["clone_backend_status"]
           status_detail?: string | null
@@ -2409,6 +2409,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clones"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clone_reference_syncs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones_missing_isolated_backend"
+            referencedColumns: ["clone_id"]
           },
         ]
       }
@@ -7268,6 +7275,96 @@ export type Database = {
           },
         ]
       }
+      phone_calls: {
+        Row: {
+          account_id: string | null
+          answered_at: string | null
+          contact_id: string | null
+          created_at: string
+          customer_name: string | null
+          direction: string
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          metadata: Json
+          notes: string | null
+          operator_identity: string | null
+          operator_user_id: string | null
+          parent_call_sid: string | null
+          phone_number: string
+          recording_duration_seconds: number | null
+          recording_sid: string | null
+          recording_url: string | null
+          started_at: string
+          status: string
+          twilio_call_sid: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          answered_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          direction: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          operator_identity?: string | null
+          operator_user_id?: string | null
+          parent_call_sid?: string | null
+          phone_number: string
+          recording_duration_seconds?: number | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          answered_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          customer_name?: string | null
+          direction?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          metadata?: Json
+          notes?: string | null
+          operator_identity?: string | null
+          operator_user_id?: string | null
+          parent_call_sid?: string | null
+          phone_number?: string
+          recording_duration_seconds?: number | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_calls_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phone_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_change_events: {
         Row: {
           acknowledged_at: string | null
@@ -7359,96 +7456,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      phone_calls: {
-        Row: {
-          account_id: string | null
-          answered_at: string | null
-          contact_id: string | null
-          created_at: string
-          customer_name: string | null
-          direction: string
-          duration_seconds: number | null
-          ended_at: string | null
-          id: string
-          metadata: Json
-          notes: string | null
-          operator_identity: string | null
-          operator_user_id: string | null
-          parent_call_sid: string | null
-          phone_number: string
-          recording_duration_seconds: number | null
-          recording_sid: string | null
-          recording_url: string | null
-          started_at: string
-          status: string
-          twilio_call_sid: string | null
-          updated_at: string
-        }
-        Insert: {
-          account_id?: string | null
-          answered_at?: string | null
-          contact_id?: string | null
-          created_at?: string
-          customer_name?: string | null
-          direction: string
-          duration_seconds?: number | null
-          ended_at?: string | null
-          id?: string
-          metadata?: Json
-          notes?: string | null
-          operator_identity?: string | null
-          operator_user_id?: string | null
-          parent_call_sid?: string | null
-          phone_number: string
-          recording_duration_seconds?: number | null
-          recording_sid?: string | null
-          recording_url?: string | null
-          started_at?: string
-          status?: string
-          twilio_call_sid?: string | null
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string | null
-          answered_at?: string | null
-          contact_id?: string | null
-          created_at?: string
-          customer_name?: string | null
-          direction?: string
-          duration_seconds?: number | null
-          ended_at?: string | null
-          id?: string
-          metadata?: Json
-          notes?: string | null
-          operator_identity?: string | null
-          operator_user_id?: string | null
-          parent_call_sid?: string | null
-          phone_number?: string
-          recording_duration_seconds?: number | null
-          recording_sid?: string | null
-          recording_url?: string | null
-          started_at?: string
-          status?: string
-          twilio_call_sid?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "phone_calls_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "crm_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "phone_calls_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "crm_contacts"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       platform_hosting_config: {
         Row: {
@@ -10370,7 +10377,9 @@ export type Database = {
           ai_recommendations: string[] | null
           artifact_messages: Json | null
           assistants_involved: Json
-          call_direction: Database["public"]["Enums"]["voice_call_direction"] | null
+          call_direction:
+            | Database["public"]["Enums"]["voice_call_direction"]
+            | null
           call_intent: string | null
           call_outcome: string | null
           call_status: string | null
@@ -10414,7 +10423,9 @@ export type Database = {
           ai_recommendations?: string[] | null
           artifact_messages?: Json | null
           assistants_involved?: Json
-          call_direction?: Database["public"]["Enums"]["voice_call_direction"] | null
+          call_direction?:
+            | Database["public"]["Enums"]["voice_call_direction"]
+            | null
           call_intent?: string | null
           call_outcome?: string | null
           call_status?: string | null
@@ -10458,7 +10469,9 @@ export type Database = {
           ai_recommendations?: string[] | null
           artifact_messages?: Json | null
           assistants_involved?: Json
-          call_direction?: Database["public"]["Enums"]["voice_call_direction"] | null
+          call_direction?:
+            | Database["public"]["Enums"]["voice_call_direction"]
+            | null
           call_intent?: string | null
           call_outcome?: string | null
           call_status?: string | null
@@ -11573,7 +11586,6 @@ export type Database = {
         | "device_limit_reached"
         | "device_registered"
         | "device_released"
-        | "phone_missed_call"
         | "lead_captured"
         | "purchase_completed"
         | "crm_sla_breach"
@@ -11602,6 +11614,7 @@ export type Database = {
         | "voice_call_flagged"
         | "voice_outbound_failed"
         | "voice_blacklist_hit"
+        | "phone_missed_call"
         | "agreement_signed"
         | "agreement_declined"
       notification_severity: "info" | "success" | "warning" | "error"
@@ -12058,7 +12071,6 @@ export const Constants = {
         "device_limit_reached",
         "device_registered",
         "device_released",
-        "phone_missed_call",
         "lead_captured",
         "purchase_completed",
         "crm_sla_breach",
@@ -12087,6 +12099,7 @@ export const Constants = {
         "voice_call_flagged",
         "voice_outbound_failed",
         "voice_blacklist_hit",
+        "phone_missed_call",
         "agreement_signed",
         "agreement_declined",
       ],
