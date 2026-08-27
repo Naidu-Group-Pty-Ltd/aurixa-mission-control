@@ -183,6 +183,19 @@ export function FleetMigrationSyncCard() {
                   <AlertTriangle className="mr-1 h-3 w-3" /> {lastResult.excluded} not eligible
                 </Badge>
               )}
+              {/*
+                Withheld is shown for the same reason as excluded. These are
+                repo migrations the prime has never applied — rollback scripts,
+                future-dated work, files production declined — and they are held
+                back from every clone deliberately. A count nobody can see is
+                indistinguishable from a corpus that had nothing in it, which is
+                precisely how two rollback scripts reached a tenant database.
+              */}
+              {lastResult.withheld > 0 && (
+                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                  {lastResult.withheld} withheld (not applied on the prime)
+                </Badge>
+              )}
             </div>
             {lastResult.failed.map((r) => (
               <div key={r.cloneId} className="flex items-start justify-between border p-2 text-xs">
