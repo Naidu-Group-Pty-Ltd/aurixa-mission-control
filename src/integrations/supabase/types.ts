@@ -11236,25 +11236,6 @@ export type Database = {
         | "conditional"
         | "poor_fit"
         | "decline"
-      crm_appointment_kind:
-        | "discovery"
-        | "strategy_phone"
-        | "strategy_zoom"
-        | "ifc_phone"
-        | "ifc_zoom"
-        | "other"
-        | "strategic_review"
-        | "discovery_session"
-        | "guided_demo"
-        | "enterprise_consultation"
-        | "kickoff"
-      crm_appointment_status:
-        | "scheduled"
-        | "confirmed"
-        | "completed"
-        | "no_show"
-        | "canceled"
-        | "rescheduled"
       crm_lifecycle_stage:
         | "lead"
         | "opportunity"
@@ -11730,27 +11711,6 @@ export const Constants = {
         "conditional",
         "poor_fit",
         "decline",
-      ],
-      crm_appointment_kind: [
-        "discovery",
-        "strategy_phone",
-        "strategy_zoom",
-        "ifc_phone",
-        "ifc_zoom",
-        "other",
-        "strategic_review",
-        "discovery_session",
-        "guided_demo",
-        "enterprise_consultation",
-        "kickoff",
-      ],
-      crm_appointment_status: [
-        "scheduled",
-        "confirmed",
-        "completed",
-        "no_show",
-        "canceled",
-        "rescheduled",
       ],
       crm_lifecycle_stage: [
         "lead",

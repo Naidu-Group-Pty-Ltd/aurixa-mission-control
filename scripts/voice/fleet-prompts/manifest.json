@@ -1,0 +1,155 @@
+{
+  "front_desk": {
+    "assistant_id": "2646fd1f-2c45-4406-acfc-03293eac9a44",
+    "name": "MC Front Desk",
+    "persona": "Angela",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "phoneNumber_inject"
+    ],
+    "chars": 23180,
+    "file": "front_desk.md"
+  },
+  "review_booking": {
+    "assistant_id": "314b7dab-de19-443d-b5f5-8b9bddcba023",
+    "name": "MC Review Booking",
+    "persona": "Sandra",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 21475,
+    "file": "review_booking.md"
+  },
+  "solutions": {
+    "assistant_id": "5c639d89-423a-4ea8-ae70-58a10edae617",
+    "name": "MC Solutions Advisor",
+    "persona": "Sandra",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 22539,
+    "file": "solutions.md"
+  },
+  "support": {
+    "assistant_id": "06846fcd-58b5-4518-a913-407c10d7421a",
+    "name": "MC Support Intake",
+    "persona": "Monica",
+    "tools": [
+      "resolve_contact",
+      "get_call_context"
+    ],
+    "chars": 19510,
+    "file": "support.md"
+  },
+  "questionnaire": {
+    "assistant_id": "3633456e-93a9-4065-b89b-287063ef0b19",
+    "name": "MC Questionnaire Follow Up",
+    "persona": "Monica",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 22811,
+    "file": "questionnaire.md"
+  },
+  "review_follow_up": {
+    "assistant_id": "c490e65b-9a6f-4765-b9c3-819c487701fb",
+    "name": "MC Review Booking Follow Up",
+    "persona": "Erica",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 22003,
+    "file": "review_follow_up.md"
+  },
+  "confirmation": {
+    "assistant_id": "e8d5962b-6e7c-45bc-8294-75e9742bd07f",
+    "name": "MC Review Confirmation",
+    "persona": "Rita",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 21696,
+    "file": "confirmation.md"
+  },
+  "reminder": {
+    "assistant_id": "48fb110b-4b56-44b7-9ccb-1e66bb41b419",
+    "name": "MC Session Reminder",
+    "persona": "Sandra",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 21163,
+    "file": "reminder.md"
+  },
+  "no_show": {
+    "assistant_id": "3139be01-2926-437c-84b8-cd5cf027de99",
+    "name": "MC Session No-Show",
+    "persona": "Sandra",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 21266,
+    "file": "no_show.md"
+  },
+  "kickoff": {
+    "assistant_id": "69d05a7b-3502-4f69-afd7-20073b828803",
+    "name": "MC Kickoff Scheduler",
+    "persona": "Sandra",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 21533,
+    "file": "kickoff.md"
+  },
+  "nurture": {
+    "assistant_id": "38522d0d-1b4a-42e3-8d85-20df34f347fa",
+    "name": "MC Nurture",
+    "persona": "Mary",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 21868,
+    "file": "nurture.md"
+  },
+  "checkin": {
+    "assistant_id": "d5e11b2e-69fd-41e9-a1f7-14996e056b30",
+    "name": "MC Account Check-In",
+    "persona": "Mary",
+    "tools": [
+      "resolve_contact",
+      "get_call_context",
+      "check_availability",
+      "book_appointment"
+    ],
+    "chars": 21924,
+    "file": "checkin.md"
+  }
+}
