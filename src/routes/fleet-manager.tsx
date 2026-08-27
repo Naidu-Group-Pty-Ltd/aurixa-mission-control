@@ -22,6 +22,7 @@ import { refreshFleetDrift } from "@/server/drift-refresh.functions";
 import { runCascade } from "@/server/cascade-engine.functions";
 import { DriftListSkeleton } from "@/components/list-skeletons";
 import { FleetMigrationSyncCard } from "@/components/fleet-migration-sync-card";
+import { ReferenceDataSyncCard } from "@/components/reference-data-sync-card";
 import { BulkLibraryPinsDialog } from "@/components/bulk-library-pins-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -333,6 +334,7 @@ function FleetManager() {
       </div>
 
       <FleetMigrationSyncCard />
+      <ReferenceDataSyncCard />
 
       <Card>
         <CardHeader>

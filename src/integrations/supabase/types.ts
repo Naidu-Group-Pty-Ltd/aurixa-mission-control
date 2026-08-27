@@ -1247,6 +1247,7 @@ export type Database = {
           service_role_key: string | null
           source_ref: string | null
           source_repo: string | null
+          reference_sync_started_at: string | null
           source_sha: string | null
           status: Database["public"]["Enums"]["clone_backend_status"]
           status_detail: string | null
@@ -1280,6 +1281,7 @@ export type Database = {
           service_role_key?: string | null
           source_ref?: string | null
           source_repo?: string | null
+          reference_sync_started_at?: string | null
           source_sha?: string | null
           status?: Database["public"]["Enums"]["clone_backend_status"]
           status_detail?: string | null
@@ -1313,6 +1315,7 @@ export type Database = {
           service_role_key?: string | null
           source_ref?: string | null
           source_repo?: string | null
+          reference_sync_started_at?: string | null
           source_sha?: string | null
           status?: Database["public"]["Enums"]["clone_backend_status"]
           status_detail?: string | null
@@ -2274,6 +2277,53 @@ export type Database = {
             columns: ["module_id"]
             isOneToOne: false
             referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clone_reference_syncs: {
+        Row: {
+          clone_id: string
+          completed_at: string | null
+          cursor: string | null
+          detail: string | null
+          rows_copied: number
+          source_rows: number | null
+          started_at: string | null
+          status: string
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          clone_id: string
+          completed_at?: string | null
+          cursor?: string | null
+          detail?: string | null
+          rows_copied?: number
+          source_rows?: number | null
+          started_at?: string | null
+          status?: string
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          clone_id?: string
+          completed_at?: string | null
+          cursor?: string | null
+          detail?: string | null
+          rows_copied?: number
+          source_rows?: number | null
+          started_at?: string | null
+          status?: string
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clone_reference_syncs_clone_id_fkey"
+            columns: ["clone_id"]
+            isOneToOne: false
+            referencedRelation: "clones"
             referencedColumns: ["id"]
           },
         ]
