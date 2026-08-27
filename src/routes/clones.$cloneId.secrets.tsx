@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
+  backfillCloneAllowedOrigins,
   listCloneBackendSecrets,
   setCloneBackendSecret,
 } from "@/lib/backend-provisioning.functions";
@@ -42,6 +43,8 @@ function CloneSecretsPage() {
   const router = useRouter();
   const listFn = useServerFn(listCloneBackendSecrets);
   const setFn = useServerFn(setCloneBackendSecret);
+  const backfillFn = useServerFn(backfillCloneAllowedOrigins);
+  const [deriving, setDeriving] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["clone-backend-secrets", cloneId],
@@ -67,11 +70,45 @@ function CloneSecretsPage() {
               in this dashboard.
             </p>
           </div>
-          {missing > 0 && (
-            <Badge variant="destructive" className="text-sm">
-              {missing} awaiting input
-            </Badge>
-          )}
+          <div className="flex items-center gap-3">
+            {missing > 0 && (
+              <Badge variant="destructive" className="text-sm">
+                {missing} awaiting input
+              </Badge>
+            )}
+            {/*
+              ALLOWED_ORIGINS is the one deployment-config secret Mission
+              Control can work out on its own, from this clone's own domains.
+              Everything else in that class needs a person, which is why this
+              is one button and not a "derive everything" sweep.
+            */}
+            <Button
+              variant="outline"
+              disabled={deriving}
+              onClick={async () => {
+                setDeriving(true);
+                try {
+                  const res = await backfillFn({ data: { cloneId } });
+                  if (!res?.ok) {
+                    toast.error(res?.error ?? "Could not derive ALLOWED_ORIGINS");
+                  } else if (res.applied > 0) {
+                    toast.success("ALLOWED_ORIGINS set from this clone's own domains");
+                  } else {
+                    const first = res.results.find((r) => !r.ok);
+                    toast.error(
+                      first && "error" in first ? first.error : "Nothing to derive for this clone",
+                    );
+                  }
+                  await refetch();
+                  await router.invalidate();
+                } finally {
+                  setDeriving(false);
+                }
+              }}
+            >
+              {deriving ? "Deriving…" : "Derive ALLOWED_ORIGINS"}
+            </Button>
+          </div>
         </div>
 
         {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}

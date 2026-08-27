@@ -117,6 +117,103 @@ opposite: its value is that only one deployment holds it.
 The manual clone generated 32 random bytes for each identity secret and
 verified the values differed from the prime's before finishing.
 
+### `deployment config` said "derive"; the code said "skip" — **FIXED**
+
+The three-way split above was implemented, and `ALLOWED_ORIGINS` classified
+`deployment_config`, but that class was implemented as **skip** rather than as
+**derive**: `planCloneSecrets` returned `skipped_deployment_config` and moved
+on. Its own comment explained why that was safe — *"`applyAuthConfig` already
+sets the clone's origins from `cloneOrigins`"* — and that is not true of this
+name. `applyAuthConfig` PATCHes `/config/auth`, which is GoTrue's `site_url`
+and `uri_allow_list`. `ALLOWED_ORIGINS` is an **edge function environment
+variable**, read by `Deno.env.get('ALLOWED_ORIGINS')` in the prime's
+`_shared/auth.ts`. Two different systems, one comment, and nothing ever wrote
+the second.
+
+Unset does not mean "no origins". The prime's CORS helper falls back to a
+hard-coded pair of the **prime's** production hostnames, so every clone answers
+every request with somebody else's origin. Probed against
+`npc-client-dashboard`'s own login endpoint, 26 Aug 2026:
+
+```
+Origin: https://npc.aurixasystems.com.au
+  → access-control-allow-origin: https://command-centre.npcservices.com.au
+    access-control-allow-credentials: true
+```
+
+Identical for the clone's `.vercel.app` host and, of course, for the prime's.
+The browser sees an allow-origin that is not the page's origin and refuses to
+hand the response to the script — so signing in fails with **no server-side
+error**, on a deployment where the credentials are correct and the account is
+healthy. It was reported as "the seed admin credentials aren't working".
+
+`DERIVED_DEPLOYMENT_CONFIG` now maps the names Mission Control can compute;
+`ALLOWED_ORIGINS` is the only member. Everything else in the class still stays
+unset for an operator to fill in, because guessing a webhook URL or a sender
+address is how a clone starts writing into somebody else's account.
+
+`CORS_STRICT_ALLOWED_ORIGINS` is deliberately **not** set: failing closed means
+no origin is trusted for a credentialed response, which takes sign-in down
+completely — worse than the status quo for a clone whose origins could not be
+computed. It is a posture an operator chooses once they can see the derived
+value is right.
+
+### Three moments, one value — and the back-fill
+
+Provisioning derives it, but provisioning runs *before* a clone has any origins
+at all. So the value is written at each of the three moments it can be known,
+all from one assembly (`resolveCloneOrigins`, lifted out of
+`backend-provisioning.functions.ts` so the three cannot disagree — a CORS
+allow-list that contradicts the auth redirect allow-list is two
+half-configured deployments rather than one):
+
+| moment | who | why there |
+| --- | --- | --- |
+| provisioning | `planCloneSecrets` | the shell is written once; `derived` rather than `skipped_deployment_config` |
+| deployment reaches `live` | `hooks.deployment-drain`'s `onLive` | the first instant a clone's real origins exist; already re-applies the auth config from the same facts |
+| operator asks | `backfillCloneAllowedOrigins` | every clone that went live before either of the above existed |
+
+The back-fill takes an optional `cloneId`: given one it does that clone, omitted
+it sweeps every clone with a provisioned backend. There is a **Derive
+ALLOWED_ORIGINS** button on the clone's secrets page.
+
+### It can only ever touch a clone
+
+This writes secrets through the Management API with the platform's own token,
+which can reach every project the organisation owns — the prime product's, and
+Mission Control's own. There is no per-project credential to get wrong and no
+permission boundary to lean on. The only thing between "set a clone's
+`ALLOWED_ORIGINS`" and "overwrite the prime's, taking the prime's own sign-in
+down" is the ref that reaches `setCloneSecretValue`.
+
+So **the project ref is not an argument**. It is the return value of
+`resolveCloneSecretTarget` (`cloneSecretTarget.pure.ts`) and there is no other
+way to obtain one. A test asserts that shape, because once a caller can pass a
+ref every rule below is advisory.
+
+Two layers, and they defend different things:
+
+- **The query cannot return the prime.** `clone_backends.clone_id` is
+  `uuid NOT NULL UNIQUE`, so the prime has no row in that table at all — its
+  ref lives in `prime_config.supabase_project_ref`, a different table. That is
+  also where the sweep's candidate list comes from.
+- **The value is compared anyway.** A `clone_backends` row whose
+  `supabase_project_ref` was mistyped, or pasted from the prime's settings
+  page, is an ordinary row the query returns happily. So the ref is refused if
+  it equals the prime's, or Mission Control's own, case- and
+  whitespace-insensitively, or if it is not project-ref shaped.
+
+And **unknown is not a pass**: if `prime_config.supabase_project_ref` cannot be
+resolved, nothing here can confirm the target is not the prime, so it refuses
+and names the setting. That costs nothing real — `resolvePrimeBackendRef()`
+already throws when it is unset, so any deployment that has ever provisioned a
+clone has it. A read that FAILED is likewise kept separate from a clone that is
+ABSENT.
+
+A clone with no resolvable origin still writes **nothing**. An empty
+`ALLOWED_ORIGINS` trusts no origin at all, which takes sign-in down rather than
+fixing it — unset beats a guess.
+
 ---
 
 ## 3 · SECURITY — the clone repository is left primed to deploy into the prime — **FIXED**

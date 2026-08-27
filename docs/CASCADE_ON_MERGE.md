@@ -76,6 +76,81 @@ so taking prime's copy would revert real work — but skipping it *silently* mea
 the clone never learns about a new upstream route. Both failure modes are real;
 only one of them is quiet, so that one gets a section in every pull request.
 
+### A list only protects what somebody remembered
+
+That table was written from `docs/CLIENT_FACING_MODE.md`, which is an honest
+place to start and not a complete one. On 26 August the first real mirror
+cascade wrote prime@14af87a over 57 paths, and **two of them carried this
+clone's own divergence and were in nobody's list**:
+
+- `public/lead-magnet-embed.html` — served verbatim out of `public/`, and it
+  hard-codes a Supabase URL *and* an anon key. Prime's pair is prime's project.
+  The clone had fixed this two days earlier, under a commit whose subject was
+  *"A live lead form was writing this clone's leads into the prime's database"*;
+  the cascade wrote prime's copy straight back over it, so for the twenty-eight
+  minutes between that merge and the repair the lead-capture form on the
+  clone's own domain was posting names, emails and phone numbers into the
+  prime's database again.
+- `src/lib/reportTemplate/__tests__/renderAssetNormalisation.spec.ts` — the
+  clone derives the fixture's project from `SUPABASE_URL`; prime hard-codes its
+  own. This one *announced itself*: `compileTemplateHtmlForPdf` admits
+  `SUPABASE_URL` and nothing else, so prime's literal is a foreign origin here,
+  the compiler correctly drops it, and the assertion fails. It was the only red
+  check on the next cascade's pull request.
+
+Both are now in `DEFAULT_MIRROR_EXCLUSIONS`. That is the repair, not the fix:
+the next file like them is also in nobody's list. So the property is guarded
+directly as well, by `backendIdentityHold`.
+
+### The content rule
+
+Before a blob is written, if the path is one the clone **ships or executes** and
+prime's content names a Supabase project that is not this clone's, the clone's
+copy is read and compared:
+
+| clone's copy | decision |
+| --- | --- |
+| names no foreign project | **held** — writing prime's would revert a fix |
+| names one too | written — prime is moving, the clone is following |
+| does not exist | **held** — a new shipped file naming another tenant |
+
+Three things make it a guard rather than a nuisance.
+
+**It is keyed on the revert, not on prime's content.** Three
+`supabase/functions/**` files in the mirror name the prime today, inherited and
+never fixed. A rule that fired on prime's content alone would report those on
+every cascade forever, and a "needs a human" section that is never empty is one
+nobody reads.
+
+**Its scope is the clone's own isolation rule and no wider** — `src/**` less
+tests, plus the whole of `public/**`, because every file in there is copied into
+`dist/` untouched and is reachable on the deployment's domain. `docs/**` is
+deliberately out: 185 tracked files in the mirror name the prime's ref, nearly
+all of them prose and captured integration payloads.
+
+**Unknown is not absent.** A clone with no registered backend has no "own
+project" to compare against, so every ref counts as foreign and the handful of
+paths that name one are held and named rather than written blind.
+
+The extra read costs almost nothing: the clone's copy is fetched only for paths
+whose prime content actually names a project — one file out of 71 on the first
+mirror run.
+
+### The constant had no caller
+
+`assertMirrorPolicy`'s refusal tells an operator to *"seed it from
+`DEFAULT_MIRROR_EXCLUSIONS` before cascading"*. Nothing in the application ever
+did: the constant was referenced only by its own test, and the live rows had
+been inserted by hand — which is why they were incomplete. Seeding is now a
+migration, `20260826070000_seed_mirror_exclusions.sql`, generated from the
+constant and re-checked against it by a test that fails on one changed
+character. It is additive and idempotent: an exclusion an operator added
+deliberately is not the migration's to withdraw.
+
+A mirror registered *after* that migration still gets no rows — the constant
+still has no caller on the registration path. `assertMirrorPolicy` refuses to
+cascade into it, which is the safe half of the answer and not the whole of it.
+
 ## The rules that carry it
 
 **Fail closed.** An exclusion set that could not be READ is not an empty one.
