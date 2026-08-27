@@ -11,6 +11,8 @@ import { BrowserPushNotifications } from "@/lib/browser-notifications";
 import { NotificationPreferencesSync } from "@/components/notification-preferences-sync";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { registerServiceWorker } from "@/lib/push-subscription";
+import { TelephonyProvider } from "@/components/voice/softphone/telephony-provider";
+import { SoftphoneOverlay } from "@/components/voice/softphone/softphone-overlay";
 
 function NotFoundComponent() {
   return (
@@ -128,11 +130,14 @@ function RootComponent() {
       <AuthProvider>
         <TooltipProvider delayDuration={150}>
           <ConfirmProvider>
-            <NotificationPreferencesSync />
-            <RealtimeNotifications />
-            <BrowserPushNotifications />
-            <Outlet />
-            <Toaster />
+            <TelephonyProvider>
+              <NotificationPreferencesSync />
+              <RealtimeNotifications />
+              <BrowserPushNotifications />
+              <Outlet />
+              <SoftphoneOverlay />
+              <Toaster />
+            </TelephonyProvider>
           </ConfirmProvider>
         </TooltipProvider>
       </AuthProvider>

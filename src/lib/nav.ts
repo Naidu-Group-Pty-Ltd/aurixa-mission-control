@@ -48,6 +48,7 @@ import {
   UserPlus,
   Users,
   Waves,
+  PhoneCall,
 } from "lucide-react";
 
 export type NavItem = {
@@ -211,6 +212,12 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Phone,
         shortcut: "v",
         keywords: "vapi calls transcripts recordings live monitor blacklist sentiment squad",
+      },
+      {
+        to: "/voice/phone",
+        label: "Phone",
+        icon: PhoneCall,
+        keywords: "softphone dial call twilio telephony inbound outbound operator",
       },
       {
         to: "/voice/agents",

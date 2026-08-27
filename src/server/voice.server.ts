@@ -743,7 +743,7 @@ async function enrichEndOfCall(payload: Record<string, unknown>): Promise<void> 
   await reconcileOutboundJob(vapiCallId, endedReason);
 }
 
-async function findContactByPhone(phone: string): Promise<{
+export async function findContactByPhone(phone: string): Promise<{
   id: string;
   account_id: string;
   first_name: string;

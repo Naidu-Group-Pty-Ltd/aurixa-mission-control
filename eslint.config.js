@@ -16,6 +16,7 @@ export default tseslint.config(
       "supabase/functions/**",
       "**/routeTree.gen.ts",
       "src/integrations/supabase/types.ts",
+      "src/vendor/**",
     ],
   },
   {
