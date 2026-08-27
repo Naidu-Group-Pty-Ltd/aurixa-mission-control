@@ -30,6 +30,14 @@ const NOT_SCHEDULED = new Map([
       "sweep it backs up lives inside /hooks/deployment-drain, which IS scheduled, " +
       "because a webhook that was never delivered leaves no trace anywhere.",
   ],
+  [
+    "migration-enqueue",
+    "Called by .github/workflows/apply-migrations.yml on merge, not by a timer. " +
+      "It appends to public.schema_migration_queue; what IS scheduled is the " +
+      "`schema-migration-drain` pg_cron job that empties it, which calls SQL " +
+      "directly rather than an endpoint. A timer here would enqueue nothing, " +
+      "because there is nothing to enqueue until a merge happens.",
+  ],
 ]);
 
 const hooks = readdirSync(ROUTES)

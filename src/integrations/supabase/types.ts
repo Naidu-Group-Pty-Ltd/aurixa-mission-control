@@ -6526,6 +6526,39 @@ export type Database = {
           },
         ]
       }
+      migration_assertion_checks: {
+        Row: {
+          assertion: string
+          checked_at: string
+          detail: string
+          first_seen_at: string
+          kind: string
+          last_satisfied_at: string | null
+          migration: string
+          status: string
+        }
+        Insert: {
+          assertion: string
+          checked_at?: string
+          detail: string
+          first_seen_at?: string
+          kind: string
+          last_satisfied_at?: string | null
+          migration: string
+          status: string
+        }
+        Update: {
+          assertion?: string
+          checked_at?: string
+          detail?: string
+          first_seen_at?: string
+          kind?: string
+          last_satisfied_at?: string | null
+          migration?: string
+          status?: string
+        }
+        Relationships: []
+      }
       module_backend_artifacts: {
         Row: {
           artifact_kind: string
@@ -8206,6 +8239,51 @@ export type Database = {
           stack?: string | null
           user_agent?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      schema_migration_queue: {
+        Row: {
+          attempts: number
+          enqueued_at: string
+          enqueued_by: string | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          name: string
+          sha256: string | null
+          sql: string
+          started_at: string | null
+          status: string
+          version: string
+        }
+        Insert: {
+          attempts?: number
+          enqueued_at?: string
+          enqueued_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          name: string
+          sha256?: string | null
+          sql: string
+          started_at?: string | null
+          status?: string
+          version: string
+        }
+        Update: {
+          attempts?: number
+          enqueued_at?: string
+          enqueued_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          name?: string
+          sha256?: string | null
+          sql?: string
+          started_at?: string | null
+          status?: string
+          version?: string
         }
         Relationships: []
       }
@@ -11617,6 +11695,7 @@ export type Database = {
         | "phone_missed_call"
         | "agreement_signed"
         | "agreement_declined"
+        | "migration_drift"
       notification_severity: "info" | "success" | "warning" | "error"
       overage_policy: "block" | "topup_only" | "pay_as_you_go"
       provisioning_method: "fork" | "template" | "clone"
@@ -12102,6 +12181,7 @@ export const Constants = {
         "phone_missed_call",
         "agreement_signed",
         "agreement_declined",
+        "migration_drift",
       ],
       notification_severity: ["info", "success", "warning", "error"],
       overage_policy: ["block", "topup_only", "pay_as_you_go"],

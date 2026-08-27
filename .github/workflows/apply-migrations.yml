@@ -1,7 +1,30 @@
 name: Apply migrations on merge
 
-# Applies the migration files a merge ADDED to this deployment's own Supabase
-# project, and records them.
+# Hands the migration files a merge ADDED to Mission Control, which queues them
+# in its own database for a postgres-owned pg_cron job to apply within the
+# minute. Waits for the outcome and fails on anything short of applied.
+#
+# ## Why this no longer uses the Supabase Management API
+#
+# It could never have worked. Mission Control's database is a Lovable Cloud
+# project in LOVABLE's Supabase organisation, so no token issued to this account
+# reaches it -- `get_project` answers 403, and Supabase's own docs say a Lovable
+# Cloud project has no service-role key and no direct database URL. The workflow
+# failed on every run since it was created and its message,
+# "SUPABASE_ACCESS_TOKEN is not set", pointed at a secret that could not have
+# helped. Setting it would have changed the error, not the outcome.
+#
+# docs/MIGRATION_QUEUE.md carries the design; docs/MIGRATION_AUTOMATION_OPTIONS.md
+# records every other channel that was probed and blocked.
+#
+# ## The target is not configurable any more
+#
+# The old path took a `PROJECT_REF` and defended itself against its own
+# configuration with a forbidden-ref list and a behavioural identity probe,
+# because the Management API token reaches every project in the organisation and
+# a wrong ref did not fail -- it wrote this control plane's admin schema onto a
+# tenant. Now the SQL goes to Mission Control, and Mission Control writes to the
+# database it is connected to. There is no ref to get wrong.
 #
 # ## The gap this closes
 #
@@ -108,14 +131,17 @@ jobs:
           echo "Added: ${ADDED:-<none>}"
           printf 'files=%s\n' "${ADDED}" >> "$GITHUB_OUTPUT"
 
-      - name: Apply
+      - name: Enqueue and wait
         if: steps.select.outputs.files != ''
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          # No default. The script refuses an empty ref rather than guessing one,
-          # because the token reaches every project in the organisation and a
-          # wrong ref does not fail — it writes this control plane's admin
-          # schema onto somebody's tenant.
-          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          # The same shared secret every scheduled worker here authenticates
+          # with, held in Mission Control's Supabase Vault as `cron_secret`.
+          # A GitHub secret, not a Lovable one: GitHub has no reserved-name
+          # restriction, which is what blocked storing `SUPABASE_*` on Lovable.
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # No default. A wrong origin posts migration SQL to somebody else's
+          # deployment, and an empty one is refused rather than guessed.
+          MISSION_CONTROL_URL: ${{ vars.MISSION_CONTROL_URL }}
           FILES: ${{ steps.select.outputs.files }}
-        run: node .github/scripts/apply-migrations.mjs
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/enqueue-migrations.mjs

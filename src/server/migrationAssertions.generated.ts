@@ -1,0 +1,50 @@
+// GENERATED FILE — do not edit by hand.
+//
+// Source: the `-- @asserts` comments in supabase/migrations/*.sql.
+// Regenerate: `npm run migrations:assertions`.
+// CI fails on drift: `npm run migrations:assertions:check`.
+//
+// The drift alarm runs in a Worker with no filesystem, so the claims travel
+// as code. Editing this file by hand makes the alarm report on a corpus that
+// does not exist — which is the failure it was built to catch, pointed the
+// wrong way.
+import type { Assertion } from "./migrationAssertions.pure";
+
+export type MigrationClaims = {
+  /** Migration filename, e.g. `20260828010000_client_agreements.sql`. */
+  readonly migration: string;
+  /** Its 14-digit version, the only identity it has in the ledger. */
+  readonly version: string;
+  readonly assertions: readonly Assertion[];
+};
+
+export const MIGRATION_CLAIMS: readonly MigrationClaims[] = [
+  {
+    migration: "20260828020000_migration_assertion_checks.sql",
+    version: "20260828020000",
+    assertions: [
+      { kind: "table", table: "migration_assertion_checks" },
+      { kind: "cron", jobname: "migration-drift-hourly" },
+      { kind: "enum", type: "notification_kind" },
+    ],
+  },
+  {
+    migration: "20260828030000_schema_migration_queue.sql",
+    version: "20260828030000",
+    assertions: [
+      { kind: "table", table: "schema_migration_queue" },
+      { kind: "cron", jobname: "schema-migration-drain" },
+    ],
+  },
+  {
+    migration: "20260828040000_assertion_checks_default_grants.sql",
+    version: "20260828040000",
+    assertions: [
+      {
+        kind: "none",
+        reason:
+          "removes default table grants; a GRANT is not observable through PostgREST, so nothing here can be asserted by effect",
+      },
+    ],
+  },
+];
