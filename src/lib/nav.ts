@@ -31,6 +31,9 @@ import {
   LayoutDashboard,
   Newspaper,
   Palette,
+  Phone,
+  PhoneOutgoing,
+  Route,
   Receipt,
   ReceiptText,
   ScrollText,
@@ -200,6 +203,30 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    heading: "Voice",
+    items: [
+      {
+        to: "/voice/calls",
+        label: "Call Logs",
+        icon: Phone,
+        shortcut: "v",
+        keywords: "vapi calls transcripts recordings live monitor blacklist sentiment squad",
+      },
+      {
+        to: "/voice/agents",
+        label: "Voice Agents",
+        icon: Bot,
+        keywords: "vapi assistants squads phone numbers campaign rules cadence",
+      },
+      {
+        to: "/voice/outbound",
+        label: "Outbound Queue",
+        icon: PhoneOutgoing,
+        keywords: "dispatch scheduled calls jobs retries follow up no show reminder",
+      },
+    ],
+  },
+  {
     heading: "Clients",
     items: [
       {
@@ -233,6 +260,13 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Tickets & Disputes",
         icon: LifeBuoy,
         keywords: "support issues sla chargeback refund",
+      },
+      {
+        to: "/crm/journey",
+        label: "Client Journey",
+        icon: Route,
+        shortcut: "j",
+        keywords: "tracker pipeline stages kanban follow up appointments voice triggers",
       },
       { to: "/leads", label: "Leads", icon: UserPlus, keywords: "waitlist inbound capture" },
     ],
