@@ -191,16 +191,22 @@ export const startJourney = createServerFn({ method: "POST" })
       if (insertError.code === "23505") throw new Error("journey_already_exists");
       throw insertError;
     }
-    // Entering the board at `applied` is a trigger like any other transition
-    // (it queues the stage-guarded questionnaire follow-up call).
-    const { transitionJourneyStage } = await import("@/server/crm-journey.server");
-    await transitionJourneyStage({
-      journeyId: journey.id,
-      toStage: "applied",
+    // The insert lands the journey directly in `applied` (the column
+    // default), so a transition to `applied` would be a no-op and fire
+    // nothing. Record the start on the timeline and fire the stage-entry
+    // chaser explicitly — it stays stage-guarded like any other chaser.
+    const { error: eventError } = await context.supabase.from("crm_journey_events").insert({
+      journey_id: journey.id,
+      from_stage: "applied",
+      to_stage: "applied",
       reason: "journey_started",
       source: "manual",
-      actorUserId: context.userId,
+      actor_user_id: context.userId,
+      metadata: { fromStage: "applied", toStage: "applied" },
     });
+    if (eventError) console.error("[journey] start event write failed:", eventError.message);
+    const { fireStageEntryChaser } = await import("@/server/crm-journey.server");
+    await fireStageEntryChaser(journey.id, "applied", context.userId);
     return { journeyId: journey.id };
   });
 
