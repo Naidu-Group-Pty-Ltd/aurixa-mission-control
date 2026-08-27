@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.phone_calls (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.phone_calls TO authenticated;
+ALTER TABLE public.phone_calls ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_phone_calls_contact ON public.phone_calls (contact_id);
 CREATE INDEX IF NOT EXISTS idx_phone_calls_account ON public.phone_calls (account_id);
 CREATE INDEX IF NOT EXISTS idx_phone_calls_created ON public.phone_calls (created_at DESC);
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS public.telephony_registrations (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.telephony_registrations TO authenticated;
+ALTER TABLE public.telephony_registrations ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_telephony_registrations_user ON public.telephony_registrations (user_id);
 CREATE INDEX IF NOT EXISTS idx_telephony_registrations_seen ON public.telephony_registrations (last_seen_at DESC);
 
@@ -74,7 +76,6 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY['phone_calls','telephony_registrations']
   LOOP
-    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_operator_read', t);
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_operator_write', t);
     EXECUTE format(
