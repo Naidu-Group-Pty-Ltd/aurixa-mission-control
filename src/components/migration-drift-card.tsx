@@ -142,6 +142,33 @@ export function MigrationDriftCard() {
                 <Badge variant="outline">{data?.neverChecked} never checked</Badge>
               )}
             </div>
+            {/* The queue is a different question from the claims -- "is my
+                migration waiting" rather than "did it take" -- but an operator
+                asks them in one breath, so they share a card. A FAILED row
+                halts the queue outright: migrations are ordered, and applying
+                N+1 after N failed is how a schema becomes unreproducible. */}
+            {(data?.queue?.length ?? 0) > 0 && (
+              <div
+                className={
+                  data?.queueHalted
+                    ? "rounded-md border border-destructive/40 bg-destructive/5 p-2.5"
+                    : "rounded-md border p-2.5"
+                }
+              >
+                <p className="text-xs font-medium">
+                  {data?.queueHalted
+                    ? "Migration queue halted by a failure"
+                    : `${data?.queue.length} migration(s) waiting to apply`}
+                </p>
+                {data?.queue.map((q) => (
+                  <p key={q.version} className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    {q.name} · {q.status}
+                    {q.attempts > 0 ? ` · ${q.attempts} attempt(s)` : ""}
+                    {q.error ? ` · ${q.error}` : ""}
+                  </p>
+                ))}
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground">
               {data?.declared ?? 0} claim(s) across {data?.migrations ?? 0} migration(s).{" "}
               {data?.lastCheckedAt

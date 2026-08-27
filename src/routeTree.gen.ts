@@ -72,6 +72,7 @@ import { Route as HooksTokenAlertsRouteImport } from './routes/hooks.token-alert
 import { Route as HooksSupportRemediationDrainRouteImport } from './routes/hooks.support-remediation-drain'
 import { Route as HooksRunSchedulesRouteImport } from './routes/hooks.run-schedules'
 import { Route as HooksReferenceDataSyncRouteImport } from './routes/hooks.reference-data-sync'
+import { Route as HooksMigrationEnqueueRouteImport } from './routes/hooks.migration-enqueue'
 import { Route as HooksMigrationDriftRouteImport } from './routes/hooks.migration-drift'
 import { Route as HooksHandoffParityRefreshRouteImport } from './routes/hooks.handoff-parity-refresh'
 import { Route as HooksHandoffObservabilityPollRouteImport } from './routes/hooks.handoff-observability-poll'
@@ -486,6 +487,11 @@ const HooksRunSchedulesRoute = HooksRunSchedulesRouteImport.update({
 const HooksReferenceDataSyncRoute = HooksReferenceDataSyncRouteImport.update({
   id: '/hooks/reference-data-sync',
   path: '/hooks/reference-data-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HooksMigrationEnqueueRoute = HooksMigrationEnqueueRouteImport.update({
+  id: '/hooks/migration-enqueue',
+  path: '/hooks/migration-enqueue',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksMigrationDriftRoute = HooksMigrationDriftRouteImport.update({
@@ -1074,6 +1080,7 @@ export interface FileRoutesByFullPath {
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
   '/hooks/migration-drift': typeof HooksMigrationDriftRoute
+  '/hooks/migration-enqueue': typeof HooksMigrationEnqueueRoute
   '/hooks/reference-data-sync': typeof HooksReferenceDataSyncRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
@@ -1234,6 +1241,7 @@ export interface FileRoutesByTo {
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
   '/hooks/migration-drift': typeof HooksMigrationDriftRoute
+  '/hooks/migration-enqueue': typeof HooksMigrationEnqueueRoute
   '/hooks/reference-data-sync': typeof HooksReferenceDataSyncRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
@@ -1396,6 +1404,7 @@ export interface FileRoutesById {
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
   '/hooks/migration-drift': typeof HooksMigrationDriftRoute
+  '/hooks/migration-enqueue': typeof HooksMigrationEnqueueRoute
   '/hooks/reference-data-sync': typeof HooksReferenceDataSyncRoute
   '/hooks/run-schedules': typeof HooksRunSchedulesRoute
   '/hooks/support-remediation-drain': typeof HooksSupportRemediationDrainRoute
@@ -1559,6 +1568,7 @@ export interface FileRouteTypes {
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
     | '/hooks/migration-drift'
+    | '/hooks/migration-enqueue'
     | '/hooks/reference-data-sync'
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
@@ -1719,6 +1729,7 @@ export interface FileRouteTypes {
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
     | '/hooks/migration-drift'
+    | '/hooks/migration-enqueue'
     | '/hooks/reference-data-sync'
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
@@ -1880,6 +1891,7 @@ export interface FileRouteTypes {
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
     | '/hooks/migration-drift'
+    | '/hooks/migration-enqueue'
     | '/hooks/reference-data-sync'
     | '/hooks/run-schedules'
     | '/hooks/support-remediation-drain'
@@ -2039,6 +2051,7 @@ export interface RootRouteChildren {
   HooksHandoffObservabilityPollRoute: typeof HooksHandoffObservabilityPollRoute
   HooksHandoffParityRefreshRoute: typeof HooksHandoffParityRefreshRoute
   HooksMigrationDriftRoute: typeof HooksMigrationDriftRoute
+  HooksMigrationEnqueueRoute: typeof HooksMigrationEnqueueRoute
   HooksReferenceDataSyncRoute: typeof HooksReferenceDataSyncRoute
   HooksRunSchedulesRoute: typeof HooksRunSchedulesRoute
   HooksSupportRemediationDrainRoute: typeof HooksSupportRemediationDrainRoute
@@ -2552,6 +2565,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/reference-data-sync'
       fullPath: '/hooks/reference-data-sync'
       preLoaderRoute: typeof HooksReferenceDataSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/migration-enqueue': {
+      id: '/hooks/migration-enqueue'
+      path: '/hooks/migration-enqueue'
+      fullPath: '/hooks/migration-enqueue'
+      preLoaderRoute: typeof HooksMigrationEnqueueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/migration-drift': {
@@ -3402,6 +3422,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksHandoffObservabilityPollRoute: HooksHandoffObservabilityPollRoute,
   HooksHandoffParityRefreshRoute: HooksHandoffParityRefreshRoute,
   HooksMigrationDriftRoute: HooksMigrationDriftRoute,
+  HooksMigrationEnqueueRoute: HooksMigrationEnqueueRoute,
   HooksReferenceDataSyncRoute: HooksReferenceDataSyncRoute,
   HooksRunSchedulesRoute: HooksRunSchedulesRoute,
   HooksSupportRemediationDrainRoute: HooksSupportRemediationDrainRoute,

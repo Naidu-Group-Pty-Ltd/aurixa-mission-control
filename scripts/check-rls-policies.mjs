@@ -27,7 +27,15 @@ const MIGRATIONS = "supabase/migrations";
 
 // Tables reached only by the service-role client, which bypasses RLS. Closed to
 // `authenticated` is the intended state; adding a policy would open them.
-const SERVICE_ROLE_ONLY = new Set(["billing_handoffs", "support_ingest_requests"]);
+const SERVICE_ROLE_ONLY = new Set([
+  "billing_handoffs",
+  "support_ingest_requests",
+  // Closed to `authenticated` on purpose, and closed HARDER than RLS can
+  // manage: `service_role` has rolbypassrls, so the control on this table is
+  // the explicit REVOKE of the default grants in its migration, not a policy.
+  // A policy here would open a queue whose payload executes as `postgres`.
+  "schema_migration_queue",
+]);
 
 const sql = readdirSync(MIGRATIONS)
   .filter((f) => f.endsWith(".sql"))

@@ -25,8 +25,31 @@ export type MigrationAssertionRow = {
   last_satisfied_at: string | null;
 };
 
+/**
+ * A migration waiting to be applied, or one that failed and is holding the
+ * queue. Only the non-settled rows travel: an operator opening this page is
+ * asking "did my migration land", and a roll call of everything that ever did
+ * is the answer to a different question.
+ */
+export type MigrationQueueRow = {
+  version: string;
+  name: string;
+  status: string;
+  attempts: number;
+  error: string | null;
+  enqueued_at: string;
+};
+
 export type MigrationDriftReport = {
   rows: MigrationAssertionRow[];
+  /** Queued, running or failed. Never the applied ones. */
+  queue: MigrationQueueRow[];
+  /**
+   * A failed migration HALTS the queue -- migrations are ordered and applying
+   * N+1 after N failed is how a schema becomes unreproducible. So this is not
+   * one bad file, it is the pipeline stopped.
+   */
+  queueHalted: boolean;
   /** Claims compiled from the corpus, whether or not they have been checked. */
   declared: number;
   /** Migrations carrying at least one claim. */
@@ -66,6 +89,21 @@ export const fetchMigrationDrift = createServerFn({ method: "POST" })
     if (error) throw new Error(`Could not read migration_assertion_checks: ${error.message}`);
 
     const rows = (data ?? []) as MigrationAssertionRow[];
+
+    // Read separately, and a failure here does not fail the whole report: the
+    // assertions and the queue answer different questions, and losing both
+    // because one table is unreachable is worse than losing one.
+    let queue: MigrationQueueRow[] = [];
+    const { data: queued, error: queueError } = await supabaseAdmin
+      .from("schema_migration_queue")
+      .select("version, name, status, attempts, error, enqueued_at")
+      .neq("status", "applied")
+      .order("version", { ascending: true });
+    if (queueError) {
+      console.error("[migration-drift] could not read the queue:", queueError.message);
+    } else {
+      queue = (queued ?? []) as MigrationQueueRow[];
+    }
     const seen = new Set(rows.map((r) => `${r.migration} ${r.assertion}`));
     const declared = MIGRATION_CLAIMS.reduce((n, c) => n + c.assertions.length, 0);
 
@@ -84,6 +122,8 @@ export const fetchMigrationDrift = createServerFn({ method: "POST" })
 
     return {
       rows,
+      queue,
+      queueHalted: queue.some((q) => q.status === "failed"),
       declared,
       migrations: MIGRATION_CLAIMS.length,
       neverChecked,

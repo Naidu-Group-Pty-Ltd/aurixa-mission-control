@@ -58,8 +58,18 @@ a question with an exact answer:
 git diff --name-only --diff-filter=A <before> <after> -- 'supabase/migrations/*.sql'
 ```
 
-Then, in filename order, it applies each file through the Management API and
-records its version. Everything else about the corpus is left alone.
+Then it hands those files to Mission Control, which queues them in its own
+database for a `postgres`-owned pg_cron job to apply. Everything else about the
+corpus is left alone.
+
+**The Management API path this replaced could never have worked.** Mission
+Control's database is a Lovable Cloud project in *Lovable's* Supabase
+organisation: `get_project` answers 403, and Supabase's own documentation says
+such a project has no service-role key and no direct database URL. The workflow
+failed on every run and blamed a missing `SUPABASE_ACCESS_TOKEN`; setting it
+would have changed the error, not the outcome. `docs/MIGRATION_QUEUE.md` carries
+the replacement, and `docs/MIGRATION_AUTOMATION_OPTIONS.md` records every other
+channel that was probed and blocked.
 
 Four rules carry it.
 
@@ -73,32 +83,38 @@ on each other, and the timestamp is the only ordering either of them states.
 **A version already in the ledger is skipped**, so re-running a push applies
 nothing.
 
-**Identity is verified, not configured.** The Management API token reaches every
-project in the organisation — this one, the prime product's, and every clone. A
-wrong `PROJECT_REF` does not fail; it writes this control plane's admin schema
-onto somebody's tenant. So the ref is checked twice: against a refusal list, and
-then *behaviourally* — the target is asked whether it holds `clones`,
-`prime_config` and `cascade_events`, the three tables Mission Control has and
-neither the prime nor a clone does. Verified against both:
+**There is no target to get wrong any more.** The Management API token reached
+every project in the organisation, so a wrong `PROJECT_REF` did not fail — it
+wrote this control plane's admin schema onto somebody's tenant. The old script
+needed a refusal list and a behavioural identity probe to defend itself against
+its own configuration. Now the SQL goes to Mission Control and Mission Control
+writes to the database it is connected to, which is the only answer there is.
+That whole class of bug is gone rather than guarded.
 
-```
-Mission Control (fgpvagejkaeqedcwvbte)  -> true,  true,  true
-clone           (plisdzywzleljorrphxv)  -> false, false, false
-```
-
-That is the same rule this codebase applies to the retention purge and to
-provider readiness: assert by effect, never by configuration.
+**Enqueueing is not applying, and the workflow knows the difference.** It polls
+until every submitted version reaches `applied` or `failed`, and exits non-zero
+on failure, on a version the queue never received, and on the wait running out.
+A run that only proved the POST succeeded would reintroduce the exact silence
+this pipeline exists to remove — assert by effect, never by configuration.
 
 ## What it needs
 
 | setting | where | value |
 | --- | --- | --- |
-| `SUPABASE_ACCESS_TOKEN` | Settings → Secrets → Actions | a Supabase Management API token |
-| `SUPABASE_PROJECT_REF` | Settings → Variables → Actions | this deployment's own project ref |
+| `CRON_SECRET` | Settings → Secrets → Actions | the SAME value as `cron_secret` in Mission Control's Supabase Vault |
+| `MISSION_CONTROL_URL` | Settings → Variables → Actions | this deployment's public origin |
 
-There is deliberately **no default** for the ref. The prime's workflow falls back
-to a literal, which is safe in exactly one repository and is the defect its
-clones have to strip out. Here an empty ref refuses.
+Neither is defaulted, and neither should be guessed. A wrong origin posts
+migration SQL to somebody else's deployment. `cron_secret` is the value 32
+scheduled jobs already authenticate with, and this platform has broken all of
+them at once by changing it — **copy the existing value into GitHub, never the
+other way round.**
+
+`SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are no longer read by
+anything, and `.github/scripts/apply-migrations.mjs` is deleted rather than left
+dormant: an applier holding an organisation-wide token is one
+`workflow_dispatch` away from doing the thing its own refusal list existed to
+prevent.
 
 Without the secret the workflow fails loudly on the first merge that touches a
 migration — which is the correct failure, and the opposite of the silence this

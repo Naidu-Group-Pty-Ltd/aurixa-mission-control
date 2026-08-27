@@ -28,4 +28,12 @@ export const MIGRATION_CLAIMS: readonly MigrationClaims[] = [
       { kind: "enum", type: "notification_kind" },
     ],
   },
+  {
+    migration: "20260828030000_schema_migration_queue.sql",
+    version: "20260828030000",
+    assertions: [
+      { kind: "table", table: "schema_migration_queue" },
+      { kind: "cron", jobname: "schema-migration-drain" },
+    ],
+  },
 ];

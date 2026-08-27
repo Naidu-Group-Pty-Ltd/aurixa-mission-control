@@ -1,13 +1,17 @@
 # Moving Mission Control off Lovable Cloud
 
-Status: **researched, decision pending.** The blocker this document previously
-named has been resolved by research — connecting your own Supabase is
-officially supported and the application stays hosted on Lovable. What remains
-is a decision, not an unknown.
+Status: **researched, NOT being done.** The decision was to stay on Lovable
+Cloud and solve the migration problem inside it instead —
+`docs/MIGRATION_QUEUE.md` is what got built. This document is kept because the
+research is sound and the option is still open, not because it is planned.
 
-Read this before touching `.github/workflows/apply-migrations.yml`,
-`.github/scripts/apply-migrations.mjs`, or anything that assumes Mission
-Control's database can be addressed by the Supabase Management API.
+The blocker it originally named turned out not to exist: connecting your own
+Supabase is officially supported and the application stays hosted on Lovable.
+
+Read this before proposing a relocation, or before touching anything that
+assumes Mission Control's database can be addressed by the Supabase Management
+API. It cannot — and `.github/scripts/apply-migrations.mjs`, which assumed it
+could, has been deleted.
 
 ## Why this came up
 
@@ -202,11 +206,13 @@ asserted **by effect**.
    byte-for-byte), re-run the scheduling migrations for the 32 cron jobs, diff
    the regenerated `client.ts` / `client.server.ts`, rebuild so the baked
    `VITE_SUPABASE_URL` points at the new project.
-7. **Re-enable the pipeline.** Repository secret `SUPABASE_ACCESS_TOKEN` and
-   repository **variable** `SUPABASE_PROJECT_REF` (read as `vars.`, not
-   `secrets.`) set to the new ref. Add `fgpvagejkaeqedcwvbte` to
-   `FORBIDDEN_REFS`. Verify by effect: merge a trivial migration and watch it
-   land with no hand-apply.
+7. **Re-point the pipeline.** Nothing to do but update
+   `MISSION_CONTROL_URL` if the origin changed, and re-run the bootstrap
+   migration (`20260828030000_schema_migration_queue.sql`) on the new project so
+   the queue and its drain exist there. The pipeline needs no Management API
+   token and no project ref, so there is no `FORBIDDEN_REFS` list to maintain
+   and no wrong ref to guard against. Verify by effect: merge a trivial
+   migration and watch it land with no hand-apply.
 
 ## Rollback
 
@@ -214,12 +220,19 @@ Until Stage 5 the old database is untouched and rollback is "stop". After Stage
 5 there is no rollback — the Cloud instance is deleted. That asymmetry is the
 whole reason Stage 4 exists.
 
-## Until then
+## What happened instead
 
-Migrations merged to `main` are applied by hand against
-`mcp__Lovable__query_database` and recorded in
-`supabase_migrations.schema_migrations`. The workflow says so rather than
-asking for a secret that cannot help.
+Migrations merged to `main` are no longer applied by hand. They are queued in
+Mission Control's own database and drained by a `postgres`-owned pg_cron job —
+see `docs/MIGRATION_QUEUE.md`, and `docs/MIGRATION_AUTOMATION_OPTIONS.md` for
+the alternatives that were probed and rejected.
+
+That removes the reason this relocation was urgent. What it does not remove is
+the standing cost of an opaque backend: no dashboard, no direct database URL, no
+service-role key issued to this account, and every schema question answerable
+only through Lovable's own tooling. If those bite hard enough later, the staged
+plan above is still correct — and Stage 7 is now simpler, because the pipeline
+it would re-enable no longer needs a Management API token at all.
 
 ## Sources
 

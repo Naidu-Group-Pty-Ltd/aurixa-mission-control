@@ -4,6 +4,11 @@ Read this before proposing any mechanism that applies Mission Control's own
 migrations. It records what was measured on 2026-08-27, what was tried, and why
 the obvious design is rejected.
 
+**Outcome: A and B were both built.** A is `docs/MIGRATION_ASSERTIONS.md` —
+every migration declares a checkable effect and an hourly worker resolves it.
+B is `docs/MIGRATION_QUEUE.md` — the queue and the `postgres`-owned drain.
+C stays rejected for the reasons below. D was not needed.
+
 ## The problem, correctly sized
 
 Migrations merged to `main` are applied to Mission Control's database by hand.

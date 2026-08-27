@@ -8242,6 +8242,51 @@ export type Database = {
         }
         Relationships: []
       }
+      schema_migration_queue: {
+        Row: {
+          attempts: number
+          enqueued_at: string
+          enqueued_by: string | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          name: string
+          sha256: string | null
+          sql: string
+          started_at: string | null
+          status: string
+          version: string
+        }
+        Insert: {
+          attempts?: number
+          enqueued_at?: string
+          enqueued_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          name: string
+          sha256?: string | null
+          sql: string
+          started_at?: string | null
+          status?: string
+          version: string
+        }
+        Update: {
+          attempts?: number
+          enqueued_at?: string
+          enqueued_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          name?: string
+          sha256?: string | null
+          sql?: string
+          started_at?: string | null
+          status?: string
+          version?: string
+        }
+        Relationships: []
+      }
       seat_audit: {
         Row: {
           action: string
