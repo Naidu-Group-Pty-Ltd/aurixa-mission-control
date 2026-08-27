@@ -1,0 +1,315 @@
+/**
+ * Applying the prime's migrations to every clone database, without a person.
+ *
+ * ## The gap this closes
+ *
+ * When the prime gains a migration, the cascade copies the FILE into every
+ * clone's repository automatically. Nothing applied it to the clone's
+ * DATABASE. `fleetMigrationSync` has existed and worked the whole time, and
+ * its only caller was a button on an admin page — so a fleet stayed in step
+ * with the prime exactly as often as somebody remembered to press it.
+ *
+ * That is the ceiling on how many clones this platform can carry. One clone is
+ * a click. Ten is a chore nobody does on the day it matters. The schema drifts,
+ * the clone's edge functions start naming columns it does not have, and the
+ * symptom arrives as PostgREST 42703s in a tenant's application rather than as
+ * anything anyone here would recognise as a missed migration.
+ *
+ * ## Why this lives in Mission Control rather than in each clone's CI
+ *
+ * The alternative is a GitHub Actions workflow in every clone repository. It
+ * does not scale, for three concrete reasons:
+ *
+ *   - It needs a Management API token and a project ref configured in N
+ *     repositories. The token reaches every project in the organisation, so
+ *     that is N copies of the most dangerous credential here, and N chances for
+ *     a ref to name the wrong tenant.
+ *   - Clone repositories are MIRRORS. The cascade overwrites them. A workflow
+ *     file living there is a file the cascade has to be told to leave alone —
+ *     `apply-migration.yml` is already in `DEFAULT_MIRROR_EXCLUSIONS` for
+ *     exactly that reason.
+ *   - Only Mission Control knows the fleet. A clone's repository does not know
+ *     which Supabase project it belongs to; `clone_backends` does.
+ *
+ * Mission Control already holds one token that reaches every project, the
+ * project ref for every clone, an idempotent applier, and a worker system. The
+ * scalable answer is to use them.
+ *
+ * ## One engine, two callers
+ *
+ * The admin button and the scheduled worker both call `runFleetMigrationSync`.
+ * They were never allowed to become two implementations of "sync the fleet" —
+ * that is how a button and a cron job come to disagree about what a clone is
+ * owed.
+ */
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+import { getAppOctokit } from "./github-app.server";
+import { fetchPrimeMigrations, resolvePrimeSource } from "./prime-backend.server";
+import { applyPrimeMigrations } from "./backend-provisioning.server";
+import { notifyOperators, writeAuditLog } from "./audit.server";
+
+type Db = SupabaseClient<Database>;
+
+/**
+ * How many clones one run will touch.
+ *
+ * Each clone is a round trip per unapplied migration against its own project,
+ * and the corpus is 200+ files. A fleet-wide loop in a single invocation is the
+ * shape that timed out the first mirror cascade at exactly 60,000 ms, so this
+ * takes a bounded slice and lets the next tick take the rest. Clones are
+ * ordered by how far behind they are, so the one that has waited longest goes
+ * first rather than whichever the planner happened to return.
+ */
+const DEFAULT_BATCH = 5;
+
+/**
+ * A claim older than this is treated as abandoned.
+ *
+ * Long enough that a slow but living run is not stolen from — a clone hundreds
+ * of migrations behind is legitimately slow — and short enough that a worker
+ * killed mid-flight does not park a clone forever.
+ */
+const STALE_CLAIM_MINUTES = 30;
+
+export type FleetMigrationResult = {
+  /** Clones eligible and claimed this run. */
+  processed: number;
+  /** Clones that received at least one migration. */
+  advanced: number;
+  /** Clones already level with the prime. */
+  upToDate: number;
+  /** Clones whose apply failed; each is now `failed` and out of the fleet. */
+  failed: Array<{ cloneId: string; cloneName: string; error: string }>;
+  /**
+   * Backends excluded because their status is not `ready`.
+   *
+   * Reported rather than merely skipped. A clone leaves the eligible set the
+   * moment a migration fails on it, and a fleet sync that says "5 processed"
+   * while three clones sit outside the query is the quiet half of the failure
+   * this module exists to end.
+   */
+  excluded: number;
+  /** Set when the run could not start at all. */
+  error?: string;
+};
+
+const EMPTY: FleetMigrationResult = {
+  processed: 0,
+  advanced: 0,
+  upToDate: 0,
+  failed: [],
+  excluded: 0,
+};
+
+/**
+ * Release claims from runs that died holding one.
+ *
+ * `worker_started_at` is reused as the claim, and that is safe rather than
+ * lucky: the backend-provisioning drain claims `pending` and reclaims
+ * `pending`/`provisioning`/`migrating`/`seeding_admin`. It never looks at a
+ * `ready` row, which is the only status this touches. The two workers cannot
+ * meet.
+ */
+async function reclaimStale(supabase: Db): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_CLAIM_MINUTES * 60_000).toISOString();
+  const { error } = await supabase
+    .from("clone_backends")
+    .update({ worker_started_at: null })
+    .eq("status", "ready")
+    .not("worker_started_at", "is", null)
+    .lt("worker_started_at", cutoff);
+  if (error) throw new Error(`Could not reclaim stale migration claims: ${error.message}`);
+}
+
+/**
+ * Apply the prime's migrations to a bounded slice of the fleet.
+ *
+ * `actorUserId` is the operator when a person pressed the button and null when
+ * the scheduler ran it, so the audit row says which.
+ */
+export async function runFleetMigrationSync(
+  supabase: Db,
+  opts?: { batchSize?: number; actorUserId?: string | null },
+): Promise<FleetMigrationResult> {
+  const batchSize = Math.max(1, opts?.batchSize ?? DEFAULT_BATCH);
+
+  const source = await resolvePrimeSource(supabase);
+  if (!source) {
+    return { ...EMPTY, error: "Prime not configured — set the prime repo in Settings first" };
+  }
+
+  await reclaimStale(supabase);
+
+  // Everything not eligible, counted before the batch is taken. A clone is
+  // excluded because it is mid-provision or because a migration failed on it,
+  // and the second of those is a clone silently falling out of the fleet.
+  const { count: excludedCount, error: excludedErr } = await supabase
+    .from("clone_backends")
+    .select("clone_id", { count: "exact", head: true })
+    .neq("status", "ready");
+  if (excludedErr) {
+    return { ...EMPTY, error: `Could not read clone backends: ${excludedErr.message}` };
+  }
+
+  const { data: backends, error: pickErr } = await supabase
+    .from("clone_backends")
+    .select("clone_id, supabase_project_ref, migration_version")
+    .eq("status", "ready")
+    .is("worker_started_at", null)
+    .not("supabase_project_ref", "is", null)
+    // Nulls first: a backend that has never recorded a version is furthest
+    // behind by definition.
+    .order("migration_version", { ascending: true, nullsFirst: true })
+    .limit(batchSize);
+  // A candidate list that could not be READ is not an empty fleet. Reporting
+  // "0 clones, nothing to do" would make a database fault look like a fleet
+  // already in step, on the one job whose purpose is noticing that it is not.
+  if (pickErr) {
+    return { ...EMPTY, excluded: excludedCount ?? 0, error: `Could not read clone backends: ${pickErr.message}` };
+  }
+
+  const out: FleetMigrationResult = { ...EMPTY, failed: [], excluded: excludedCount ?? 0 };
+  if (!backends || backends.length === 0) return out;
+
+  // Read the prime's migrations ONCE. Per clone would be N GitHub round trips
+  // for identical bytes, and the corpus is the largest thing this run moves.
+  let migrations: Array<{ id: string; name: string; sql: string }>;
+  let sourceSha: string;
+  try {
+    ({ migrations, sourceSha } = await fetchPrimeMigrations(getAppOctokit(), source));
+  } catch (e) {
+    return {
+      ...out,
+      error: e instanceof Error ? e.message : "Failed to read prime repo migrations",
+    };
+  }
+
+  const ids = backends.map((b) => b.clone_id);
+  const { data: clones } = await supabase.from("clones").select("id, name").in("id", ids);
+  const nameOf = new Map((clones ?? []).map((c) => [c.id, c.name]));
+
+  for (const backend of backends) {
+    const cloneId = backend.clone_id;
+    const cloneName = nameOf.get(cloneId) ?? cloneId;
+
+    // Claim. The filter carries `worker_started_at is null` so two overlapping
+    // runs cannot both take the same clone — pg_cron does not serialise its own
+    // job, and applying one migration twice concurrently is how a clone gets
+    // marked failed by a duplicate-object error it never really had.
+    const { data: claimed, error: claimErr } = await supabase
+      .from("clone_backends")
+      .update({ worker_started_at: new Date().toISOString() })
+      .eq("clone_id", cloneId)
+      .eq("status", "ready")
+      .is("worker_started_at", null)
+      .select("clone_id");
+    if (claimErr) {
+      // A claim that ERRORED is not a claim somebody else won. Discarding the
+      // difference is what made the screening consumer's claim look like a lost
+      // race for months while it had never once succeeded.
+      out.failed.push({ cloneId, cloneName, error: `claim failed: ${claimErr.message}` });
+      continue;
+    }
+    if (!claimed || claimed.length === 0) continue; // another run has it
+
+    try {
+      const { results, latestApplied } = await applyPrimeMigrations(
+        backend.supabase_project_ref!,
+        migrations,
+      );
+      const successes = results.filter((r) => r.success && !r.skipped);
+      const failures = results.filter((r) => !r.success);
+
+      out.processed++;
+      if (successes.length === 0 && failures.length === 0) {
+        out.upToDate++;
+      } else if (failures.length === 0) {
+        out.advanced++;
+      }
+
+      const { error: updErr } = await supabase
+        .from("clone_backends")
+        .update({
+          migration_version: latestApplied,
+          source_repo: `${source.owner}/${source.repo}`,
+          source_ref: source.branch,
+          source_sha: sourceSha,
+          migrations_applied: results,
+          status: failures.length > 0 ? ("failed" as const) : ("ready" as const),
+          status_detail:
+            failures.length > 0
+              ? `Migration failed at ${failures[0].name}`
+              : `Synced to ${latestApplied}`,
+          error_message: failures.length > 0 ? failures[0].error : null,
+          // Released here, not in a finally: on the failure path the row is
+          // deliberately left `failed`, and a `failed` row is outside this
+          // worker's query anyway.
+          worker_started_at: null,
+        })
+        .eq("clone_id", cloneId);
+      if (updErr) {
+        out.failed.push({ cloneId, cloneName, error: `result not recorded: ${updErr.message}` });
+        continue;
+      }
+
+      if (failures.length > 0) {
+        out.failed.push({ cloneId, cloneName, error: `${failures[0].name}: ${failures[0].error}` });
+        // A clone that fails leaves the eligible set — `status` is no longer
+        // `ready`, so the next run will not see it. That is the right
+        // behaviour and the wrong silence: without this it drops out of the
+        // fleet and nothing anywhere says so.
+        await notifyOperators({
+          kind: "cascade_failed",
+          severity: "error",
+          title: `${cloneName} has fallen out of migration sync`,
+          body:
+            `A prime migration failed on this clone (${failures[0].name}: ${failures[0].error}). ` +
+            `Its backend is now \`failed\`, which takes it out of the fleet sync until an ` +
+            `operator repairs it — no further prime migrations will reach this clone's database.`,
+          cloneId,
+          url: `/clones/${cloneId}`,
+          metadata: { migration: failures[0].name, source_sha: sourceSha },
+        });
+      }
+    } catch (e) {
+      const error = e instanceof Error ? e.message : "Unknown error";
+      out.failed.push({ cloneId, cloneName, error });
+      // Release the claim so a transient fault does not park the clone for
+      // STALE_CLAIM_MINUTES. The status is untouched: this threw before any
+      // verdict about the clone's schema was reached, and guessing one is
+      // worse than retrying.
+      const { error: relErr } = await supabase
+        .from("clone_backends")
+        .update({ worker_started_at: null })
+        .eq("clone_id", cloneId);
+      if (relErr) {
+        // Not fatal — `reclaimStale` will free it on a later run — but silence
+        // here would turn a clone that is merely stuck into one that looks
+        // like it was never eligible.
+        console.error("[fleet-migration] could not release claim", {
+          cloneId,
+          error: relErr.message,
+        });
+      }
+    }
+  }
+
+  await writeAuditLog({
+    action: "fleet.migrations_synced",
+    entityType: "fleet",
+    actorUserId: opts?.actorUserId ?? null,
+    metadata: {
+      source_repo: `${source.owner}/${source.repo}`,
+      source_sha: sourceSha,
+      trigger: opts?.actorUserId ? "operator" : "schedule",
+      processed: out.processed,
+      advanced: out.advanced,
+      up_to_date: out.upToDate,
+      failed: out.failed.length,
+      excluded: out.excluded,
+    },
+  });
+
+  return out;
+}

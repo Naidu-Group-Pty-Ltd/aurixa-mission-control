@@ -72,6 +72,7 @@ import { Route as HooksRunSchedulesRouteImport } from './routes/hooks.run-schedu
 import { Route as HooksHandoffParityRefreshRouteImport } from './routes/hooks.handoff-parity-refresh'
 import { Route as HooksHandoffObservabilityPollRouteImport } from './routes/hooks.handoff-observability-poll'
 import { Route as HooksGithubRouteImport } from './routes/hooks.github'
+import { Route as HooksFleetMigrationSyncRouteImport } from './routes/hooks.fleet-migration-sync'
 import { Route as HooksFleetDriftRouteImport } from './routes/hooks.fleet-drift'
 import { Route as HooksFeedbackForwardRetryRouteImport } from './routes/hooks.feedback-forward-retry'
 import { Route as HooksExpireReservationsRouteImport } from './routes/hooks.expire-reservations'
@@ -480,6 +481,11 @@ const HooksHandoffObservabilityPollRoute =
 const HooksGithubRoute = HooksGithubRouteImport.update({
   id: '/hooks/github',
   path: '/hooks/github',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HooksFleetMigrationSyncRoute = HooksFleetMigrationSyncRouteImport.update({
+  id: '/hooks/fleet-migration-sync',
+  path: '/hooks/fleet-migration-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksFleetDriftRoute = HooksFleetDriftRouteImport.update({
@@ -1018,6 +1024,7 @@ export interface FileRoutesByFullPath {
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
   '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
+  '/hooks/fleet-migration-sync': typeof HooksFleetMigrationSyncRoute
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
@@ -1170,6 +1177,7 @@ export interface FileRoutesByTo {
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
   '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
+  '/hooks/fleet-migration-sync': typeof HooksFleetMigrationSyncRoute
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
@@ -1324,6 +1332,7 @@ export interface FileRoutesById {
   '/hooks/expire-reservations': typeof HooksExpireReservationsRoute
   '/hooks/feedback-forward-retry': typeof HooksFeedbackForwardRetryRoute
   '/hooks/fleet-drift': typeof HooksFleetDriftRoute
+  '/hooks/fleet-migration-sync': typeof HooksFleetMigrationSyncRoute
   '/hooks/github': typeof HooksGithubRoute
   '/hooks/handoff-observability-poll': typeof HooksHandoffObservabilityPollRoute
   '/hooks/handoff-parity-refresh': typeof HooksHandoffParityRefreshRoute
@@ -1479,6 +1488,7 @@ export interface FileRouteTypes {
     | '/hooks/expire-reservations'
     | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
+    | '/hooks/fleet-migration-sync'
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
@@ -1631,6 +1641,7 @@ export interface FileRouteTypes {
     | '/hooks/expire-reservations'
     | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
+    | '/hooks/fleet-migration-sync'
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
@@ -1784,6 +1795,7 @@ export interface FileRouteTypes {
     | '/hooks/expire-reservations'
     | '/hooks/feedback-forward-retry'
     | '/hooks/fleet-drift'
+    | '/hooks/fleet-migration-sync'
     | '/hooks/github'
     | '/hooks/handoff-observability-poll'
     | '/hooks/handoff-parity-refresh'
@@ -1935,6 +1947,7 @@ export interface RootRouteChildren {
   HooksExpireReservationsRoute: typeof HooksExpireReservationsRoute
   HooksFeedbackForwardRetryRoute: typeof HooksFeedbackForwardRetryRoute
   HooksFleetDriftRoute: typeof HooksFleetDriftRoute
+  HooksFleetMigrationSyncRoute: typeof HooksFleetMigrationSyncRoute
   HooksGithubRoute: typeof HooksGithubRoute
   HooksHandoffObservabilityPollRoute: typeof HooksHandoffObservabilityPollRoute
   HooksHandoffParityRefreshRoute: typeof HooksHandoffParityRefreshRoute
@@ -2446,6 +2459,13 @@ declare module '@tanstack/react-router' {
       path: '/hooks/github'
       fullPath: '/hooks/github'
       preLoaderRoute: typeof HooksGithubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hooks/fleet-migration-sync': {
+      id: '/hooks/fleet-migration-sync'
+      path: '/hooks/fleet-migration-sync'
+      fullPath: '/hooks/fleet-migration-sync'
+      preLoaderRoute: typeof HooksFleetMigrationSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/fleet-drift': {
@@ -3234,6 +3254,7 @@ const rootRouteChildren: RootRouteChildren = {
   HooksExpireReservationsRoute: HooksExpireReservationsRoute,
   HooksFeedbackForwardRetryRoute: HooksFeedbackForwardRetryRoute,
   HooksFleetDriftRoute: HooksFleetDriftRoute,
+  HooksFleetMigrationSyncRoute: HooksFleetMigrationSyncRoute,
   HooksGithubRoute: HooksGithubRoute,
   HooksHandoffObservabilityPollRoute: HooksHandoffObservabilityPollRoute,
   HooksHandoffParityRefreshRoute: HooksHandoffParityRefreshRoute,
