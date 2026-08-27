@@ -374,13 +374,29 @@ async function handleResolveContact(tc: ToolCall, message: Rec): Promise<Record<
     .single();
   if (contactError) throw contactError;
 
-  const { error: journeyError } = await supabaseAdmin.from("crm_client_journeys").insert({
-    contact_id: contact.id,
-    account_id: account.id,
-    stage_key: "applied",
-    metadata: { created_by: "voice_inbound" } as Json,
-  });
+  const { data: journey, error: journeyError } = await supabaseAdmin
+    .from("crm_client_journeys")
+    .insert({
+      contact_id: contact.id,
+      account_id: account.id,
+      stage_key: "applied",
+      metadata: { created_by: "voice_inbound" } as Json,
+    })
+    .select("id")
+    .single();
   if (journeyError) console.error("[voice-tools] journey create failed:", journeyError.message);
+
+  // Entering `applied` queues the stage-guarded questionnaire chaser, the
+  // same as a board transition would; if the caller completes the BRQ before
+  // it dials, the guard cancels it.
+  if (journey) {
+    try {
+      const { fireStageEntryChaser } = await import("@/server/crm-journey.server");
+      await fireStageEntryChaser(journey.id, "applied");
+    } catch (err) {
+      console.error("[voice-tools] stage-entry chaser failed:", (err as Error).message);
+    }
+  }
 
   await upsertContext(identity, {
     contact_id: contact.id,

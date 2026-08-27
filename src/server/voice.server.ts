@@ -409,10 +409,16 @@ async function dispatchOne(job: OutboundJob): Promise<"dispatched" | "failed" | 
     assistantOverrides: { variableValues: job.variable_values ?? {} },
   };
   if (job.vapi_phone_number_id) body.phoneNumberId = job.vapi_phone_number_id;
-  const schedulePlan: Record<string, string> = {};
-  if (scheduled.getTime() > Date.now() + 5_000) schedulePlan.earliestAt = scheduled.toISOString();
-  if (job.expires_at) schedulePlan.latestAt = job.expires_at;
-  if (Object.keys(schedulePlan).length > 0) body.schedulePlan = schedulePlan;
+  // VAPI rejects a schedulePlan without earliestAt, and the dispatcher only
+  // claims jobs whose scheduled_at has already passed — so a due-now job must
+  // dial immediately with NO schedulePlan (expiry is enforced by the sweep
+  // above, not by latestAt). Only a genuinely future job schedules, and then
+  // latestAt may ride along.
+  if (scheduled.getTime() > Date.now() + 5_000) {
+    const schedulePlan: Record<string, string> = { earliestAt: scheduled.toISOString() };
+    if (job.expires_at) schedulePlan.latestAt = new Date(job.expires_at).toISOString();
+    body.schedulePlan = schedulePlan;
+  }
 
   try {
     const res = await vapiFetch("/call", { method: "POST", body: JSON.stringify(body) });

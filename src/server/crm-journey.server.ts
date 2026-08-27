@@ -113,6 +113,27 @@ async function fire(
 
 /* ------------------------------- transitions ------------------------------- */
 
+/**
+ * Fire the stage-entry chaser for a journey that was CREATED in a stage
+ * rather than transitioned into it. transitionJourneyStage only fires when
+ * fromStage !== toStage, and since the column default became `applied` a
+ * fresh journey already sits in its entry stage — so creation paths
+ * (startJourney, the inbound resolve_contact tool) must call this instead.
+ * The chaser stays stage-guarded: it cancels itself if the journey has
+ * moved on by dial time.
+ */
+export async function fireStageEntryChaser(
+  journeyId: string,
+  stage: string,
+  actorUserId?: string | null,
+): Promise<EnqueueOutcome | null> {
+  const trigger = STAGE_TRIGGER[stage];
+  if (!trigger) return null;
+  const subject = await subjectForJourney(journeyId);
+  if (!subject) return null;
+  return fire(trigger, subject, { actorUserId: actorUserId ?? null, onlyInStage: stage });
+}
+
 export async function transitionJourneyStage(input: {
   journeyId: string;
   toStage: string;
