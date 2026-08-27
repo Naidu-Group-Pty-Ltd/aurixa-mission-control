@@ -37,7 +37,7 @@ import {
   journeyBoard,
   listAppointments,
   listContactsWithoutJourney,
-  recordQuizSubmission,
+  recordNurtureSignal,
   setAppointmentStatus,
   startJourney,
   transitionStage,
@@ -184,7 +184,7 @@ function JourneyPage() {
                               : overdue
                                 ? "warn"
                                 : stage.is_terminal
-                                  ? stage.key === "won"
+                                  ? stage.key === "live"
                                     ? "ok"
                                     : "bad"
                                   : "live"
@@ -253,7 +253,9 @@ function StartJourneyDialog() {
   const start = useMutation({
     mutationFn: (contactId: string) => startJourney({ data: { contactId } }),
     onSuccess: () => {
-      toast.success("Journey started — opt-in follow-up call queued if the cadence is enabled.");
+      toast.success(
+        "Journey started — the questionnaire follow-up call is queued if the cadence is enabled.",
+      );
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["journey"] });
     },
@@ -304,11 +306,11 @@ function StartJourneyDialog() {
 }
 
 const KIND_LABELS: Record<string, string> = {
-  discovery: "Discovery Call",
-  strategy_phone: "Strategy (Phone)",
-  strategy_zoom: "Strategy (Zoom)",
-  ifc_phone: "Finance Consult (Phone)",
-  ifc_zoom: "Finance Consult (Zoom)",
+  strategic_review: "Strategic Review",
+  discovery_session: "Discovery Session",
+  guided_demo: "Guided Demonstration",
+  enterprise_consultation: "Enterprise Consultation",
+  kickoff: "Onboarding Kickoff",
   other: "Other",
 };
 
@@ -460,9 +462,9 @@ function JourneyDetailDialog({
   const data = q.data;
   const journey = data?.journey as Rec | undefined;
 
-  const [bookKind, setBookKind] = useState<(typeof APPOINTMENT_KINDS)[number]>("discovery");
+  const [bookKind, setBookKind] = useState<(typeof APPOINTMENT_KINDS)[number]>("strategic_review");
   const [bookAt, setBookAt] = useState("");
-  const [quizSummary, setQuizSummary] = useState("");
+  const [nurtureNote, setNurtureNote] = useState("");
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["journey"] });
@@ -494,13 +496,13 @@ function JourneyDetailDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const quiz = useMutation({
+  const nurture = useMutation({
     mutationFn: () =>
-      recordQuizSubmission({ data: { journeyId: journeyId!, summary: quizSummary || null } }),
+      recordNurtureSignal({ data: { journeyId: journeyId!, summary: nurtureNote || null } }),
     onSuccess: (r) => {
       dialToast(r as Rec);
-      toast.success("Quiz submission recorded");
-      setQuizSummary("");
+      toast.success("Re-engagement call queued");
+      setNurtureNote("");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -593,16 +595,20 @@ function JourneyDetailDialog({
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <p className="label-mono mb-1 text-muted-foreground">
-                  quiz submission (queues the quiz follow-up call)
+                  re-engage (queues the nurture call)
                 </p>
                 <Input
-                  placeholder="One-line summary of the quiz answers"
-                  value={quizSummary}
-                  onChange={(e) => setQuizSummary(e.target.value)}
+                  placeholder="Context for the agent — where things left off"
+                  value={nurtureNote}
+                  onChange={(e) => setNurtureNote(e.target.value)}
                 />
               </div>
-              <Button variant="outline" disabled={quiz.isPending} onClick={() => quiz.mutate()}>
-                <PhoneCall className="mr-2 h-4 w-4" /> Record
+              <Button
+                variant="outline"
+                disabled={nurture.isPending}
+                onClick={() => nurture.mutate()}
+              >
+                <PhoneCall className="mr-2 h-4 w-4" /> Call
               </Button>
             </div>
 

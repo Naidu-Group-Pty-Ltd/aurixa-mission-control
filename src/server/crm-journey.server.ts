@@ -13,35 +13,42 @@ import { enqueueOutboundForTrigger, type EnqueueOutcome } from "@/server/voice.s
 type VoiceTriggerType = Database["public"]["Enums"]["voice_trigger_type"];
 type AppointmentKind = Database["public"]["Enums"]["crm_appointment_kind"];
 
-/** Appointment kind -> the trigger fired when it is booked. */
-const SCHEDULED_TRIGGER: Partial<Record<AppointmentKind, VoiceTriggerType>> = {
-  discovery: "discovery_reminder",
-  strategy_phone: "strategy_confirmation",
-  strategy_zoom: "strategy_confirmation",
-  ifc_phone: "ifc_confirmation",
-  ifc_zoom: "ifc_confirmation",
+/** Appointment kind -> the triggers fired when it is booked. */
+const SCHEDULED_TRIGGERS: Partial<Record<AppointmentKind, VoiceTriggerType[]>> = {
+  strategic_review: ["review_confirmation", "session_reminder"],
+  discovery_session: ["session_reminder"],
+  guided_demo: ["session_reminder"],
+  enterprise_consultation: ["session_reminder"],
+  kickoff: ["session_reminder"],
 };
 
 /** Appointment kind -> the trigger fired when it is marked a no-show. */
 const NO_SHOW_TRIGGER: Partial<Record<AppointmentKind, VoiceTriggerType>> = {
-  discovery: "discovery_no_show",
-  strategy_phone: "strategy_no_show",
-  strategy_zoom: "strategy_no_show",
-  ifc_phone: "ifc_no_show",
-  ifc_zoom: "ifc_no_show",
+  strategic_review: "session_no_show",
+  discovery_session: "session_no_show",
+  guided_demo: "session_no_show",
+  enterprise_consultation: "session_no_show",
+  kickoff: "session_no_show",
 };
 
-/** Journey stage entered -> the trigger fired (only stages that dial). */
+/**
+ * Journey stage entered -> the chaser fired. Chasers are stage-guarded: the
+ * job carries only_in_stage, and the dispatcher cancels it if the journey has
+ * already moved on — a lead who finished the BRQ before the +4h call is never
+ * chased about it.
+ */
 const STAGE_TRIGGER: Record<string, VoiceTriggerType> = {
-  new_lead: "opt_in_follow_up",
-  engaged: "nurture",
+  applied: "questionnaire_follow_up",
+  review_pending: "review_booking_follow_up",
+  onboarding: "kickoff_scheduler",
 };
 
-const KIND_CALL_TYPE: Partial<Record<AppointmentKind, string>> = {
-  strategy_phone: "phone",
-  strategy_zoom: "zoom",
-  ifc_phone: "phone",
-  ifc_zoom: "zoom",
+const SESSION_LABEL: Partial<Record<AppointmentKind, string>> = {
+  strategic_review: "strategic review",
+  discovery_session: "platform discovery session",
+  guided_demo: "guided demonstration",
+  enterprise_consultation: "enterprise requirements consultation",
+  kickoff: "onboarding kickoff call",
 };
 
 type JourneySubject = {
@@ -84,6 +91,7 @@ async function fire(
     appointmentAt?: Date;
     extras?: Record<string, unknown>;
     actorUserId?: string | null;
+    onlyInStage?: string;
   },
 ): Promise<EnqueueOutcome> {
   if (!subject.phone) return { queued: false, reason: "no_phone" };
@@ -99,6 +107,7 @@ async function fire(
     appointmentAt: opts?.appointmentAt ?? null,
     extras: opts?.extras,
     createdBy: opts?.actorUserId ?? null,
+    onlyInStage: opts?.onlyInStage ?? null,
   });
 }
 
@@ -153,15 +162,24 @@ export async function transitionJourneyStage(input: {
   const trigger = STAGE_TRIGGER[input.toStage];
   if (trigger && fromStage !== input.toStage) {
     const subject = await subjectForJourney(input.journeyId);
-    if (subject) dial = await fire(trigger, subject, { actorUserId: input.actorUserId });
+    if (subject) {
+      dial = await fire(trigger, subject, {
+        actorUserId: input.actorUserId,
+        // Chasers only make sense while the journey is still parked here.
+        onlyInStage: input.toStage,
+      });
+    }
   }
   return { fromStage, toStage: input.toStage, dial };
 }
 
-/** A quiz submission carries a summary the follow-up agent is briefed with. */
+/**
+ * An operator-recorded re-engagement signal: queues the nurture call, with an
+ * optional context summary the agent is briefed with.
+ */
 export async function recordJourneySignal(input: {
   journeyId: string;
-  kind: "quiz_submission" | "nurture_step";
+  kind: "nurture_step";
   summary?: string | null;
   actorUserId?: string | null;
 }): Promise<EnqueueOutcome> {
@@ -177,13 +195,10 @@ export async function recordJourneySignal(input: {
   });
   if (error) console.error("[journey] signal event write failed:", error.message);
 
-  if (input.kind === "quiz_submission") {
-    return fire("quiz_follow_up", subject, {
-      extras: input.summary ? { quizSummary: input.summary } : undefined,
-      actorUserId: input.actorUserId,
-    });
-  }
-  return fire("nurture", subject, { actorUserId: input.actorUserId });
+  return fire("nurture", subject, {
+    extras: input.summary ? { contextSummary: input.summary } : undefined,
+    actorUserId: input.actorUserId,
+  });
 }
 
 /* ------------------------------- appointments ------------------------------ */
@@ -203,11 +218,11 @@ export async function onAppointmentScheduled(
   // Booking an appointment advances the journey to its matching stage.
   if (appointment.journey_id) {
     const stageFor: Partial<Record<AppointmentKind, string>> = {
-      discovery: "discovery_call",
-      strategy_phone: "strategy_session",
-      strategy_zoom: "strategy_session",
-      ifc_phone: "finance_consult",
-      ifc_zoom: "finance_consult",
+      strategic_review: "review_booked",
+      discovery_session: "pathway",
+      guided_demo: "pathway",
+      enterprise_consultation: "pathway",
+      kickoff: "onboarding",
     };
     const target = stageFor[appointment.kind];
     if (target) {
@@ -225,19 +240,23 @@ export async function onAppointmentScheduled(
     }
   }
 
-  const trigger = SCHEDULED_TRIGGER[appointment.kind];
-  if (!trigger || !appointment.journey_id) return null;
+  const triggers = SCHEDULED_TRIGGERS[appointment.kind] ?? [];
+  if (triggers.length === 0 || !appointment.journey_id) return null;
   const subject = await subjectForJourney(appointment.journey_id);
   if (!subject) return null;
-  return fire(trigger, subject, {
-    appointmentId: appointment.id,
-    appointmentAt: new Date(appointment.starts_at),
-    extras: {
-      discoveryCallTime: appointment.starts_at,
-      callType: KIND_CALL_TYPE[appointment.kind],
-    },
-    actorUserId,
-  });
+  let last: EnqueueOutcome | null = null;
+  for (const trigger of triggers) {
+    last = await fire(trigger, subject, {
+      appointmentId: appointment.id,
+      appointmentAt: new Date(appointment.starts_at),
+      extras: {
+        sessionTime: appointment.starts_at,
+        sessionLabel: SESSION_LABEL[appointment.kind],
+      },
+      actorUserId,
+    });
+  }
+  return last;
 }
 
 export async function onAppointmentStatusChange(
@@ -263,8 +282,8 @@ export async function onAppointmentStatusChange(
       // A no-show call anchors on the *event* (now + delay), but the agent is
       // told the missed time so it can rebook naturally.
       extras: {
-        discoveryCallTime: appointment.starts_at,
-        callType: KIND_CALL_TYPE[appointment.kind],
+        sessionTime: appointment.starts_at,
+        sessionLabel: SESSION_LABEL[appointment.kind],
       },
       actorUserId,
     });

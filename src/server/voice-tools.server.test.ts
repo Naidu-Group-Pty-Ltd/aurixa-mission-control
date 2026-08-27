@@ -50,12 +50,20 @@ describe("extractToolCalls", () => {
 });
 
 describe("classifyBookingIntent", () => {
-  it("maps the five booking types the Make router served", () => {
-    expect(classifyBookingIntent("book a discovery call").kind).toBe("discovery");
-    expect(classifyBookingIntent("strategy session please").kind).toBe("strategy_phone");
-    expect(classifyBookingIntent("strategy session on zoom").kind).toBe("strategy_zoom");
-    expect(classifyBookingIntent("initial finance consult").kind).toBe("ifc_phone");
-    expect(classifyBookingIntent("finance chat over zoom").kind).toBe("ifc_zoom");
+  it("maps the Aurixa session vocabulary", () => {
+    expect(classifyBookingIntent("book my strategic review").kind).toBe("strategic_review");
+    expect(classifyBookingIntent("platform discovery session").kind).toBe("discovery_session");
+    expect(classifyBookingIntent("a guided demonstration of the platform").kind).toBe(
+      "guided_demo",
+    );
+    expect(classifyBookingIntent("enterprise requirements consultation").kind).toBe(
+      "enterprise_consultation",
+    );
+    expect(classifyBookingIntent("our onboarding kickoff call").kind).toBe("kickoff");
+  });
+
+  it("lands plain review/application language on the strategic review", () => {
+    expect(classifyBookingIntent("the review for my application").kind).toBe("strategic_review");
   });
 
   it("asks for clarification instead of guessing", () => {
@@ -70,24 +78,31 @@ describe("candidateSlots", () => {
   const now = new Date("2026-08-26T00:00:00Z");
   const slots = candidateSlots(now);
 
-  it("offers no same-day slots and nothing outside Mon–Fri 13:00–18:00 Sydney", () => {
+  it("honours 24h minimum notice and the Mon–Fri 9:00–16:30 Sydney window", () => {
     expect(slots.length).toBeGreaterThan(0);
+    const minStart = now.getTime() + 24 * 60 * 60_000;
     const fmt = new Intl.DateTimeFormat("en-AU", {
       timeZone: "Australia/Sydney",
       weekday: "short",
-      day: "2-digit",
       hour: "2-digit",
+      minute: "2-digit",
       hour12: false,
     });
     for (const s of slots) {
+      expect(s.getTime()).toBeGreaterThanOrEqual(minStart);
       const parts = fmt.formatToParts(s);
       const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-      expect(get("day")).not.toBe("26");
       expect(["Sat", "Sun"]).not.toContain(get("weekday").slice(0, 3));
-      const hour = Number(get("hour")) % 24;
-      expect(hour).toBeGreaterThanOrEqual(13);
-      expect(hour).toBeLessThan(18);
+      const minutes = (Number(get("hour")) % 24) * 60 + Number(get("minute"));
+      expect(minutes).toBeGreaterThanOrEqual(9 * 60);
+      // A 30-minute slot must end by 4:30 p.m., so the last start is 4:00 p.m.
+      expect(minutes).toBeLessThanOrEqual(16 * 60);
     }
+  });
+
+  it("covers the 45-day booking horizon", () => {
+    const last = slots[slots.length - 1];
+    expect(last.getTime()).toBeGreaterThan(now.getTime() + 40 * 24 * 60 * 60_000);
   });
 
   it("starts every slot on a half hour", () => {
@@ -96,12 +111,17 @@ describe("candidateSlots", () => {
 });
 
 describe("classifyHandoffIntent", () => {
-  it("routes finance and strategy language to the specialists", () => {
-    expect(classifyHandoffIntent("I want to talk about my mortgage and borrowing")).toBe("finance");
-    expect(classifyHandoffIntent("we need a portfolio strategy plan")).toBe("strategy");
+  it("routes support and product language to the specialists", () => {
+    expect(classifyHandoffIntent("something is broken and I need support with an error")).toBe(
+      "support",
+    );
+    expect(classifyHandoffIntent("what does the platform cost and which modules exist")).toBe(
+      "solutions",
+    );
+    expect(classifyHandoffIntent("I want to book my review time slot")).toBe("review");
   });
 
-  it("defaults to discovery when nothing scores", () => {
-    expect(classifyHandoffIntent("hello there")).toBe("discovery");
+  it("defaults to the solutions advisor when nothing scores", () => {
+    expect(classifyHandoffIntent("hello there")).toBe("solutions");
   });
 });

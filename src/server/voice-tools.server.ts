@@ -73,12 +73,16 @@ export function extractToolCalls(message: Rec): ToolCall[] {
 
 /* ------------------------- availability (pure) ----------------------------- */
 
+// The strategic-review rules from the Aurixa scheduling page: Mon–Fri
+// 9:00 a.m.–4:30 p.m. Sydney, 30-minute slots, minimum 24 hours' notice,
+// bookable 45 days ahead.
 export const BOOKING_WINDOW = {
   timezone: "Australia/Sydney",
-  startMinutes: 13 * 60,
-  endMinutes: 18 * 60,
+  startMinutes: 9 * 60,
+  endMinutes: 16 * 60 + 30,
   slotMinutes: 30,
-  searchDays: 7,
+  searchDays: 45,
+  minNoticeHours: 24,
 } as const;
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -112,22 +116,19 @@ function sydneyParts(date: Date): {
 }
 
 /**
- * The candidate 30-minute slot starts over the next week, skipping weekends
- * and today (no same-day bookings), expressed as UTC instants. Built by
- * scanning forward in 30-minute steps from the next UTC half-hour — the same
- * DST-proof trick the quiet-hours shift uses.
+ * Candidate 30-minute slot starts over the booking horizon, skipping
+ * weekends and anything inside the minimum-notice window, expressed as UTC
+ * instants. Built by scanning forward in 30-minute steps from the next UTC
+ * half-hour — the same DST-proof trick the quiet-hours shift uses.
  */
 export function candidateSlots(now: Date): Date[] {
   const slots: Date[] = [];
-  const today = sydneyParts(now);
-  const todayKey = today.y * 10_000 + today.m * 100 + today.d;
-  const start = new Date(Math.ceil(now.getTime() / (30 * 60_000)) * 30 * 60_000);
+  const earliest = now.getTime() + BOOKING_WINDOW.minNoticeHours * 60 * 60_000;
+  const start = new Date(Math.ceil(earliest / (30 * 60_000)) * 30 * 60_000);
   const horizonMs = BOOKING_WINDOW.searchDays * 24 * 60 * 60_000;
-  for (let t = start.getTime(); t < start.getTime() + horizonMs; t += 30 * 60_000) {
+  for (let t = start.getTime(); t < now.getTime() + horizonMs; t += 30 * 60_000) {
     const d = new Date(t);
     const p = sydneyParts(d);
-    const key = p.y * 10_000 + p.m * 100 + p.d;
-    if (key === todayKey) continue; // no same-day bookings
     if (p.day === 0 || p.day === 6) continue;
     if (p.minutes < BOOKING_WINDOW.startMinutes) continue;
     if (p.minutes + BOOKING_WINDOW.slotMinutes > BOOKING_WINDOW.endMinutes) continue;
@@ -137,42 +138,45 @@ export function candidateSlots(now: Date): Date[] {
 }
 
 export type AppointmentKind =
-  | "discovery"
-  | "strategy_phone"
-  | "strategy_zoom"
-  | "ifc_phone"
-  | "ifc_zoom";
+  | "strategic_review"
+  | "discovery_session"
+  | "guided_demo"
+  | "enterprise_consultation"
+  | "kickoff";
 
 /**
- * Deterministic version of the Make booking-intent classifier. Keyword-based;
- * anything ambiguous asks for clarification instead of guessing.
+ * Deterministic session-intent classifier for the Aurixa funnel. Keyword
+ * based; anything ambiguous asks for clarification instead of guessing.
+ * The strategic review is the default sales conversation, so plain "review"
+ * or "session" language lands there.
  */
 export function classifyBookingIntent(text: string | null | undefined): {
   kind: AppointmentKind | null;
   clarificationQuestion: string | null;
 } {
   const t = (text ?? "").toLowerCase();
-  const zoom = /\bzoom\b|video|online meeting/.test(t);
-  if (/discovery/.test(t)) return { kind: "discovery", clarificationQuestion: null };
-  if (/strategy/.test(t)) {
-    return { kind: zoom ? "strategy_zoom" : "strategy_phone", clarificationQuestion: null };
+  if (/kick.?off|onboard/.test(t)) return { kind: "kickoff", clarificationQuestion: null };
+  if (/enterprise|procurement|security review|requirements consult/.test(t)) {
+    return { kind: "enterprise_consultation", clarificationQuestion: null };
   }
-  if (/finance|ifc|lending|loan|borrow/.test(t)) {
-    return { kind: zoom ? "ifc_zoom" : "ifc_phone", clarificationQuestion: null };
+  if (/demo(nstration)?\b/.test(t)) return { kind: "guided_demo", clarificationQuestion: null };
+  if (/discovery/.test(t)) return { kind: "discovery_session", clarificationQuestion: null };
+  if (/strategic|review|strategy|assessment|application/.test(t)) {
+    return { kind: "strategic_review", clarificationQuestion: null };
   }
   return {
     kind: null,
     clarificationQuestion:
-      "Would you like a Discovery Call, a Strategy Session, or an Initial Finance Consult — and phone or Zoom?",
+      "Is this for your strategic review, a platform discovery session, a guided demonstration, or an enterprise requirements consultation?",
   };
 }
 
 const KIND_LABEL: Record<AppointmentKind, string> = {
-  discovery: "Discovery Call",
-  strategy_phone: "Strategy Session (Phone)",
-  strategy_zoom: "Strategy Session (Zoom)",
-  ifc_phone: "Initial Finance Consult (Phone)",
-  ifc_zoom: "Initial Finance Consult (Zoom)",
+  strategic_review: "Strategic Review",
+  discovery_session: "Platform Discovery Session",
+  guided_demo: "Guided Demonstration",
+  enterprise_consultation: "Enterprise Requirements Consultation",
+  kickoff: "Onboarding Kickoff Call",
 };
 
 async function freeSlots(now: Date, limit = 8): Promise<Date[]> {
@@ -373,7 +377,7 @@ async function handleResolveContact(tc: ToolCall, message: Rec): Promise<Record<
   const { error: journeyError } = await supabaseAdmin.from("crm_client_journeys").insert({
     contact_id: contact.id,
     account_id: account.id,
-    stage_key: "new_lead",
+    stage_key: "applied",
     metadata: { created_by: "voice_inbound" } as Json,
   });
   if (journeyError) console.error("[voice-tools] journey create failed:", journeyError.message);
@@ -642,34 +646,40 @@ export async function handleToolCalls(message: Rec): Promise<Rec> {
 
 /* ------------------------------ handoff router ----------------------------- */
 
-export type HandoffIntent = "discovery" | "strategy" | "finance";
+export type HandoffIntent = "review" | "solutions" | "support";
 
 /** Deterministic transcript classifier for squad handoffs. */
 export function classifyHandoffIntent(transcriptText: string): HandoffIntent {
   const t = transcriptText.toLowerCase();
-  const scores: Record<HandoffIntent, number> = { discovery: 0, strategy: 0, finance: 0 };
-  for (const m of t.matchAll(/finance|loan|lend|borrow|mortgage|broker|ifc/g)) {
+  const scores: Record<HandoffIntent, number> = { review: 0, solutions: 0, support: 0 };
+  for (const m of t.matchAll(
+    /support|broken|error|not working|issue|ticket|outage|bug|help with my account/g,
+  )) {
     void m;
-    scores.finance += 1;
+    scores.support += 1;
   }
-  for (const m of t.matchAll(/strategy|portfolio|plan(?:ning)?\b|structure/g)) {
+  for (const m of t.matchAll(
+    /pricing|price|cost|module|capabilit|feature|integrat|platform|demo|how does|what does/g,
+  )) {
     void m;
-    scores.strategy += 1;
+    scores.solutions += 1;
   }
-  for (const m of t.matchAll(/discovery|get started|first (?:call|chat)|new (?:to|client)/g)) {
+  for (const m of t.matchAll(
+    /book|schedule|review|appointment|reschedul|time slot|calendar|application/g,
+  )) {
     void m;
-    scores.discovery += 1;
+    scores.review += 1;
   }
   const best = (Object.entries(scores) as Array<[HandoffIntent, number]>).sort(
     (a, b) => b[1] - a[1],
   )[0];
-  return best[1] > 0 ? best[0] : "discovery";
+  return best[1] > 0 ? best[0] : "solutions";
 }
 
 const HANDOFF_ROLE: Record<HandoffIntent, string> = {
-  discovery: "handoff_discovery",
-  strategy: "handoff_strategy",
-  finance: "handoff_finance",
+  review: "handoff_review",
+  solutions: "handoff_solutions",
+  support: "handoff_support",
 };
 
 /**
@@ -691,14 +701,19 @@ export async function routeHandoff(message: Rec): Promise<Rec | null> {
         .join("\n")
     : (artifact.transcript ?? message.transcript ?? "");
 
+  const bookingIntents = new Set([
+    "strategic_review",
+    "discovery_session",
+    "guided_demo",
+    "enterprise_consultation",
+    "kickoff",
+  ]);
   const intent: HandoffIntent =
-    ctx?.confirmed_intent === "strategy_phone" || ctx?.confirmed_intent === "strategy_zoom"
-      ? "strategy"
-      : ctx?.confirmed_intent === "ifc_phone" || ctx?.confirmed_intent === "ifc_zoom"
-        ? "finance"
-        : ctx?.confirmed_intent === "discovery"
-          ? "discovery"
-          : classifyHandoffIntent(transcriptText);
+    ctx?.confirmed_intent && bookingIntents.has(ctx.confirmed_intent)
+      ? "review"
+      : ctx?.confirmed_intent === "support"
+        ? "support"
+        : classifyHandoffIntent(transcriptText);
 
   const { data: agent, error } = await supabaseAdmin
     .from("voice_agents")

@@ -10,11 +10,11 @@ import { requireOperator } from "@/integrations/supabase/role-middleware";
 const uuid = z.string().uuid();
 
 export const APPOINTMENT_KINDS = [
-  "discovery",
-  "strategy_phone",
-  "strategy_zoom",
-  "ifc_phone",
-  "ifc_zoom",
+  "strategic_review",
+  "discovery_session",
+  "guided_demo",
+  "enterprise_consultation",
+  "kickoff",
   "other",
 ] as const;
 
@@ -191,11 +191,12 @@ export const startJourney = createServerFn({ method: "POST" })
       if (insertError.code === "23505") throw new Error("journey_already_exists");
       throw insertError;
     }
-    // Entering the board at new_lead is a trigger like any other transition.
+    // Entering the board at `applied` is a trigger like any other transition
+    // (it queues the stage-guarded questionnaire follow-up call).
     const { transitionJourneyStage } = await import("@/server/crm-journey.server");
     await transitionJourneyStage({
       journeyId: journey.id,
-      toStage: "new_lead",
+      toStage: "applied",
       reason: "journey_started",
       source: "manual",
       actorUserId: context.userId,
@@ -227,7 +228,7 @@ export const listContactsWithoutJourney = createServerFn({ method: "POST" })
     });
   });
 
-export const recordQuizSubmission = createServerFn({ method: "POST" })
+export const recordNurtureSignal = createServerFn({ method: "POST" })
   .middleware([requireOperator])
   .inputValidator((input) =>
     z.object({ journeyId: uuid, summary: z.string().max(2000).nullable().optional() }).parse(input),
@@ -236,7 +237,7 @@ export const recordQuizSubmission = createServerFn({ method: "POST" })
     const { recordJourneySignal } = await import("@/server/crm-journey.server");
     return recordJourneySignal({
       journeyId: data.journeyId,
-      kind: "quiz_submission",
+      kind: "nurture_step",
       summary: data.summary ?? null,
       actorUserId: context.userId,
     });

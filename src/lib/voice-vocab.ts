@@ -101,16 +101,22 @@ export const SENTIMENT_TONE: Record<Sentiment, OutcomeTone> = {
 };
 
 export const CALL_INTENTS = [
-  "discovery_booking",
-  "strategy_booking",
-  "finance_consult",
+  "strategic_review",
+  "discovery_session",
+  "guided_demo",
+  "enterprise_consultation",
+  "kickoff",
+  "support",
   "general_inquiry",
 ] as const;
 
 export const INTENT_LABELS: Record<string, string> = {
-  discovery_booking: "Discovery booking",
-  strategy_booking: "Strategy booking",
-  finance_consult: "Finance consult",
+  strategic_review: "Strategic review",
+  discovery_session: "Discovery session",
+  guided_demo: "Guided demo",
+  enterprise_consultation: "Enterprise consultation",
+  kickoff: "Onboarding kickoff",
+  support: "Support",
   general_inquiry: "General inquiry",
 };
 

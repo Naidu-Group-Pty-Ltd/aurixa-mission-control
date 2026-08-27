@@ -202,6 +202,11 @@ export type EnqueueOutboundInput = {
   /** Manual jobs may name an assistant directly instead of using the rule's. */
   assistantId?: string | null;
   scheduledAtOverride?: Date | null;
+  /**
+   * Stage-guarded chaser: the dispatcher cancels the job if the journey has
+   * left this stage by the time it comes due.
+   */
+  onlyInStage?: string | null;
 };
 
 export type EnqueueOutcome =
@@ -289,6 +294,7 @@ export async function enqueueOutboundForTrigger(
       max_attempts: rule.max_attempts,
       dedupe_key: dedupeKey,
       created_by: input.createdBy ?? null,
+      metadata: (input.onlyInStage ? { only_in_stage: input.onlyInStage } : {}) as Json,
     })
     .select("id, scheduled_at")
     .single();
@@ -359,6 +365,26 @@ export async function dispatchDueOutboundJobs(): Promise<{
 }
 
 async function dispatchOne(job: OutboundJob): Promise<"dispatched" | "failed" | "retry"> {
+  // Stage-guarded chasers: if the journey moved past the stage that queued
+  // this job (the lead did the thing), the call is moot — cancel, not dial.
+  const onlyInStage = (job.metadata as Record<string, unknown> | null)?.only_in_stage;
+  if (typeof onlyInStage === "string" && job.journey_id) {
+    const { data: journey, error: journeyError } = await supabaseAdmin
+      .from("crm_client_journeys")
+      .select("stage_key")
+      .eq("id", job.journey_id)
+      .maybeSingle();
+    if (journeyError) console.error("[voice] stage-guard read failed:", journeyError.message);
+    if (journey && journey.stage_key !== onlyInStage) {
+      const { error } = await supabaseAdmin
+        .from("voice_outbound_jobs")
+        .update({ status: "canceled", last_error: `stage_moved_to_${journey.stage_key}` })
+        .eq("id", job.id);
+      if (error) console.error("[voice] stage-guard cancel failed:", error.message);
+      return "retry";
+    }
+  }
+
   // The blacklist can change between enqueue and dial; re-check at the wire.
   const { data: blocked, error: blockError } = await supabaseAdmin
     .from("voice_blacklist")
@@ -711,9 +737,7 @@ async function enrichEndOfCall(payload: Record<string, unknown>): Promise<void> 
   await reconcileOutboundJob(vapiCallId, endedReason);
 }
 
-async function findContactByPhone(
-  phone: string,
-): Promise<{
+async function findContactByPhone(phone: string): Promise<{
   id: string;
   account_id: string;
   first_name: string;
