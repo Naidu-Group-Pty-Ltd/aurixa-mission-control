@@ -76,6 +76,13 @@ jobs:
       - name: Migration corpus stays replayable
         run: npm run check:migration-replay
 
+      # A migration merges and never applies, twice over: a filename the version
+      # regex cannot read is refused by the apply-on-merge workflow, and two
+      # files sharing a version are recorded once — the loser chosen by sort
+      # order, reported by nothing. Both are silent, and both are a rename away.
+      - name: Migrations can be applied and recorded
+        run: npm run check:migration-pipeline
+
       # Two failures with no runtime signal, on the deployment path: a secret
       # given a `VITE_` name is inlined into the client bundle and served to the
       # public with nothing logging it, and a deployment status the column

@@ -1,0 +1,121 @@
+name: Apply migrations on merge
+
+# Applies the migration files a merge ADDED to this deployment's own Supabase
+# project, and records them.
+#
+# ## The gap this closes
+#
+# Mission Control is edited in two places: this repository, and Lovable. Lovable
+# applies the migrations it authors. Nothing applied the ones that arrive here
+# through a pull request — they merged, they shipped in the repo, and the
+# database never saw them. Measured on 2026-08-27, `20260826070000` (the mirror
+# cascade's exclusion seed) and `20260827030000` (the ALLOWED_ORIGINS reconcile
+# schedule) had both merged and neither existed in the database. The first left
+# a cascade able to revert a clone's backend identity; the second left a cron
+# job that was never created, so a worker that had shipped correctly simply
+# never ran.
+#
+# Nothing reported either. A migration that never runs looks exactly like one
+# that ran and did nothing.
+#
+# ## Why it keys on the push, not on the ledger
+#
+# `supabase_migrations.schema_migrations` cannot answer "what is pending" in
+# this project — it is a second namespace, written by Lovable under its own
+# timestamps, and it under-reports by 172 of 207 files. `.github/scripts/
+# apply-migrations.mjs` carries the measurement. So the file list comes from
+# git: the migrations added between the push's before and after SHAs.
+#
+# ## Ordering against the deploy
+#
+# This runs on push to `main`; the application itself is published from Lovable.
+# Migrations therefore land before or without the code that uses them, which is
+# the safe order for the additive migrations this repo writes — a column that
+# exists before its reader is inert, a column that arrives after is a 42703.
+# A migration that REMOVES something a live deployment still reads has to be
+# staged by hand, in two merges.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**.sql'
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 'Space-separated migration paths to apply (manual recovery)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One writer at a time, and never cancel a run mid-way: a half-applied merge is
+# worse than a late one.
+concurrency:
+  group: apply-migrations
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Both ends of the push have to be resolvable to diff them.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Select the migrations this push added
+        id: select
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          MANUAL: ${{ inputs.files }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MANUAL:-}" ]; then
+            echo "Manual dispatch: ${MANUAL}"
+            printf 'files=%s\n' "${MANUAL}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A zero/absent BEFORE means GitHub could not give a range — a new
+          # branch, or a force push. Guessing one would silently apply either
+          # nothing or the entire history, and both failures are quiet. Refuse
+          # and name the manual path instead.
+          if [ -z "${BEFORE:-}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            echo "::error title=No push range::github.event.before is empty or zero, so the added files cannot be determined. Re-run via workflow_dispatch with an explicit file list."
+            exit 1
+          fi
+          if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "::error title=Unreachable base::${BEFORE} is not in this checkout. Re-run via workflow_dispatch with an explicit file list."
+            exit 1
+          fi
+
+          ADDED=$(git diff --name-only --diff-filter=A "${BEFORE}" "${AFTER}" -- 'supabase/migrations/*.sql' | tr '\n' ' ')
+          # A MODIFIED migration is reported and never re-applied — see the
+          # script header. Editing an applied migration is the mistake; running
+          # the new text over the old one is the damage.
+          CHANGED=$(git diff --name-only --diff-filter=M "${BEFORE}" "${AFTER}" -- 'supabase/migrations/*.sql' | tr '\n' ' ')
+          if [ -n "${CHANGED// /}" ]; then
+            echo "::warning title=Modified migration::${CHANGED} was edited rather than added. It will NOT be re-applied; a migration that has run is history. Add a new migration instead."
+          fi
+          echo "Added: ${ADDED:-<none>}"
+          printf 'files=%s\n' "${ADDED}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply
+        if: steps.select.outputs.files != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # No default. The script refuses an empty ref rather than guessing one,
+          # because the token reaches every project in the organisation and a
+          # wrong ref does not fail — it writes this control plane's admin
+          # schema onto somebody's tenant.
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          FILES: ${{ steps.select.outputs.files }}
+        run: node .github/scripts/apply-migrations.mjs

@@ -16,6 +16,7 @@
     "check:cron": "node scripts/check-cron-coverage.mjs",
     "check:migration-secrets": "node scripts/check-migration-secrets.mjs",
     "check:migration-replay": "node scripts/check-migration-replay.mjs",
+    "check:migration-pipeline": "node scripts/check-migration-pipeline.mjs",
     "check:prime-backend-ref": "node scripts/check-prime-backend-ref.mjs",
     "check:hosting": "node scripts/check-hosting-env-policy.mjs",
     "check:fk-indexes": "node scripts/check-fk-indexes.mjs",
