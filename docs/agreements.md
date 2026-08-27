@@ -51,9 +51,15 @@ secrets change (`DOCUSIGN_BASE_URL` + re-consent on the production host).
 ## The template
 
 The document every client sees is `public/agreements/aurixa-sla-template.pdf`:
-nine clause pages generated in Gamma on the Aurixa brand (deep navy, gold,
-cyan — the aurixa-systems.com.au styling) plus an **Execution Schedule** page
-appended by `scripts/agreements/build-sla-template.mjs`.
+nine clause pages generated in Gamma on the Aurixa brand (warm near-black
+ground, metallic gold serif display — the **aurum** theme, matching the
+aurixa-systems.com.au gold/dark identity) plus an **Execution Schedule** page
+appended by `scripts/agreements/build-sla-template.mjs`. The script also
+stamps the real brand marks onto the Gamma body: the full lockup
+(`scripts/agreements/aurixa-lockup.png`, alpha-trimmed from
+`aurixa-systems/brand-source/aurixa-lockup-source.png`) as the cover
+centrepiece and in the Execution Schedule header, and the triangle mark
+(`aurixa-mark.png`) in the top-right corner of every body page.
 
 The execution page carries the machinery:
 
@@ -72,9 +78,11 @@ client, so what was reviewed is what is signed.
 
 ### Regenerating the template
 
-- Clause content or styling: regenerate the body in Gamma (theme **stratos**
-  gave the current dark-navy look), export as PDF, replace
+- Clause content or styling: regenerate the body in Gamma (theme **aurum**
+  gave the current black/gold serif look), export as PDF, replace
   `scripts/agreements/aurixa-sla-gamma-source.pdf`.
+- Logo artwork: rebuild `aurixa-lockup.png` / `aurixa-mark.png` from the
+  sources in the aurixa-systems repo (`brand-source/`), alpha-trimmed.
 - Execution page layout: edit `scripts/agreements/build-sla-template.mjs`.
 - Then:
 

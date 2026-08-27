@@ -3,12 +3,14 @@
 //   node scripts/agreements/build-sla-template.mjs
 //
 // Takes the Gamma-generated agreement body (aurixa-sla-gamma-source.pdf,
-// 9 clause pages on the Aurixa dark-navy brand) and appends the Execution
-// Schedule — the one page DocuSign actually acts on. The page carries two
-// kinds of content:
+// 9 clause pages on the aurum theme — warm near-black, metallic gold serif
+// display), stamps the real Aurixa lockup on the cover and the triangle
+// mark on every body page, and appends the Execution Schedule — the one
+// page DocuSign actually acts on. The page carries two kinds of content:
 //
-//   * what a person sees: labelled panels for the client details and two
-//     signature blocks, in the same navy/gold styling as the Gamma body;
+//   * what a person sees: the lockup, labelled panels for the client
+//     details and two signature blocks, in the same dark/gold styling as
+//     the Gamma body;
 //   * what DocuSign sees: anchor tokens (e.g. \sig_client_1\) printed in
 //     6pt text in the EXACT colour of the panel they sit on. Invisible to
 //     a reader, found by DocuSign's text scanner, and matched by the tab
@@ -28,6 +30,8 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SOURCE = join(here, "aurixa-sla-gamma-source.pdf");
+const LOCKUP = join(here, "aurixa-lockup.png"); // full wordmark, alpha-trimmed
+const MARK = join(here, "aurixa-mark.png"); // triangle symbol alone
 const OUT = join(here, "../../public/agreements/aurixa-sla-template.pdf");
 
 // Anchor tokens — mirror of ANCHORS in src/server/agreements.server.ts.
@@ -44,14 +48,15 @@ const ANCHORS = {
   fieldCommencement: "\\field_commencement\\",
 };
 
-// Aurixa brand (matches the Gamma stratos body and the aurixa-systems site).
-const NAVY = rgb(0x0a / 255, 0x0f / 255, 0x1a / 255); // page ground
-const PANEL = rgb(0x14 / 255, 0x1c / 255, 0x2c / 255); // field/signature panels
-const GOLD = rgb(0xd7 / 255, 0xb3 / 255, 0x5f / 255);
+// Aurixa brand, keyed to the Gamma aurum body (warm near-black, metallic
+// gold serif display) and the aurixa-systems gold/dark identity.
+const GROUND = rgb(0x15 / 255, 0x15 / 255, 0x15 / 255); // page ground
+const PANEL = rgb(0x22 / 255, 0x23 / 255, 0x24 / 255); // field/signature panels
+const PANEL_EDGE = rgb(0x3a / 255, 0x3b / 255, 0x3c / 255);
+const GOLD = rgb(0xd2 / 255, 0xac / 255, 0x47 / 255);
 const GOLD_SOFT = rgb(0xf2 / 255, 0xd2 / 255, 0x8d / 255);
-const CYAN = rgb(0x5e / 255, 0xdd / 255, 0xe8 / 255);
 const BODY = rgb(0xeb / 255, 0xed / 255, 0xf0 / 255);
-const MUTED = rgb(0x9a / 255, 0xa5 / 255, 0xb5 / 255);
+const MUTED = rgb(0xa5 / 255, 0xa2 / 255, 0x99 / 255);
 
 const A4 = { width: 595.92, height: 841.92 };
 const MARGIN = 52;
@@ -65,9 +70,40 @@ async function main() {
   const helv = await doc.embedFont(StandardFonts.Helvetica);
   const helvBold = await doc.embedFont(StandardFonts.HelveticaBold);
   const serifBold = await doc.embedFont(StandardFonts.TimesRomanBold);
+  const lockup = await doc.embedPng(readFileSync(LOCKUP));
+  const mark = await doc.embedPng(readFileSync(MARK));
+
+  // ---- Brand marks on the Gamma body ----
+  // Cover: the full lockup as a centrepiece in the empty lower half beneath
+  // the title block (the aurum cover sets eyebrow, title, rule and intro in
+  // the top quarter). Body pages: the triangle mark alone, small, in the
+  // top-right corner — clear of the section chip and heading on the left.
+  const covers = doc.getPages();
+  {
+    const cover = covers[0];
+    const w = 340;
+    const h = (w * lockup.height) / lockup.width;
+    cover.drawImage(lockup, {
+      x: (cover.getWidth() - w) / 2,
+      y: 380,
+      width: w,
+      height: h,
+    });
+  }
+  for (let i = 1; i < covers.length; i++) {
+    const p = covers[i];
+    const w = 30;
+    const h = (w * mark.height) / mark.width;
+    p.drawImage(mark, {
+      x: p.getWidth() - MARGIN - w,
+      y: p.getHeight() - h - 34,
+      width: w,
+      height: h,
+    });
+  }
 
   const page = doc.addPage([A4.width, A4.height]);
-  page.drawRectangle({ x: 0, y: 0, width: A4.width, height: A4.height, color: NAVY });
+  page.drawRectangle({ x: 0, y: 0, width: A4.width, height: A4.height, color: GROUND });
 
   const contentW = A4.width - MARGIN * 2;
   let y = A4.height - 64;
@@ -76,11 +112,13 @@ async function main() {
   const anchor = (text, x, yy, color) =>
     page.drawText(text, { x, y: yy, size: 6, font: helv, color });
 
-  // ---- Header ----
-  page.drawText("AURIXA SYSTEMS PTY LTD", {
-    x: MARGIN, y, size: 9, font: helvBold, color: CYAN,
-  });
-  y -= 30;
+  // ---- Header: the lockup instead of a typed wordmark ----
+  {
+    const w = 150;
+    const h = (w * lockup.height) / lockup.width;
+    page.drawImage(lockup, { x: MARGIN - 4, y: y - h + 12, width: w, height: h });
+    y -= h + 18;
+  }
   page.drawText("Execution Schedule", {
     x: MARGIN, y, size: 30, font: serifBold, color: GOLD,
   });
@@ -115,7 +153,7 @@ async function main() {
     y -= panelH + 10;
     page.drawRectangle({
       x: MARGIN, y, width: contentW, height: panelH, color: PANEL,
-      borderColor: rgb(0x24 / 255, 0x30 / 255, 0x46 / 255), borderWidth: 0.75,
+      borderColor: PANEL_EDGE, borderWidth: 0.75,
     });
     page.drawRectangle({ x: MARGIN, y, width: 3, height: panelH, color: GOLD });
     page.drawText(f.label.toUpperCase(), {
@@ -139,7 +177,7 @@ async function main() {
   const signatureBlock = (x, title, subtitle, sigToken, nameToken, dateToken) => {
     page.drawRectangle({
       x, y, width: colW, height: blockH, color: PANEL,
-      borderColor: rgb(0x24 / 255, 0x30 / 255, 0x46 / 255), borderWidth: 0.75,
+      borderColor: PANEL_EDGE, borderWidth: 0.75,
     });
     page.drawRectangle({ x, y: y + blockH - 3, width: colW, height: 3, color: GOLD });
     let by = y + blockH - 24;
@@ -183,7 +221,7 @@ async function main() {
   );
 
   // ---- Footer ----
-  page.drawRectangle({ x: MARGIN, y: 58, width: contentW, height: 0.6, color: rgb(0x24 / 255, 0x30 / 255, 0x46 / 255) });
+  page.drawRectangle({ x: MARGIN, y: 58, width: contentW, height: 0.6, color: PANEL_EDGE });
   page.drawText("AURIXA SYSTEMS PTY LTD  ·  SERVICE LEVEL AGREEMENT  ·  EXECUTION SCHEDULE", {
     x: MARGIN, y: 44, size: 7, font: helvBold, color: MUTED,
   });
