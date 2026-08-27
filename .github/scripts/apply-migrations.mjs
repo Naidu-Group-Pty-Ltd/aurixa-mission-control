@@ -78,7 +78,23 @@ const fail = (title, msg) => {
 };
 
 if (!DRY_RUN && !TOKEN) {
-  fail('No credential', 'SUPABASE_ACCESS_TOKEN is not set. Add it in Settings → Secrets → Actions.');
+  // Deliberately not just "add the secret". This deployment's database is a
+  // LOVABLE CLOUD project (fgpvagejkaeqedcwvbte), which lives in Lovable's
+  // Supabase organisation — `get_project` on it answers "You do not have
+  // permission to perform this action" for this account's own token, and
+  // `list_projects` does not return it. So a Management API credential this
+  // account can create cannot reach the target, and an operator who follows a
+  // bare "add SUPABASE_ACCESS_TOKEN" instruction will find Lovable refuses the
+  // name (reserved prefix) and GitHub accepts it without helping.
+  fail(
+    'No credential',
+    'SUPABASE_ACCESS_TOKEN is not set — but read docs/MC_DATABASE_RELOCATION.md before ' +
+      "adding it. Mission Control's database is a Lovable Cloud project outside this " +
+      'account\'s Supabase organisation, so a Management API token cannot reach it and ' +
+      'this workflow cannot yet apply anything. Until that is resolved, migrations merged ' +
+      'to main are applied BY HAND against the Lovable database and their version recorded ' +
+      'in supabase_migrations.schema_migrations.',
+  );
 }
 if (!REF) {
   fail(
