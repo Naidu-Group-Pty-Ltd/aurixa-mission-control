@@ -1,27 +1,23 @@
 # Moving Mission Control off Lovable Cloud
 
-Status: **planned, not started.** One prerequisite remains and it is outside
-this repository. Read this before touching
-`.github/workflows/apply-migrations.yml`, `.github/scripts/apply-migrations.mjs`,
-or anything that assumes Mission Control's database can be addressed by the
-Supabase Management API.
+Status: **researched, decision pending.** The blocker this document previously
+named has been resolved by research — connecting your own Supabase is
+officially supported and the application stays hosted on Lovable. What remains
+is a decision, not an unknown.
+
+Read this before touching `.github/workflows/apply-migrations.yml`,
+`.github/scripts/apply-migrations.mjs`, or anything that assumes Mission
+Control's database can be addressed by the Supabase Management API.
 
 ## Why this came up
 
 Every migration merged into `main` has to be applied to Mission Control's
 database **by hand**. The workflow built to do it automatically (PR #73) has
-failed on every run since it was created:
+failed on every run since it was created, and its original message —
+"SUPABASE_ACCESS_TOKEN is not set" — was misleading. Adding the secret could
+not have helped.
 
-```
-Added: supabase/migrations/20260827090000_clone_reference_syncs.sql
-##[error]SUPABASE_ACCESS_TOKEN is not set.
-```
-
-That message was misleading. Adding the secret would not have fixed it, because
-the workflow rests on a premise nobody checked: **that Mission Control's own
-database is a Supabase project this account can address.** It is not.
-
-Measured, not assumed:
+Measured here:
 
 ```
 list_projects (this account's Supabase auth) → 4 projects
@@ -34,96 +30,102 @@ get_project('fgpvagejkaeqedcwvbte')
   → "You do not have permission to perform this action"
 ```
 
-`fgpvagejkaeqedcwvbte` is Mission Control's database. It is a **Lovable Cloud**
-project, living in Lovable's Supabase organisation. `moeyytuduycrvvncdtme`
-("Aurixa Systems") is *not* it — it has no `clones`, no `prime_config`, no
-`cascade_events`, and a 12-row migration ledger.
+Confirmed verbatim by Supabase's own documentation on identifying a Lovable
+backend:
 
-## The move does not need a connection string
+> You won't see this project in your Supabase Dashboard, and you won't have
+> access to service role keys or direct database URLs.
 
-The obvious plan — get a Postgres URL from Lovable and `pg_dump` — is not
-available. Lovable's **Cloud → Database** panel exposes a table browser, an RLS
-viewer and a Backups button, and no connection string or database password.
+`fgpvagejkaeqedcwvbte` is Mission Control's database, and it is a Lovable Cloud
+project in Lovable's Supabase organisation. `moeyytuduycrvvncdtme` ("Aurixa
+Systems") is *not* it — no `clones`, no `prime_config`, no `cascade_events`, a
+12-row ledger.
 
-It is also not necessary, because **Mission Control can already provision and
-write to Supabase projects in this account's own organisation.** It holds
-`SB_MGMT_API_TOKEN` and `SB_ORG_ID`, and it is what created
-`plisdzywzleljorrphxv` in org `nchuigmqbfcdhdgplrxq`. The machinery to relocate
-itself already exists and is already exercised in production:
+## What the status quo costs
 
-| need | what already does it |
-| --- | --- |
-| create the target project | `provisionCloneBackend` |
-| replicate 173 tables, 145 functions, 55 enums, 342 policies | catalogue introspection (`schema-introspection.server.ts`) |
-| run arbitrary SQL on either project | `runSqlOnProject` |
-| copy table data, budgeted and resumed on a keyset cursor | `reference-data.server.ts` |
-| stamp the migration ledger on the target | `stampMigrationLedgerFromPrime` |
+**52 migrations were added to this repository in August 2026 alone** — roughly
+two a day. Every one is a hand-apply against `mcp__Lovable__query_database`
+plus a manual ledger stamp. The cost is not the minutes; it is that a step a
+person has to remember is a step that eventually gets forgotten, and a clone
+fleet whose control plane has silently drifted from its migrations is the
+failure this platform has spent the week removing everywhere else.
 
-So the shape is: **Mission Control provisions its own new backend and copies
-itself into it**, the same way it builds a clone — except the allow-list does
-not apply, because source and target are the same tenant.
+## CORRECTION: this is not a hosting migration
 
-That is a far better route than a dump. It reuses code that is tested, it is
-resumable by construction, and nothing has to pass through an operator's
-machine.
+An earlier revision of this document concluded that because Lovable reserves
+the `SUPABASE_` environment-variable prefix, a Lovable-hosted app "very likely
+cannot be pointed at a foreign Supabase project", and therefore that moving the
+database implied moving the hosting.
 
-## The prerequisite that remains
+**That was wrong.** Lovable's own documentation describes connecting your own
+Supabase project as a supported feature, with the app still hosted on Lovable:
 
-**Somewhere for the application to point.**
+> Link your organization (workspace admins only): Connectors → Supabase, then
+> authorize your Supabase organization. In the editor, open More → Cloud, select
+> your Supabase project, and confirm.
 
-Lovable reserves the `SUPABASE_` environment-variable prefix for itself — the
-error that surfaced this whole question was Lovable refusing to let an operator
-create a secret named `SUPABASE_ACCESS_TOKEN`, "reserved for internal
-Lovable-managed secrets". Lovable owns `SUPABASE_URL` and the keys for a Cloud
-project.
+The reserved prefix is a consequence of Lovable managing the Cloud backend, not
+a barrier to replacing it. Once your own Supabase is connected, Lovable's docs
+state that authentication settings, edge functions and secrets all live in your
+Supabase project.
 
-So a Lovable Cloud app very likely **cannot be pointed at a foreign Supabase
-project**, which means moving the database implies moving the hosting:
+`src/server/hosting/` remains available if leaving Lovable is ever wanted for
+other reasons. It is not required for this.
 
-> **Relocating Mission Control's database is not a database task. It is moving
-> Mission Control off Lovable.**
+## The supported path
 
-That is survivable. This repository already contains the hosting provider layer
-it would need — `src/server/hosting/` with a Vercel provider, an env policy and
-a DNS target — because that is exactly what was built to deploy the clones.
-Mission Control would become the first tenant of its own hosting system, which
-is a good test of it and a bad thing to discover halfway through.
+Lovable added export/pause/remove in July 2026.
 
-**Open question for Lovable:** can a project be pointed at an external Supabase,
-or is leaving Lovable Cloud the only way to stop it managing the database? The
-answer decides whether Stage 5 below is "repoint" or "redeploy".
+**Export** — Cloud → Overview → Advanced settings → Export project data.
 
-## Do not plan from Lovable's table browser
+> The export includes your full database, both structure and data.
 
-Its row counts are read **through RLS as the signed-in user**, so they are what
-that session may see, not what the table holds:
+It **excludes** storage-bucket files, edge-function code, and project secrets.
+Storage is exported separately from Cloud → Storage. Exports are **limited to
+5 GB, one per 24 hours** — this database is 632 MB, comfortably inside that.
 
-| table | Lovable UI | actual |
-| --- | --- | --- |
-| `audit_log` | 407 | **21,090** |
-| `codex_findings` | — | **176,424** |
+**Remove** — Cloud → Overview → Advanced settings → Remove Lovable Cloud.
 
-A screen full of "0 rows" is not an empty database. Count with
-`mcp__Lovable__query_database`, which runs privileged.
+> Removing Lovable Cloud permanently deletes your Cloud instance and cannot be
+> undone.
+
+**Cloud and your own Supabase cannot coexist.** Cloud must be removed before
+the project can be pointed at your own Supabase, and Lovable is explicit that
+there is "no automatic migration between the built-in backend (Cloud) and your
+own Supabase project, in either direction."
+
+So the order is **export → build the target → verify → remove → connect**, and
+the verification has to be complete *before* the irreversible step, because
+after it there is nothing to fall back to.
+
+## An unresolved conflict about passwords
+
+Lovable's Advanced-settings documentation says user passwords "are not exported
+in usable form." A widely-cited third-party migration guide claims the opposite
+— that the export is a `pg_dump` and therefore carries `auth.users` bcrypt
+hashes intact.
+
+**Not worth resolving.** There are **3 auth users**. Plan for a password reset
+for all three and treat surviving hashes as a bonus. Assuming hashes survive,
+and finding out after the irreversible step that they did not, is the expensive
+order to be wrong in.
 
 ## Inventory (measured, 2026-08-27)
 
 | | |
 | --- | --- |
-| database size | **632 MB** |
+| database size | **632 MB** (export limit is 5 GB) |
 | tables (`public`) | 173 (219 across all schemas) |
-| functions | 145 |
-| enums | 55 |
-| RLS policies | 342 |
-| cron jobs | 32 |
+| functions / enums / policies | 145 / 55 / 342 |
+| cron jobs | **32** |
 | auth users | **3** |
 | storage buckets / objects | 4 / **0** |
 | extensions | citext, pg_cron, pg_net, pg_stat_statements, pgcrypto, plpgsql, supabase_vault, uuid-ossp |
 | vault secrets | `cron_secret`, `public_app_url`, `storefront_catalog_sync_url`, `storefront_catalog_sync_token` |
-| edge functions in repo | 1 |
-| migrations in repo | 209 |
+| encrypted rows (`CREDENTIALS_ENC_KEY`) | 1 `clone_backend_secrets`, 1 `clone_api_keys` |
+| new Supabase project cost | **$10/month** (org `Xenochrome 3`, Pro) |
 
-Size is concentrated, which matters for the cutover window:
+Size is concentrated, which matters for how long the copy takes:
 
 | table | rows | size |
 | --- | --- | --- |
@@ -132,71 +134,96 @@ Size is concentrated, which matters for the cutover window:
 | `audit_log` | 21,090 | 6 MB |
 | everything else | — | ~25 MB |
 
-`codex_findings` alone is 28% of the database and is security-scan output with
-a natural retention story. Pruning it before the cutover is the single biggest
-lever on how long the copy takes, and it is reversible in a way the cutover is
-not.
+`codex_findings` is 28% of the database and is security-scan output with a
+natural retention story. Pruning it first is the biggest lever, and reversible
+in a way the cutover is not.
 
-## The three things that will bite
+## Do not plan from Lovable's table browser
 
-**Auth users do not come with a schema copy.** Only 3 accounts, so the cheap
-answer is to recreate them and have each operator reset their password. Copying
-`auth.users` hashes across projects is possible and is not worth the risk for
-three rows.
+Its row counts are read **through RLS as the signed-in user**:
 
-**Vault secrets are encrypted with a project-scoped key.** They cannot be
-copied — `vault.decrypted_secrets` is a view over an encrypted store. All four
-must be re-created by hand on the new project *before* the cron jobs are
-scheduled, or every job 401s. `cron_secret` in particular must keep its exact
-current value, because the deployed application checks it: guessing it breaks
-all 32 jobs at once, which is a failure this platform has already had.
+| table | Lovable UI | actual |
+| --- | --- | --- |
+| `audit_log` | 407 | **21,090** |
 
-**The 32 cron jobs must be re-created, not copied.** They live in `cron.job`,
-they embed the vault read in their command, and they point at Mission Control's
-public URL. Re-running the repository's scheduling migrations against the new
-project is the way to get them.
+A screen full of "0 rows" is not an empty database. Count with
+`mcp__Lovable__query_database`, which runs privileged.
+
+## What will bite
+
+**Secrets do not export — and one of them is load-bearing.** Every secret must
+be re-entered by hand. `CREDENTIALS_ENC_KEY` must be carried over **exactly**:
+`crypto.server.ts` encrypts stored credentials with it, and a changed key makes
+existing ciphertext undecryptable. Only 2 rows are encrypted today, so the
+blast radius is small *now* and grows with every clone.
+
+**`cron_secret` must keep its exact value.** The deployed application checks
+it; guessing breaks all 32 jobs at once, which this platform has already had
+happen.
+
+**Vault secrets are project-scoped.** `vault.decrypted_secrets` is a view over
+an encrypted store — all four must be recreated on the new project *before* the
+cron jobs are scheduled, or every job 401s.
+
+**The 32 cron jobs must be recreated, not restored**, and they embed Mission
+Control's public URL. Re-run the repository's scheduling migrations.
+
+**Lovable regenerates the Supabase clients.** `src/integrations/supabase/client.ts`
+and `client.server.ts` both carry "This file is automatically generated. Do not
+edit it directly." Connecting your own Supabase rewrites them, and a documented
+trap in this exact migration is that doing so can break SSR. Diff both after
+connecting, before assuming the app is fine.
+
+**`VITE_SUPABASE_URL` is baked at build time** and `.env` is tracked in git
+(publishable values only). Repointing the browser is a rebuild plus a repo
+change, not a settings toggle.
 
 ## Staged plan
 
-Each stage ends in a verification asserted **by effect**, never by
-configuration. Nothing is destructive until Stage 5.
+Nothing is destructive until Stage 5. Each stage ends in a verification
+asserted **by effect**.
 
-1. **Settle the hosting question.** Ask Lovable whether a project can point at
-   an external Supabase. If not, insert a Vercel deployment stage before
-   Stage 5 and treat this as a hosting migration.
-2. **Prune.** Apply retention to `codex_findings` and
-   `module_backend_artifacts`. Verify: size re-measured.
-3. **Provision the target** in org `nchuigmqbfcdhdgplrxq` via the existing
-   provisioning path, pointed at Mission Control instead of a clone. Enable the
-   eight extensions. Verify: `pg_extension` matches the list above, and the
-   behavioural identity probe (`clones` / `prime_config` / `cascade_events`)
-   answers true.
-4. **Copy, rehearsed.** Copy every table with the reference-data copier's shape
-   — budgeted, keyset cursor, resumed — with no allow-list, because this is the
-   same tenant. Recreate the four vault secrets and the three operators. Re-run
-   the scheduling migrations. Verify by effect: per-table row counts matched
-   against the source, an md5 `pg_policies` fingerprint matched the way
-   clone/prime parity already is, and one `net.http_post` to a hook returning
-   200.
-5. **Cut over.** Freeze writes, run a final incremental copy, repoint or
-   redeploy the application, swap DNS. This is the only irreversible stage.
-6. **Re-enable the pipeline.** Set the repository secret
-   `SUPABASE_ACCESS_TOKEN` and the repository **variable**
-   `SUPABASE_PROJECT_REF` (it is read as `vars.`, not `secrets.`) to the new
-   ref. Add the old Lovable ref `fgpvagejkaeqedcwvbte` to `FORBIDDEN_REFS` in
-   `.github/scripts/apply-migrations.mjs`. Verify by effect: merge a trivial
-   migration and watch it land without a hand-apply.
+1. **Prune.** Retention on `codex_findings` and `module_backend_artifacts`.
+   Verify: size re-measured.
+2. **Provision the target** in org `nchuigmqbfcdhdgplrxq` ($10/mo). Enable the
+   eight extensions. Verify: `pg_extension` matches.
+3. **Load it.** Either restore Lovable's export, or have Mission Control copy
+   itself using the machinery it already has — `provisionCloneBackend` for the
+   schema, `runSqlOnProject` for either side, and the reference-data copier's
+   budgeted keyset-cursor shape for the rows, minus the allow-list because
+   source and target are the same tenant.
+4. **Verify against the source, hard.** Per-table row counts; an md5
+   `pg_policies` fingerprint matched the way clone/prime parity already is; the
+   four vault secrets recreated; the three operators able to actually log in;
+   one `net.http_post` to a hook returning 200. **This gate must pass before
+   Stage 5**, because Stage 5 destroys the fallback.
+5. **Remove Lovable Cloud and connect your own Supabase.** Irreversible.
+6. **Repair what did not travel.** Re-enter every secret (`CREDENTIALS_ENC_KEY`
+   byte-for-byte), re-run the scheduling migrations for the 32 cron jobs, diff
+   the regenerated `client.ts` / `client.server.ts`, rebuild so the baked
+   `VITE_SUPABASE_URL` points at the new project.
+7. **Re-enable the pipeline.** Repository secret `SUPABASE_ACCESS_TOKEN` and
+   repository **variable** `SUPABASE_PROJECT_REF` (read as `vars.`, not
+   `secrets.`) set to the new ref. Add `fgpvagejkaeqedcwvbte` to
+   `FORBIDDEN_REFS`. Verify by effect: merge a trivial migration and watch it
+   land with no hand-apply.
 
 ## Rollback
 
 Until Stage 5 the old database is untouched and rollback is "stop". After Stage
-5 it is repointing the application back and replaying anything written in the
-gap — which is why Stage 4 must have been rehearsed end to end, and why the
-write freeze in Stage 5 is not optional.
+5 there is no rollback — the Cloud instance is deleted. That asymmetry is the
+whole reason Stage 4 exists.
 
 ## Until then
 
 Migrations merged to `main` are applied by hand against
-`mcp__Lovable__query_database`, and the version is recorded in
-`supabase_migrations.schema_migrations` afterwards. The workflow says so rather
-than asking for a secret that cannot help — see `docs/MIGRATION_PIPELINE.md`.
+`mcp__Lovable__query_database` and recorded in
+`supabase_migrations.schema_migrations`. The workflow says so rather than
+asking for a secret that cannot help.
+
+## Sources
+
+- Supabase — [Identifying Lovable backend: Lovable Cloud or Supabase](https://supabase.com/docs/guides/troubleshooting/identify-lovable-cloud-or-supabase-backend)
+- Lovable — [Connect to Supabase](https://docs.lovable.dev/integrations/supabase)
+- Lovable — [Advanced settings](https://docs.lovable.dev/features/advanced-settings)
+- Third-party, unverified — [lovable-cloud-to-supabase-migration](https://github.com/CarolMonroe22/lovable-cloud-to-supabase-migration) (source of the password-hash claim that contradicts Lovable's own docs, and of several of the traps above; treat as leads to verify, not authority)
