@@ -4,7 +4,7 @@ import { requireAdmin } from "@/integrations/supabase/role-middleware";
 import { getAppOctokit } from "./github-app.server";
 import {
   fetchPrimeMigrationList,
-  fetchPrimeMigrations,
+  openPrimeMigrationCorpus,
   resolvePrimeBackendRef,
   resolvePrimeSource,
 } from "./prime-backend.server";
@@ -163,10 +163,17 @@ export const syncCloneMigrations = createServerFn({ method: "POST" })
         .eq("clone_id", data.cloneId);
 
       try {
-        const { migrations, sourceSha } = await fetchPrimeMigrations(getAppOctokit(), source);
+        // Metadata only; bodies are fetched inside the replay, for the versions
+        // this clone turns out to be missing. Materialising the whole corpus
+        // here is what made the fleet job time out at 60 s without claiming a
+        // single clone — this button ran the same code and never once finished.
+        const corpus = await openPrimeMigrationCorpus(getAppOctokit(), source);
+        const sourceSha = corpus.sourceSha;
         const { results, latestApplied } = await applyPrimeMigrations(
           backend.supabase_project_ref,
-          migrations,
+          corpus.metas,
+          undefined,
+          (m) => corpus.loadSql(m.id),
         );
 
         const successes = results.filter((r) => r.success && !r.skipped);
