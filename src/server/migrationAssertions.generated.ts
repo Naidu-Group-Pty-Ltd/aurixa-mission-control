@@ -36,4 +36,15 @@ export const MIGRATION_CLAIMS: readonly MigrationClaims[] = [
       { kind: "cron", jobname: "schema-migration-drain" },
     ],
   },
+  {
+    migration: "20260828040000_assertion_checks_default_grants.sql",
+    version: "20260828040000",
+    assertions: [
+      {
+        kind: "none",
+        reason:
+          "removes default table grants; a GRANT is not observable through PostgREST, so nothing here can be asserted by effect",
+      },
+    ],
+  },
 ];
