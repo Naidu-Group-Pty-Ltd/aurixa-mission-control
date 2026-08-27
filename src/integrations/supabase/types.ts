@@ -11184,6 +11184,11 @@ export type Database = {
         | "ifc_phone"
         | "ifc_zoom"
         | "other"
+        | "strategic_review"
+        | "discovery_session"
+        | "guided_demo"
+        | "enterprise_consultation"
+        | "kickoff"
       crm_appointment_status:
         | "scheduled"
         | "confirmed"
@@ -11423,6 +11428,13 @@ export type Database = {
         | "ifc_confirmation"
         | "ifc_no_show"
         | "manual"
+        | "questionnaire_follow_up"
+        | "review_booking_follow_up"
+        | "review_confirmation"
+        | "session_reminder"
+        | "session_no_show"
+        | "kickoff_scheduler"
+        | "checkin_at_risk"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -11640,6 +11652,11 @@ export const Constants = {
         "ifc_phone",
         "ifc_zoom",
         "other",
+        "strategic_review",
+        "discovery_session",
+        "guided_demo",
+        "enterprise_consultation",
+        "kickoff",
       ],
       crm_appointment_status: [
         "scheduled",
@@ -11901,6 +11918,13 @@ export const Constants = {
         "ifc_confirmation",
         "ifc_no_show",
         "manual",
+        "questionnaire_follow_up",
+        "review_booking_follow_up",
+        "review_confirmation",
+        "session_reminder",
+        "session_no_show",
+        "kickoff_scheduler",
+        "checkin_at_risk",
       ],
     },
   },
