@@ -91,6 +91,23 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Lovable regenerates this file and its header says so: "This file is
+    // automatically generated. Do not edit it directly."
+    //
+    // It declares `timer` with `let` and assigns it once, which `prefer-const`
+    // treats as an error. That has been fixed by hand TWICE (0d07dda, c7dc3e9)
+    // and reverted by the generator both times — the flip-flop is visible in
+    // `git log -L 38,38` on the file. Two hand-fixes and two reverts is a
+    // settled pattern, not bad luck, and each revert turned an unrelated PR's
+    // merge-ref CI red for a file nobody in this repository authored.
+    //
+    // Downgraded rather than ignored: the file is small and the rest of it is
+    // worth linting, and a finding that is real should stay visible. What it
+    // must not do is fail a gate on code we cannot keep fixed.
+    files: ["src/integrations/supabase/previewAuthStorage.ts"],
+    rules: { "prefer-const": "warn" },
+  },
   eslintPluginPrettier,
   {
     // Keep format drift visible without blocking feature verification. The repo
