@@ -1715,6 +1715,7 @@ export type Database = {
           requested_by: string | null
           status: string
           status_detail: string | null
+          status_since: string
           team_id: string | null
           updated_at: string
           worker_finished_at: string | null
@@ -1748,6 +1749,7 @@ export type Database = {
           requested_by?: string | null
           status?: string
           status_detail?: string | null
+          status_since?: string
           team_id?: string | null
           updated_at?: string
           worker_finished_at?: string | null
@@ -1781,6 +1783,7 @@ export type Database = {
           requested_by?: string | null
           status?: string
           status_detail?: string | null
+          status_since?: string
           team_id?: string | null
           updated_at?: string
           worker_finished_at?: string | null

@@ -183,6 +183,34 @@ export function reportableHeld(held: readonly HeldPath[]): HeldPath[] {
 }
 
 /**
+ * The phrase a per-clone result uses to say a human is owed work, defined here
+ * so the engine that WRITES it and the summary that COUNTS it cannot drift.
+ *
+ * It exists because a cascade that held a `manual_reconcile` path was reported
+ * as an unqualified success. `src/App.tsx` is held on the client-facing mirror
+ * — it carries route gates the prime does not — so when the prime added
+ * `/passport/:token` and `/partner-acknowledgement/:token` together with source
+ * tests asserting those routes are in `App.tsx`, the tests cascaded and the
+ * routes could not. The clone's CI went red on every run for over twelve hours,
+ * the "never merge into a clone whose CI is red" rule correctly refused, and
+ * the only thing anyone was told was `cascade_completed · success · 0 merged`.
+ *
+ * The PR body has always carried a "Needs a human" section. Nobody reads a PR
+ * body to find out why drift will not clear.
+ */
+export const RECONCILE_MARKER = "need reconciling";
+
+/** How the per-clone `diff_summary` says it. One writer, one reader. */
+export function reconcileSuffixFor(count: number): string {
+  return count > 0 ? ` · ${count} ${RECONCILE_MARKER}` : "";
+}
+
+/** Read back what `reconcileSuffixFor` wrote, from a stored result summary. */
+export function summaryOwesReconcile(diffSummary: string | null | undefined): boolean {
+  return typeof diffSummary === "string" && diffSummary.includes(RECONCILE_MARKER);
+}
+
+/**
  * The exclusion set a client-facing mirror of this prime needs on day one.
  *
  * Not invented here. Every entry is a divergence that already exists between

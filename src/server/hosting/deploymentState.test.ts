@@ -6,6 +6,7 @@ import {
   backoffSeconds,
   isDormant,
   isRetryable,
+  judgeWait,
   isTerminal,
   reading,
 } from "./deploymentState.pure";
@@ -101,5 +102,85 @@ describe("retry policy", () => {
     expect(backoffSeconds(0)).toBe(15);
     expect(backoffSeconds(3)).toBe(120);
     expect(backoffSeconds(99)).toBe(3600);
+  });
+});
+
+/**
+ * The bug these pin: the worker measured `now - created_at` — the age of the
+ * deployment ROW — while reporting "Stuck in <status> for more than 6h". A row
+ * advances through eight statuses over its life, so on any row older than the
+ * budget the first wait of any kind resolved to stuck.
+ */
+describe("judgeWait", () => {
+  const HOUR = 3_600_000;
+  const now = Date.parse("2026-08-28T02:37:01Z");
+  const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
+
+  it("waits while the row has been in this status for less than the budget", () => {
+    expect(judgeWait({ statusSince: iso(60_000), now, stuckHours: 6 })).toEqual({
+      kind: "waiting",
+    });
+  });
+
+  /**
+   * The exact production shape. The row was created the previous day and
+   * entered `syncing_env` sixty seconds before this tick; measuring the row's
+   * age called that "stuck for more than 6h" and failed a healthy deployment.
+   */
+  it("does not call a 60-second wait stuck just because the row is a day old", () => {
+    const enteredStatus = iso(60_000);
+    const rowCreated = iso(20 * HOUR);
+    expect(judgeWait({ statusSince: enteredStatus, now, stuckHours: 6 })).toEqual({
+      kind: "waiting",
+    });
+    // What the old code did, kept here so the difference is the assertion.
+    expect((now - Date.parse(rowCreated)) / HOUR).toBeGreaterThan(6);
+  });
+
+  it("still reports a genuine stall — the bound has to keep existing", () => {
+    const verdict = judgeWait({ statusSince: iso(7 * HOUR), now, stuckHours: 6 });
+    expect(verdict.kind).toBe("stuck");
+    if (verdict.kind === "stuck") expect(verdict.hoursInStatus).toBeCloseTo(7, 5);
+  });
+
+  it("treats exactly the budget as still waiting, not yet stuck", () => {
+    expect(judgeWait({ statusSince: iso(6 * HOUR), now, stuckHours: 6 })).toEqual({
+      kind: "waiting",
+    });
+  });
+
+  /**
+   * An unreadable stamp is not a finding. The failure direction here is
+   * destructive — it marks a live deployment failed — so an absent, empty or
+   * unparseable value reads as waiting, the same discipline `ok: null` carries
+   * everywhere else in this codebase.
+   */
+  it.each([null, undefined, "", "not-a-date"])("reads %p as waiting, never as stuck", (v) => {
+    expect(judgeWait({ statusSince: v as string | null, now, stuckHours: 6 })).toEqual({
+      kind: "waiting",
+    });
+  });
+
+  it("does not read clock skew into the future as a stall", () => {
+    expect(judgeWait({ statusSince: iso(-3 * HOUR), now, stuckHours: 6 })).toEqual({
+      kind: "waiting",
+    });
+  });
+});
+
+/**
+ * The pure function above cannot catch the actual defect coming back: both
+ * `row.status_since` and `row.created_at` are strings, so feeding the wrong one
+ * to `judgeWait` type-checks and every test here still passes. The wrong
+ * quantity was the entire bug, so the call site is asserted directly.
+ */
+describe("the drain measures the wait from the status stamp", () => {
+  it("passes status_since to judgeWait, never created_at", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/routes/hooks.deployment-drain.tsx", "utf8");
+    const call = src.slice(src.indexOf("judgeWait({"));
+    const args = call.slice(0, call.indexOf("})"));
+    expect(args).toContain("statusSince: row.status_since");
+    expect(args).not.toContain("created_at");
   });
 });

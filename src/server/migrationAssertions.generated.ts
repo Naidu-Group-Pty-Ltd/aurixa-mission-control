@@ -47,4 +47,9 @@ export const MIGRATION_CLAIMS: readonly MigrationClaims[] = [
       },
     ],
   },
+  {
+    migration: "20260828050000_deployment_status_since.sql",
+    version: "20260828050000",
+    assertions: [{ kind: "column", table: "clone_deployments", column: "status_since" }],
+  },
 ];

@@ -17,6 +17,8 @@ import {
   isShippedPath,
   partitionCascadePaths,
   reportableHeld,
+  reconcileSuffixFor,
+  summaryOwesReconcile,
   requireExclusions,
   type HeldPath,
   type SyncExclusion,
@@ -125,6 +127,8 @@ export async function executeCascade(
   let failed = 0;
   let opened = 0;
   let skipped = 0;
+  /** Clones this run left owing a hand-reconcile. Counted as results land. */
+  let owedReconcile = 0;
 
   // Pre-flight: validate clone library pins. If any pin references a missing,
   // unapproved, or empty library entry, fail that clone's queued result early
@@ -200,6 +204,12 @@ export async function executeCascade(
 
       await supabase.from("cascade_results").update(patch).eq("id", r.id);
 
+      // Read off the patch, not off `queuedRes.data`: those rows were fetched
+      // before this loop and still carry the pre-run `diff_summary`.
+      if (summaryOwesReconcile((patch as { diff_summary?: string | null }).diff_summary)) {
+        owedReconcile++;
+      }
+
       if (patch.status === "succeeded") succeeded++;
       else if (patch.status === "pr_opened") opened++;
       else if (patch.status === "failed") failed++;
@@ -266,18 +276,29 @@ export async function executeCascade(
       : failed > 0
         ? ("partial" as const)
         : ("completed" as const);
-  const summary = `${succeeded} merged · ${opened} PRs · ${failed} failed · ${skipped} skipped (of ${totalQueued})`;
+  // A cascade can do everything asked of it and still leave a clone unable to
+  // go green, because a `manual_reconcile` path moved upstream and was held
+  // back by design. That is not a failure of the cascade and it is not a
+  // success either: it is work owed to a person, and reporting it as
+  // `completed · success` is what left a clone red for twelve hours with the
+  // explanation sitting unread in a pull request body.
+  const summary =
+    `${succeeded} merged · ${opened} PRs · ${failed} failed · ${skipped} skipped (of ${totalQueued})` +
+    (owedReconcile > 0 ? ` · ${owedReconcile} awaiting manual reconcile` : "");
 
   await supabase
     .from("cascade_events")
     .update({ status: finalStatus, completed_at: new Date().toISOString(), summary })
     .eq("id", event.id);
 
-  await supabase.from("audit_log").insert({
+  // Through the helper rather than a bare insert: it checks the error and logs
+  // it. A discarded audit write is a record that silently does not exist.
+  const { writeAuditLog } = await import("@/server/audit.server");
+  await writeAuditLog({
     action: "cascade.executed",
-    entity_type: "cascade_event",
-    entity_id: event.id,
-    metadata: { mode: event.mode, succeeded, opened, failed, skipped },
+    entityType: "cascade_event",
+    entityId: event.id,
+    metadata: { mode: event.mode, succeeded, opened, failed, skipped, owedReconcile },
   });
 
   const kind =
@@ -286,18 +307,31 @@ export async function executeCascade(
       : finalStatus === "failed"
         ? "cascade_failed"
         : "cascade_partial";
+  // `finalStatus` is deliberately untouched — the run did complete, and
+  // collapsing "owes a human" into "failed" would make the two unreadable.
+  // Severity is the attention channel, so that is what changes.
   const severity =
-    finalStatus === "completed" ? "success" : finalStatus === "failed" ? "error" : "warning";
+    finalStatus === "failed"
+      ? "error"
+      : finalStatus === "completed" && owedReconcile === 0
+        ? "success"
+        : "warning";
 
-  await supabase.from("notifications").insert({
+  // Not `notifyOperators()`: that helper has no `cascade_event_id`, and the
+  // link from a notification back to its run is the whole point of this one.
+  // So the error is checked here instead, the same way the helper checks it.
+  const { error: notifyError } = await supabase.from("notifications").insert({
     kind,
     severity,
     title: `Cascade ${finalStatus} (${event.mode})`,
     body: summary,
     cascade_event_id: event.id,
     url: `/cascades/${event.id}`,
-    metadata: { mode: event.mode, succeeded, opened, failed, skipped },
+    metadata: { mode: event.mode, succeeded, opened, failed, skipped, owedReconcile },
   });
+  if (notifyError) {
+    console.error(`[cascade] could not raise the ${kind} notification:`, notifyError.message);
+  }
 
   type NotifInsert = Database["public"]["Tables"]["notifications"]["Insert"];
   const cloneNotifs: NotifInsert[] = [];
@@ -607,7 +641,10 @@ async function processClone(args: {
       // ships -- one file out of 71 on the first mirror run -- so the extra
       // read costs nothing on the paths that are not about identity, which is
       // nearly all of them.
-      if (isShippedPath(path) && backendRefsIn(primeFile.content).some((r) => r !== ownProjectRef)) {
+      if (
+        isShippedPath(path) &&
+        backendRefsIn(primeFile.content).some((r) => r !== ownProjectRef)
+      ) {
         if (!cloneFileRead) {
           cloneFile = await getFileContent(octokit, cloneRef, path);
           cloneFileRead = true;
@@ -679,8 +716,7 @@ async function processClone(args: {
   const summarySuffix = treeEntries.length > 5 ? ` (+${treeEntries.length - 5} more)` : "";
   const pinSuffix = pinSummary ? ` · ${pinSummary}` : "";
   const heldSuffix = partition.held.length > 0 ? ` · ${partition.held.length} withheld` : "";
-  const reconcileSuffix =
-    needsReconcile.length > 0 ? ` · ${needsReconcile.length} need reconciling` : "";
+  const reconcileSuffix = reconcileSuffixFor(needsReconcile.length);
   const fileSummary = `${summaryFiles.join(", ")}${summarySuffix}${pinSuffix}${heldSuffix}${reconcileSuffix}`;
 
   const { data: cloneCommit } = await octokit.git.getCommit({
@@ -711,9 +747,7 @@ async function processClone(args: {
       ? `\n\n### Needs a human — ${needsReconcile.length} file(s) changed upstream and were held back\n\n` +
         `These carry deliberate divergence on this clone, so the cascade will never overwrite them. ` +
         `Prime has moved; someone has to decide what to carry across.\n\n` +
-        needsReconcile
-          .map((h) => `- \`${h.path}\`${h.note ? ` — ${h.note}` : ""}`)
-          .join("\n")
+        needsReconcile.map((h) => `- \`${h.path}\`${h.note ? ` — ${h.note}` : ""}`).join("\n")
       : "") +
     (partition.held.length - needsReconcile.length > 0
       ? `\n\n_${partition.held.length - needsReconcile.length} further path(s) are owned by this clone and were withheld without comment._`

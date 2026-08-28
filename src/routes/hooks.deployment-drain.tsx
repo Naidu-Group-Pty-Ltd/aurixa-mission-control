@@ -28,6 +28,7 @@ import {
   CLAIMABLE,
   backoffSeconds,
   isRetryable,
+  judgeWait,
   type DeploymentStatus,
 } from "@/server/hosting/deploymentState.pure";
 import { buildCloneEnv, envDigest } from "@/server/hosting/envPolicy.pure";
@@ -61,6 +62,8 @@ type DeploymentRow = {
   attempts: number;
   max_attempts: number;
   created_at: string;
+  /** When the row entered the status it is in now. See judgeWait. */
+  status_since: string | null;
 };
 
 type StepOutcome =
@@ -107,7 +110,7 @@ async function claim(limit: number): Promise<DeploymentRow[]> {
     .is("worker_started_at", null)
     .in("status", CLAIMABLE)
     .select(
-      "clone_id, provider_slug, status, project_id, project_name, team_id, latest_deployment_id, provider_origin, domain, dns_target_type, dns_target_value, domain_verification, env_digest, attempts, max_attempts, created_at",
+      "clone_id, provider_slug, status, project_id, project_name, team_id, latest_deployment_id, provider_origin, domain, dns_target_type, dns_target_value, domain_verification, env_digest, attempts, max_attempts, created_at, status_since",
     );
   // Losing the race is normal and returns zero rows with no error. A fault is
   // not, and must not be reported as one.
@@ -223,9 +226,77 @@ async function step(row: DeploymentRow): Promise<StepOutcome> {
     case "syncing_env": {
       if (!row.project_id) return { kind: "error", error: "no project_id", retryable: false };
       if (!backend?.anon_key || !backend?.supabase_url) {
-        // The backend has not finished provisioning. Wait rather than deploying
-        // a build wired to nothing — a clone that boots against an absent
-        // Supabase URL renders an empty shell that looks like a broken app.
+        // Two different situations wear the same shape here, and waiting is
+        // only right for one of them.
+        //
+        // A backend still PROVISIONING will write these itself, so waiting is
+        // correct — deploying a build wired to nothing renders an empty shell
+        // that looks like a broken app.
+        //
+        // A backend that already says `ready` will not. Nothing in the system
+        // writes these columns after provisioning finishes, so waiting is
+        // waiting for something that is never coming — a clone enrolled by
+        // hand, or adopted from an existing project, lands here permanently.
+        // That is how this deployment sat in `syncing_env` with a backend
+        // reporting `ready — Synced to 20260920000000`.
+        //
+        // The keys are recoverable rather than lost: the row names the project
+        // ref, and the Management API is authoritative about that project's
+        // keys. Reading them is not a guess, so recover once and re-queue.
+        if (backend?.status === "ready" && backend.supabase_project_ref) {
+          const ref = backend.supabase_project_ref;
+          try {
+            const { getProjectApiKeys, selectProjectKeys, getProjectUrl } =
+              await import("@/server/backend-provisioning.server");
+            const { anonKey } = selectProjectKeys(await getProjectApiKeys(ref));
+            if (!anonKey) {
+              return {
+                kind: "error",
+                error: `Backend ${ref} is marked ready but publishes no anon key. Re-run provisioning for this clone.`,
+                retryable: false,
+              };
+            }
+            // Only the anon key — the client-safe one, which the build ships to
+            // browsers anyway. The service-role key is not needed to deploy and
+            // is not written here.
+            const { error: healError } = await admin
+              .from("clone_backends")
+              .update({
+                anon_key: anonKey,
+                supabase_url: backend.supabase_url ?? getProjectUrl(ref),
+              })
+              .eq("clone_id", row.clone_id);
+            if (healError) {
+              return {
+                kind: "error",
+                error: `recovered the anon key for ${ref} but could not store it: ${healError.message}`,
+                retryable: true,
+              };
+            }
+            return {
+              kind: "wait",
+              seconds: 5,
+              detail: `Recovered the backend's anon key from project ${ref}.`,
+            };
+          } catch (e) {
+            // A Management API fault is transient and worth retrying; it is
+            // reported as an error rather than swallowed into a wait, because a
+            // wait here is indistinguishable from the permanent case above.
+            return {
+              kind: "error",
+              error: `could not read API keys for ${ref}: ${e instanceof Error ? e.message : String(e)}`,
+              retryable: true,
+            };
+          }
+        }
+        if (backend?.status === "ready") {
+          return {
+            kind: "error",
+            error:
+              "The clone's backend is marked ready but records no Supabase project ref, so its URL and key cannot be recovered. Re-run backend provisioning for this clone.",
+            retryable: false,
+          };
+        }
         return {
           kind: "wait",
           seconds: 120,
@@ -519,8 +590,17 @@ async function finalize(row: DeploymentRow, outcome: StepOutcome) {
   } else if (outcome.kind === "wait") {
     // A wait does NOT consume an attempt. Burning the retry budget on a healthy
     // build is how a clone that was going to be fine gets marked failed.
-    const ageHours = (Date.now() - new Date(row.created_at).getTime()) / 3_600_000;
-    if (ageHours > STUCK_HOURS) {
+    //
+    // Measured from `status_since` — when this row entered the status it is in
+    // now — and NOT from `created_at`, which is the age of the whole row. Those
+    // are different quantities, and the message has always claimed the first
+    // one. See judgeWait for what the second one cost.
+    const verdict = judgeWait({
+      statusSince: row.status_since,
+      now: Date.now(),
+      stuckHours: STUCK_HOURS,
+    });
+    if (verdict.kind === "stuck") {
       Object.assign(base, {
         status: "failed",
         status_detail: `Stuck in ${row.status} for more than ${STUCK_HOURS}h: ${outcome.detail}`,
@@ -548,6 +628,12 @@ async function finalize(row: DeploymentRow, outcome: StepOutcome) {
     });
     toStatus = willRetry ? row.status : "failed";
   }
+
+  // Stamped here and nowhere else, because this is the only place a status is
+  // written. A transition restarts the clock the wait budget is measured
+  // against; a wait inside the same status must NOT, or the budget can never
+  // be reached and the bound stops existing in the other direction.
+  if (toStatus !== row.status) base.status_since = nowIso;
 
   await admin
     .from("clone_deployments")
