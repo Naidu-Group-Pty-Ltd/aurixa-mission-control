@@ -9,7 +9,9 @@ import {
   isShippedPath,
   MissingExclusionPolicyError,
   partitionCascadePaths,
+  reconcileSuffixFor,
   reportableHeld,
+  summaryOwesReconcile,
   requireExclusions,
   type SyncExclusion,
 } from "./syncExclusions.pure";
@@ -132,7 +134,9 @@ describe("glob semantics match the file selector", () => {
 describe("a mirror must have a policy", () => {
   it("refuses to cascade a whole tree with no exclusions", () => {
     expect(() => assertMirrorPolicy("c1", [])).toThrow(MissingExclusionPolicyError);
-    expect(() => assertMirrorPolicy("c1", [])).toThrow(/would overwrite this clone's backend identity/);
+    expect(() => assertMirrorPolicy("c1", [])).toThrow(
+      /would overwrite this clone's backend identity/,
+    );
   });
 
   it("accepts one that has been seeded", () => {
@@ -173,9 +177,9 @@ describe("backendRefsIn", () => {
   });
 
   it("finds both halves of a mismatched pair, because that pair authenticates to nothing", () => {
-    expect(
-      backendRefsIn(`url=https://${PRIME}.supabase.co key={"ref":"${CLONE}"}`).sort(),
-    ).toEqual([CLONE, PRIME].sort());
+    expect(backendRefsIn(`url=https://${PRIME}.supabase.co key={"ref":"${CLONE}"}`).sort()).toEqual(
+      [CLONE, PRIME].sort(),
+    );
   });
 
   it("does not mistake an ordinary word for a project ref", () => {
@@ -295,7 +299,11 @@ describe("the two paths the 26 Aug cascade reverted are now listed as well", () 
     ];
     const { write, held } = partitionCascadePaths(paths, DEFAULT_MIRROR_EXCLUSIONS);
     expect(write).toEqual(["src/pages/Index.tsx"]);
-    expect(reportableHeld(held).map((h) => h.path).sort()).toEqual([
+    expect(
+      reportableHeld(held)
+        .map((h) => h.path)
+        .sort(),
+    ).toEqual([
       "public/lead-magnet-embed.html",
       "src/lib/reportTemplate/__tests__/renderAssetNormalisation.spec.ts",
     ]);
@@ -341,5 +349,47 @@ describe("the seeding migration is a projection of this constant, not a second c
     expect(readFileSync(join(process.cwd(), MIGRATION), "utf8")).toContain(
       "WHERE c.sync_scope = 'mirror'",
     );
+  });
+});
+
+/**
+ * The writer and the reader of the reconcile marker are in different files and
+ * ran twelve hours apart in production, which is exactly how a clone stayed red
+ * while its cascade reported `completed · success · 0 merged`.
+ */
+describe("the reconcile marker round-trips", () => {
+  it("says nothing when nothing is owed", () => {
+    expect(reconcileSuffixFor(0)).toBe("");
+    expect(summaryOwesReconcile("a.ts, b.ts (+3 more)")).toBe(false);
+  });
+
+  it("is readable back out of the summary it was written into", () => {
+    const suffix = reconcileSuffixFor(2);
+    expect(suffix).toContain("2");
+    expect(summaryOwesReconcile(`src/App.tsx, src/lib/clientFacing.ts${suffix}`)).toBe(true);
+  });
+
+  it("survives the other suffixes it sits beside", () => {
+    const summary = `src/App.tsx (+9 more) · 3 pins · 8 withheld${reconcileSuffixFor(1)}`;
+    expect(summaryOwesReconcile(summary)).toBe(true);
+  });
+
+  it("reads an absent or null summary as owing nothing, never as owing work", () => {
+    expect(summaryOwesReconcile(null)).toBe(false);
+    expect(summaryOwesReconcile(undefined)).toBe(false);
+  });
+
+  it("counts only the manual_reconcile half of what was held", () => {
+    const held = [
+      {
+        path: "src/App.tsx",
+        pattern: "src/App.tsx",
+        reason: "manual_reconcile" as const,
+        note: null,
+      },
+      { path: "vercel.json", pattern: "vercel.json", reason: "protected" as const, note: null },
+    ];
+    expect(reportableHeld(held)).toHaveLength(1);
+    expect(reconcileSuffixFor(reportableHeld(held).length)).toContain("1");
   });
 });

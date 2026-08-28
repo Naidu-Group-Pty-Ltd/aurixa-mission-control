@@ -167,3 +167,45 @@ export function isRetryable(err: { status?: number } | null | undefined): boolea
   if (status >= 500) return true;
   return false;
 }
+
+/**
+ * How long a deployment has been waiting IN ITS CURRENT STATUS — which is a
+ * different quantity from how old its row is, and the two are what this
+ * function exists to keep apart.
+ *
+ * The worker bounds waits by wall clock rather than by attempts, because a
+ * healthy wait must never burn the retry budget. That bound used to be computed
+ * as `now - row.created_at`: the age of the deployment ROW. A row is created
+ * once and then advances through eight statuses over its whole life, so on any
+ * row older than the limit the very first wait — including the 30-second "Build
+ * queued." — resolved to "stuck", and the row was failed with
+ * `Stuck in syncing_env for more than 6h` sixty seconds after entering
+ * `syncing_env`. Measured against a row created the previous day, no deployment
+ * could ever wait for anything, so none could ever finish.
+ *
+ * `statusSince` is stamped on every transition. When it is absent or
+ * unparseable the verdict is `waiting`, never `stuck`: this codebase's standing
+ * rule is that a value this side cannot read is not a finding, and the failure
+ * direction here is destructive — it marks a live deployment failed.
+ */
+export type WaitVerdict =
+  /** Still inside the budget, or not measurable. Re-queue without an attempt. */
+  | { kind: "waiting" }
+  /** Has genuinely sat in this one status past the budget. */
+  | { kind: "stuck"; hoursInStatus: number };
+
+export function judgeWait(input: {
+  /** When the row entered the status it is in now. */
+  statusSince: string | null | undefined;
+  /** Milliseconds since the epoch. */
+  now: number;
+  stuckHours: number;
+}): WaitVerdict {
+  if (!input.statusSince) return { kind: "waiting" };
+  const since = new Date(input.statusSince).getTime();
+  if (!Number.isFinite(since)) return { kind: "waiting" };
+  // A clock skew that puts the stamp in the future is not evidence of a stall.
+  const hoursInStatus = (input.now - since) / 3_600_000;
+  if (!(hoursInStatus > input.stuckHours)) return { kind: "waiting" };
+  return { kind: "stuck", hoursInStatus };
+}
