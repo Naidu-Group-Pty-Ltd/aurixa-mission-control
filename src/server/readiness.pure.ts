@@ -262,6 +262,12 @@ export type ReadinessReport = {
   readonly unknown: number;
   /** True when nothing required is missing anywhere. */
   readonly cloneReady: boolean;
+  /**
+   * What these verdicts are allowed to mean. Carried ON the report rather
+   * than imported by whatever renders it: a caller cannot hold the answer
+   * without also holding the qualification on it.
+   */
+  readonly caveat: string;
 };
 
 /** The capabilities a clone needs end to end, in the order it needs them. */
@@ -317,14 +323,23 @@ export function judgeReadiness(input: ReadinessInput): ReadinessReport {
     cloneReady: capabilities
       .filter((c) => (CLONE_PATH as readonly string[]).includes(c.key))
       .every((c) => c.verdict !== "blocked"),
+    caveat: PRESENCE_CAVEAT,
   };
 }
 
 /**
  * What "ready" is allowed to mean, rendered wherever a verdict is.
  *
- * Kept here rather than in the component so the caveat cannot be dropped by
- * a redesign: it is part of the answer, not decoration around it.
+ * Declared here and returned as `ReadinessReport.caveat` rather than imported
+ * by the component: it is part of the answer, not decoration around it, so a
+ * redesign that drops it has to drop a field off the payload rather than
+ * delete a line of JSX.
+ *
+ * Shipping it on the report is also what keeps this module server-only. It
+ * lives under `src/server/**`, which TanStack Start's import-protection plugin
+ * denies to the client bundle — a component importing this VALUE fails the
+ * build (importing the types is fine; they erase). Answering with the caveat
+ * rather than exporting it to the renderer satisfies both constraints at once.
  */
 export const PRESENCE_CAVEAT =
   "Presence only. A credential that is set may still be revoked, expired or " +

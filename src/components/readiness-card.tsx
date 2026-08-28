@@ -19,7 +19,6 @@ import {
   Minus,
 } from "lucide-react";
 import { fetchReadiness, type ReadinessReport } from "@/lib/readiness.functions";
-import { PRESENCE_CAVEAT } from "@/server/readiness.pure";
 
 type Capability = ReadinessReport["capabilities"][number];
 
@@ -206,8 +205,9 @@ export function ReadinessCard() {
               ))}
             </div>
 
-            {/* Part of the answer, not decoration around it. */}
-            <p className="text-[11px] text-muted-foreground">{PRESENCE_CAVEAT}</p>
+            {/* Part of the answer, not decoration around it — which is why it
+                arrives ON the report rather than being imported beside it. */}
+            {data && <p className="text-[11px] text-muted-foreground">{data.caveat}</p>}
           </>
         )}
       </CardContent>

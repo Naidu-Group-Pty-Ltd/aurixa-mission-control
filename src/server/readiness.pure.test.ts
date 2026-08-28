@@ -129,6 +129,18 @@ describe("judgeReadiness", () => {
     expect([...states]).toEqual(["set"]);
     expect(PRESENCE_CAVEAT).toContain("revoked");
   });
+
+  /**
+   * The caveat travels ON the report. It used to be exported to the card,
+   * which is a VALUE import of `src/server/**` and is denied to the client
+   * bundle — so the qualification either ships with the answer or a renderer
+   * has to reach across a boundary the build refuses to let it cross.
+   */
+  it("carries the presence caveat on every report it returns", () => {
+    for (const present of [ALL, without("VERCEL_API_TOKEN"), new Set<string>()]) {
+      expect(judgeReadiness({ present, config: {} }).caveat).toBe(PRESENCE_CAVEAT);
+    }
+  });
 });
 
 describe("the catalog", () => {
