@@ -35,6 +35,7 @@ import { exportRowsAsCSV } from "@/lib/csv";
 import { SavedViewsBar } from "@/components/saved-views-bar";
 import { CronDeliveryHealthCard } from "@/components/cron-delivery-health-card";
 import { MigrationDriftCard } from "@/components/migration-drift-card";
+import { ReadinessCard } from "@/components/readiness-card";
 
 export const Route = createFileRoute("/health")({
   component: () => (
@@ -125,6 +126,8 @@ function FleetHealthPage() {
           <CardContent className="p-4 text-sm text-destructive">{error}</CardContent>
         </Card>
       )}
+
+      <ReadinessCard />
 
       <CronDeliveryHealthCard />
 
