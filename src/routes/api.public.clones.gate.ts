@@ -50,7 +50,15 @@ export const Route = createFileRoute("/api/public/clones/gate")({
         ]);
         if (!key) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
 
-        const rl = await checkRateLimit(`gate:${key.id}`);
+        // Its own bucket, so polling the gate never eats the token budget, and
+        // a ceiling well above what a large workspace produces: every browser
+        // tab polls once every five minutes, so 120/min is ~600 concurrent
+        // tabs. Being rate limited here fails OPEN on the clone (a 429 is an
+        // error, and every error renders the dashboard), which is the right
+        // direction — the reservation endpoints have their own limit and those
+        // fail closed, so a workspace that out-polls this one still cannot
+        // generate anything.
+        const rl = await checkRateLimit(`gate:${key.id}`, 120);
         if (!rl.ok) {
           return new Response(
             JSON.stringify({
