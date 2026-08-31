@@ -341,7 +341,7 @@ function CloneDetail() {
       >
         <CloneHealthTimeline cloneId={cloneId} />
       </Suspense>
-      <ClonePaymentGateCard cloneId={cloneId} />
+      <ClonePaymentGateCard cloneId={cloneId} cloneName={clone.name} />
       <CloneAddonsCard cloneId={cloneId} />
 
       <CloneBackendCard cloneId={cloneId} />

@@ -40,7 +40,15 @@ function money(cents: number | null | undefined, currency = "AUD"): string {
  * every clone that pre-dates this. An "activation: none" panel on 40 clones
  * would be 40 panels saying nothing.
  */
-export function ClonePaymentGateCard({ cloneId }: { cloneId: string }) {
+export function ClonePaymentGateCard({
+  cloneId,
+  cloneName,
+}: {
+  cloneId: string;
+  /** The clone's own name. The action dialogs say "Lock <name>", and a plan
+   *  name there would have an operator confirming they are locking "Growth". */
+  cloneName: string;
+}) {
   const qc = useQueryClient();
   const get = useServerFn(getCloneGate);
   const query = useQuery({
@@ -121,7 +129,7 @@ export function ClonePaymentGateCard({ cloneId }: { cloneId: string }) {
 
         <CloneGateActions
           cloneId={cloneId}
-          cloneName={data.gate.plan_name ?? "this clone"}
+          cloneName={cloneName}
           state={data.state}
           hasGate
           graceHours={data.gate.grace_hours}
