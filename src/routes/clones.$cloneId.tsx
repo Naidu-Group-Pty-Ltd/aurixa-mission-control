@@ -24,6 +24,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { CloneActivityHistory } from "@/components/clone-activity-history";
 import { CloneBackendCard } from "@/components/clone-backend-card";
 import { CloneAddonsCard } from "@/components/clone-addons-card";
+import { ClonePaymentGateCard } from "@/components/clone-payment-gate-card";
 import { CloneDriftPolicyCard } from "@/components/clone-drift-policy-card";
 import { CloneDriftSuggestionsCard } from "@/components/clone-drift-suggestions-card";
 import { CloneEditDialog } from "@/components/clone-edit-dialog";
@@ -340,6 +341,7 @@ function CloneDetail() {
       >
         <CloneHealthTimeline cloneId={cloneId} />
       </Suspense>
+      <ClonePaymentGateCard cloneId={cloneId} />
       <CloneAddonsCard cloneId={cloneId} />
 
       <CloneBackendCard cloneId={cloneId} />
