@@ -9,6 +9,7 @@ import { factsOf, logGateEvent, readGate } from "@/server/payment-gate.server";
 import { resolveGateState } from "@/lib/clonePaymentGate.pure";
 import { storefrontPricingBase } from "@/server/billing-handoffs.server";
 import { checkRateLimit } from "@/server/token-rate-limit.server";
+import { seatPlanForTier } from "@/lib/pricing/seatPlanForTier.pure";
 
 /**
  * POST /api/public/clones/gate/checkout
@@ -109,17 +110,52 @@ export const Route = createFileRoute("/api/public/clones/gate/checkout")({
           return jsonResponse({ ok: false, error: "no_plan_on_gate" }, 409);
         }
 
-        // The Stripe-facing catalogue row for the gate's plan. `seat_plans` is
-        // what Stripe charges; the gate's `amount_due_cents` is what the
-        // customer was quoted, and the two are reconciled by the catalogue
-        // sync rather than by this route inventing a price.
-        const { data: plan, error: planError } = await supabaseAdmin
+        // The Stripe-facing catalogue row for the gate's plan.
+        //
+        // NOT `WHERE slug = plan_slug`. The catalogue reuses rows through the
+        // tier rename — `professional` becomes Growth and `growth` becomes
+        // Scale — so a row called `growth` exists on both sides of the cutover
+        // and is a DIFFERENT tier in each. A naive slug match would quote a
+        // Growth customer $860 and charge them Scale's $2,015.
+        // `seatPlanForTier` settles that the same way the catalogue sync does,
+        // and then refuses any row whose price disagrees with what this gate
+        // quoted — because the settling rule is inference about a cutover this
+        // request cannot observe, and the cost of inferring wrong is a
+        // customer charged more than twice what they agreed to.
+        const { data: planRows, error: planError } = await supabaseAdmin
           .from("seat_plans")
-          .select("id, slug, name, is_active, stripe_price_id")
-          .eq("slug", read.row.plan_slug)
-          .maybeSingle();
+          .select("id, slug, name, is_active, stripe_price_id, price_cents");
         if (planError) return jsonResponse({ ok: false, error: "plan_lookup_failed" }, 503);
-        if (!plan || !plan.is_active || !plan.stripe_price_id) {
+
+        const match = seatPlanForTier(
+          read.row.plan_slug,
+          (planRows ?? []).filter((r) => r.is_active),
+          read.row.amount_due_cents,
+        );
+        if (!match.ok) {
+          console.error("[gate] no purchasable plan row for this gate", {
+            clone_id: key.clone_id,
+            plan_slug: read.row.plan_slug,
+            reason: match.reason,
+            quoted_cents: read.row.amount_due_cents,
+            row_cents: match.reason === "price_mismatch" ? match.rowCents : undefined,
+          });
+          // Not the customer's problem and not something they can retry — send
+          // them to the pricing page, where a person chooses and sees the
+          // number before paying it.
+          return jsonResponse(
+            {
+              ok: false,
+              error: "plan_not_purchasable",
+              detail: match.reason,
+              pricing_url: storefrontPricingBase(),
+            },
+            409,
+          );
+        }
+        const plan = match.row;
+
+        if (!plan.stripe_price_id) {
           // Not the customer's problem and not something they can retry — send
           // them to the pricing page, which can always take a payment.
           return jsonResponse(
