@@ -112,6 +112,33 @@ goodwill credit. `noteGateRefund` writes a `payment_reversed` event and an
 operator notification that says the workspace is still open; the manual lock is
 the deliberate act it leaves to a person.
 
+## The CTA charges what it quoted, and refuses if it cannot prove that
+
+`POST /api/public/clones/gate/checkout` resolves the plan, the price and the
+tenant from the gate row Mission Control already wrote, so the button charges
+exactly what the clone was armed for and the browser is never told a price it
+could edit. It refuses on a gate that is already paid — a CTA is the one place
+that is easy to click twice.
+
+Finding the plan row is not `WHERE slug = plan_slug`, and that is the subtle
+part. The catalogue reuses `seat_plans` rows through the tier rename —
+`professional` becomes Growth, `growth` becomes Scale — so a row called
+`growth` exists on both sides of the cutover and is a **different tier in
+each**: Scale at $2,015 before, Growth at $860 after. A naive slug match shows
+a Growth customer "$860" and sends them to a Stripe session for $2,015.
+
+`seatPlanForTier.pure.ts` states the settling rule once, the same way
+`stripe-catalog-sync.server.ts` reasons for the rename path, and is tested
+against the pre-cutover catalogue, the post-cutover one, and a half-done
+cutover where the naive match hands one row to two tiers.
+
+The **price assertion** beside it is the actual guarantee rather than a second
+opinion: the settling rule is inference about a cutover this request cannot
+observe, so a row whose `price_cents` disagrees with what the gate quoted is
+refused outright, and the buyer goes to the pricing page — where a person
+chooses and sees the number before paying it. Refusing to charge is always
+available; un-charging is not.
+
 ## Where the gate is enforced
 
 | Layer | What it refuses | Fails how |
