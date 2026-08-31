@@ -159,12 +159,26 @@ export function resolveGateState(facts: GateFacts | null, now: Date = new Date()
   };
 }
 
-/** `armed_at + graceHours`, or null when there is no deadline. */
-export function computeLocksAt(armedAt: Date | string, graceHours: number | null): string | null {
-  if (graceHours === null) return null;
+/**
+ * `armed_at + graceHours`, or null when there is no deadline.
+ *
+ * Both inputs are checked because `new Date(NaN).toISOString()` THROWS rather
+ * than producing a bad string, and the caller that would hit it is
+ * provisioning — where an operator typing letters into the window field would
+ * otherwise take out the arming step and leave a paid clone silently ungated.
+ * A value this cannot use is no deadline, which is safe; `armGate` refuses it
+ * earlier and substitutes the platform default, which is correct.
+ */
+export function computeLocksAt(
+  armedAt: Date | string,
+  graceHours: number | null,
+): string | null {
+  if (graceHours === null || !Number.isFinite(graceHours)) return null;
   const base = typeof armedAt === "string" ? Date.parse(armedAt) : armedAt.getTime();
   if (!Number.isFinite(base)) return null;
-  return new Date(base + graceHours * HOUR_MS).toISOString();
+  const at = base + graceHours * HOUR_MS;
+  if (!Number.isFinite(at)) return null;
+  return new Date(at).toISOString();
 }
 
 /**

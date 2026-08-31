@@ -137,6 +137,16 @@ describe("computeLocksAt", () => {
   it("an unparseable arm time yields no deadline rather than 1970", () => {
     expect(computeLocksAt("nonsense", 72)).toBeNull();
   });
+
+  it("a non-finite window yields no deadline rather than THROWING", () => {
+    // `new Date(NaN).toISOString()` throws a RangeError. The caller that would
+    // hit it is provisioning, where an operator typing letters into the window
+    // field would take out the arming step and leave a paid clone silently
+    // ungated — a gate somebody asked for and did not get.
+    expect(computeLocksAt(NOW, Number("soon"))).toBeNull();
+    expect(computeLocksAt(NOW, Number.POSITIVE_INFINITY)).toBeNull();
+    expect(() => computeLocksAt(NOW, Number.NaN)).not.toThrow();
+  });
 });
 
 describe("normaliseGraceHours", () => {

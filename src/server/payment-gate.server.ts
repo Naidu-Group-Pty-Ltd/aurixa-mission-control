@@ -20,6 +20,7 @@ import {
   computeLocksAt,
   GATE_DEFAULT_HOURS,
   gateEligibility,
+  normaliseGraceHours,
   resolveGateState,
   type GateOverride,
   type GateState,
@@ -219,7 +220,28 @@ export async function armGate(input: {
     if (!eligible.eligible)
       return { armed: false, reason: "not_eligible", detail: eligible.reason };
 
-    const hours = input.graceHours === undefined ? defaults.hours : input.graceHours;
+    // Never trust the window this was handed. It travels from a text field in
+    // the New Clone wizard, and `Number("soon")` is NaN — which used to reach
+    // `computeLocksAt`, throw, and leave a paid clone silently ungated with
+    // only a console line to say so. An unusable value falls back to the
+    // platform default rather than to "no deadline", because the default is
+    // what an operator who typed something meant.
+    let hours: number | null;
+    if (input.graceHours === undefined) {
+      hours = defaults.hours;
+    } else {
+      const normalised = normaliseGraceHours(input.graceHours);
+      if (normalised.ok) {
+        hours = normalised.hours;
+      } else {
+        console.error("[gate] unusable window on arm — using the platform default", {
+          cloneId: input.cloneId,
+          given: input.graceHours,
+          error: normalised.error,
+        });
+        hours = defaults.hours;
+      }
+    }
     const armedAt = new Date();
     const locksAt = computeLocksAt(armedAt, hours);
 
